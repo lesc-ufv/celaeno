@@ -9,7 +9,7 @@
 
 ## Who Am I?
 
-<img align="left" width="200px" src="doc/character/character.png"/>
+<img align="left" width="200px" src="doc/character/celaeno.png"/>
 
 Hello there, my name is **Celaeno**, have you heard of the amazing world of
 Field-Coupled Nanocomputing? You can have an overview of the subject
