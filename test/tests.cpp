@@ -13,3 +13,4 @@
 #include <catch2/catch.hpp>
 #include "include/celaeno/graph/bfs.cpp"
 #include "include/celaeno/graph/hvm.cpp"
+#include "include/celaeno/math/cantor-pairing.cpp"
