@@ -17,11 +17,11 @@
 #include <set>
 #include <type_traits>
 
-namespace celaeno::graph::hem
+namespace celaeno::graph::hvm
 {
 
 template<typename T, typename F1, typename F2>
-std::unordered_map<T,T> hem(T&& size, F1&& get_adjacent, F2&& get_weight)
+std::unordered_map<T,T> hvm(T&& size, F1&& get_adjacent, F2&& get_weight)
 {
   // Helpers
   std::random_device rd;

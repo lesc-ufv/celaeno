@@ -12,5 +12,4 @@
 
 #include <catch2/catch.hpp>
 #include "include/celaeno/graph/bfs.cpp"
-#include "include/celaeno/graph/hem.cpp"
-#include "include/celaeno/graph/coarsening.cpp"
+#include "include/celaeno/graph/hvm.cpp"

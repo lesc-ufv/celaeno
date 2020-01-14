@@ -9,13 +9,13 @@
 //
 
 #include <celaeno/graph/bfs.hpp>
-#include <celaeno/graph/hem.hpp>
+#include <celaeno/graph/hvm.hpp>
 #include <taygete/graph.hpp>
 
-namespace celaeno::graph::hem::test
+namespace celaeno::graph::hvm::test
 {
 
-TEST_CASE("Heavy-edge Matching", "[hem]")
+TEST_CASE("Heavy-vertex Matching", "[hvm]")
 {
   using namespace taygete::graph;
 
@@ -33,7 +33,7 @@ TEST_CASE("Heavy-edge Matching", "[hem]")
       {17,18}
     };
 
-    auto res = celaeno::graph::hem::hem(chebyshev.get_node_count(),
+    auto res = celaeno::graph::hvm::hvm(chebyshev.get_node_count(),
       [&chebyshev]( auto const& node ) -> auto
       {
         return chebyshev.get_adjacent(node);
