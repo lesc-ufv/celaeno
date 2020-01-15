@@ -33,18 +33,12 @@ TEST_CASE("Heavy-vertex Matching", "[hvm]")
       {17,18}
     };
 
-    auto res = celaeno::graph::hvm::hvm(chebyshev.get_node_count(),
+    auto res = celaeno::graph::hvm::hvm(0,
       [&chebyshev]( auto const& node ) -> auto
       {
         return chebyshev.get_adjacent(node);
-      },
-      [&chebyshev]( auto const& node ) -> auto
-      {
-        return chebyshev.get_adjacent(node).size();
       }
     );
-
-    // TODO implement BFS test
   }
 }
 

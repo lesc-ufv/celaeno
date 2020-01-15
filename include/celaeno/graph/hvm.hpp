@@ -11,76 +11,119 @@
 #pragma once
 
 #include <unordered_map>
-#include <algorithm>
-#include <random>
-#include <vector>
 #include <set>
-#include <type_traits>
+#include <functional>
+#include <range/v3/all.hpp>
+#include <algorithm>
 
 namespace celaeno::graph::hvm
 {
 
-template<typename T, typename F1, typename F2>
-std::unordered_map<T,T> hvm(T&& size, F1&& get_adjacent, F2&& get_weight)
-{
-  // Helpers
-  std::random_device rd;
-  std::mt19937 g(rd());
+//
+// @params
+// root -> The root vertex of the graph
+// adjancent -> A lambda to obtain the neighbors of an
+//              arbitrary node
+//
 
-  // Static Assertions
-  static_assert( std::is_integral<T>(),
-    "\n\n\033[91;1m * \033[mThe type T is not an integral type.\n" );
+template<typename T, typename F1>
+std::unordered_map<T,T> hvm(T&& root, F1&& adjacent)
+{
+
+  //
+  // Algorithm's steps:
+  // sat -> A set of saturated vertices.
+  // usat -> A set of unsaturated vertices.
+  // edg -> A map that represents matched vertices.
+  // 1. From a given vertex v1, obtain all the adjacent ones in a
+  //    reference container usat that are not in sat.
+  // 2. Get the vertices adjacent to v1
+  //    2.1 If there is none, saturate v1, go to step 5.
+  //    2.2 Get the one with maximum cardinality
+  //    2.3 Remove the vertex from usat
+  //    2.4 Pick and remove the vertex v2 with max cardinality from usat
+  //    that is adjacent to v1.
+  // 3. Insert v2 in sat
+  // 4. Insert v1 and v2 in edg
+  // 4. Insert in usat, all the neighbors of v2 that are not in sat.
+  // 5. Pick a new vertex with the highest cardinality v1 from usat
+  //    5.1 If usat is empty, end of algorithm.
+  //    5.2 Remove the vertex from usat
+  //    5.3 Include the vertex in sat
+  //    5.4 Go back to step 1
+  //
+  using namespace ranges;
+
+  std::set<T> sat;
+  std::set<T> usat;
+  std::unordered_map<T,T> edg;
+
+  // Helper lambdas
+  auto usat_ins = [&usat](auto v){ usat.insert(v); };
+  auto not_in_sat = [&sat](auto v){ return sat.find(v) == sat.cend(); };
+  auto card = [&adjacent](auto v){ return adjacent(v).size(); };
+  auto max_card = [&card](auto v1, auto v2){ return (card(v1) < card(v2)); };
+
 
   // Algorithm
-  std::set<T> saturated; // Logarithmic lookup for saturated vertices
-  std::unordered_map<T,T> edges; // From vertex a to b
+  auto v1 {root};
 
-  std::vector<T> vxs(size); // Vertices
-  std::iota(vxs.begin(), vxs.end(), T{}); // Fill from 0 to size
-  std::shuffle(vxs.begin(), vxs.end(), g);
-
-
-  while( ! vxs.empty() )
+  do
   {
-    // Get next vertex
-    auto vx { vxs.front() }; vxs.erase(vxs.begin());
+    // Step 1
+    auto adj {adjacent(v1)};
+    auto nis {adj | views::filter(not_in_sat)};
+    ranges::for_each(nis, usat_ins);
 
-    // If is saturated, continue
-    if ( saturated.find(vx) != saturated.cend() ) continue;
+    // Step 2
+    // Get the vertices adjacent to v1
+    auto adj_v1 { adj |
+      views::filter([&usat](auto v){ return usat.contains(v); }) };
 
-    // Get adjacent vertices
-    auto vas { get_adjacent(vx) };
-
-    // Filter marked vertices to remove saturated ones
-    vas.erase(std::remove_if(vas.begin(), vas.end(),
-      [&saturated](auto const& adj)
-      {
-        return saturated.find(adj) != saturated.cend();
-      }), vas.end());
-
-    if( ! vas.empty() )
+    if( ! adj_v1.empty() )
     {
-      // Get the vertex with the maximum cardinality
-      auto va_max = *(vas.begin());
-      std::for_each(vas.cbegin()+1, vas.cend(),
-        [&va_max, &get_weight](auto const& va)
-        {
-          if( get_weight(va) > va_max )
-          {
-            va_max = va;
-          }
-        }
-      );
+      // 2.2 Get the one with maximum cardinality
+      auto v2 {ranges::max_element(adj_v1, max_card)};
+      // 2.3 Remove the vertex from usat
+      usat.erase(*v2);
+      // Step 3
+      sat.insert(v1); sat.insert(*v2);
+      edg.insert({v1,*v2});
+      // Step 4
+      adj = adjacent(*v2);
+      nis = adj | views::filter(not_in_sat);
+      ranges::for_each(nis, usat_ins);
+    }
+    else
+    {
+      // Step 2.1
+      sat.insert(v1);
+    }
 
-      // Saturate both vertices
-      saturated.insert(va_max);
-      saturated.insert(vx);
-
-      // Insert the edge between them in the edge list
-      edges.insert({vx, va_max});
+    // Step 5
+    auto v {ranges::max_element(usat, max_card)};
+    // 5.1 If usat is empty, end of algorithm.
+    if( v == ranges::end(usat) )
+    {
+      break;
+    }
+    else
+    {
+      // 5.2 Remove the vertex from usat
+      usat.erase(*v);
+      // 5.3 Include the vertex in sat
+      sat.insert(*v);
+      v1 = *v;
     }
   }
-  return edges;
+  while( true );
+
+  return edg;
 }
 
-} // namespace celaeno::graph::hwm
+} // namespace celaeno::graph::hvm
+
+//
+// Notes
+// https://www.youtube.com/watch?v=jtgBCGVux-8
+//
