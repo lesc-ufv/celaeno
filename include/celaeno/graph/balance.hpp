@@ -30,38 +30,16 @@ std::optional<int64_t> find(M&& m, T1&& e, T2&& size)
   return std::nullopt;
 }
 
-template<typename M, typename T1, typename T2>
-void erase_edge(M&& m, T1&& e1, T2&& e2)
-{
-  // Find the range of elements with the same key e1
-  auto range{ m.equal_range(e1) };
-  // Search for the element with value of e2
-  auto search{ std::find_if(range.first,range.second,
-    [&e2](auto&& tgt){ return tgt.second == e2; }) };
-  // Erase the connection e1 -> e2
-  if( search != range.second )
-  {
-    m.erase(search);
-  }
-  else
-  {
-    std::cerr
-      << " * Could not find connection from predecessor to successor" 
-      << std::endl;
-    exit(1);
-  }
-}
-
 template<typename M, typename T>
-void insert_in_between(M&& map, T&& e1, T&& e2, T&& e3)
+void insert_in_between(M&& graph, T&& e1, T&& e2, T&& e3)
 {
-  map.emplace(std::forward<T>(e1), std::forward<T>(e2));
-  map.emplace(std::forward<T>(e2), std::forward<T>(e3));
+  graph.emplace( std::make_pair(std::forward<T>(e1), std::forward<T>(e2)) );
+  graph.emplace( std::make_pair(std::forward<T>(e2), std::forward<T>(e3)) );
 }
 
 
 template<typename T1, typename T2, typename T3, typename F1>
-void balance(T1&& depth_map, T2 &&map, T3&& depth, F1&& get_predecessors)
+void balance(T1&& depth_map, T2 &&graph, T3&& depth, F1&& get_predecessors)
 {
 
   int64_t pseudo_counter{-1};
@@ -88,16 +66,17 @@ void balance(T1&& depth_map, T2 &&map, T3&& depth, F1&& get_predecessors)
           {
             // Insert new intermediate connection
             insert_in_between(
-              std::forward<T2>(map),
+              std::forward<T2>(graph),
               std::forward<decltype(input)>(input),
               std::forward<decltype(input)>(pseudo_counter),
               std::forward<decltype(input)>(it->second)
             );
             // Remove old connection from input to node
-            erase_edge(
-              std::forward<T2>(map),
-              std::forward<decltype(input)>(input),
-              std::forward<decltype(it->second)>(it->second)
+            graph.erase_edge(
+              {
+                std::forward<decltype(input)>(input),
+                std::forward<decltype(input)>(it->second)
+              }
             );
             // Decrease counter
             --pseudo_counter;
