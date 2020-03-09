@@ -7,6 +7,7 @@
 #pragma once
 
 #include <queue>
+#include <set>
 #include <vector>
 #include <range/v3/all.hpp>
 
@@ -78,22 +79,28 @@ std::vector<T> rebuild_path(Map&& m, T current)
 // T must be default constructible
 template<typename T, typename F1, typename F2, typename F3>
 std::optional<std::vector<T>> a_star(
-  T&& start,
-  T&& end,
-  F1&& f_neighbors,
-  F2&& f_distance,
-  F3&& f_heuristic
+  T start,
+  T end,
+  F1 f_neighbors,
+  F2 f_distance,
+  F3 f_heuristic
   )
 {
+  using float64_t = long double;
   // id, g_score, f_score
-  using Entry = std::tuple<T,T,T>;
+  using Entry = std::tuple<T,float64_t,float64_t>;
 
   // Comparison by f_score
   auto comp = [](auto& a, auto& b)
-    { return std::get<2>(a) < std::get<2>(b); };
+    {
+      return std::get<2>(a) > std::get<2>(b);
+    };
+
+  // Open set
+  std::set<T> open;
 
   // Paths memory
-  std::unordered_map<T,T> mem;
+  std::map<T,T> mem;
 
   // Ascending priority queue
   PriorityQueue<Entry,std::vector<Entry>,decltype(comp)> p_queue;
@@ -115,7 +122,13 @@ std::optional<std::vector<T>> a_star(
     p_queue.pop();
     for( auto n : f_neighbors(curr_id) )
     {
+      // If the first time exploring node, add to the open set
+      if( ! open.contains(n) ) open.insert(n);
+      // else, continue
+      else continue;
+
       auto n_comp = [&n](auto&& v) { return std::get<0>(v) == n; };
+
       if( auto search = p_queue.find(n_comp) )
       {
         // The node is already in the queue
@@ -127,7 +140,7 @@ std::optional<std::vector<T>> a_star(
         {
           mem[n] = curr_id;
           p_queue.erase(n_comp);
-          p_queue.push({n,test_g,f_heuristic(n)});
+          p_queue.push({n,test_g,test_g+f_heuristic(n)});
         }
       }
       else
