@@ -10,6 +10,6 @@
 
 if( ${PROJECT_NAME}_tests )
   add_executable(${PROJECT_NAME}_tests tests.cpp)
-  target_link_libraries(${PROJECT_NAME}_tests celaeno taygete Catch2)
+  target_link_libraries(${PROJECT_NAME}_tests celaeno taygete asterope Catch2)
   target_compile_features(${PROJECT_NAME}_tests PRIVATE cxx_std_20)
 endif()

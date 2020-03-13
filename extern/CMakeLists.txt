@@ -27,6 +27,12 @@ FetchContent_Declare(
 )
 
 FetchContent_Declare(
+  asterope
+  GIT_REPOSITORY git@gitlab.com:formigoni/asterope.git
+  GIT_TAG origin/refactor
+)
+
+FetchContent_Declare(
   catch
   GIT_REPOSITORY git@github.com:catchorg/Catch2.git
 )
@@ -38,6 +44,6 @@ FetchContent_Declare(
 
 # Populate Libraries
 if(${PROJECT_NAME}_tests)
-  Fetch("catch;taygete")
+  Fetch("catch;taygete;asterope")
 endif()
 Fetch("ranges")

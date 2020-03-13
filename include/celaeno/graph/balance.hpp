@@ -53,7 +53,7 @@ void balance(T1&& depth_map, T2 &&graph, T3&& depth, F1&& get_predecessors)
     {
       // For each input of node
       auto inputs{ get_predecessors(it->second) };
-      for( auto input : inputs )
+      for( auto const& input : inputs )
       {
         if( auto input_level = find(
               std::forward<T1>(depth_map),
@@ -62,24 +62,29 @@ void balance(T1&& depth_map, T2 &&graph, T3&& depth, F1&& get_predecessors)
             )
           )
         {
-          if( *input_level != i-1 )
+          auto current{input};
+          while( *input_level != i-1 )
           {
             // Insert new intermediate connection
             insert_in_between(
               std::forward<T2>(graph),
-              std::forward<decltype(input)>(input),
-              std::forward<decltype(input)>(pseudo_counter),
-              std::forward<decltype(input)>(it->second)
+              std::forward<decltype(current)>(current),
+              std::forward<decltype(current)>(pseudo_counter),
+              std::forward<decltype(current)>(it->second)
             );
-            // Remove old connection from input to node
+            // Remove old connection from current to node
             graph.erase_edge(
               {
-                std::forward<decltype(input)>(input),
-                std::forward<decltype(input)>(it->second)
+                std::forward<decltype(current)>(current),
+                std::forward<decltype(current)>(it->second)
               }
             );
+            // Update current
+            current = pseudo_counter;
             // Decrease counter
             --pseudo_counter;
+            // Update the input level
+            ++(*input_level);
           }
         }
         else
