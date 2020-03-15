@@ -9,6 +9,9 @@
 ######################################################################
 
 add_library(celaeno INTERFACE)
-target_include_directories(celaeno INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(celaeno INTERFACE
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 target_compile_features(celaeno INTERFACE cxx_std_20)
-target_link_libraries(celaeno INTERFACE range-v3)
+target_link_libraries(celaeno INTERFACE range-v3::range-v3)

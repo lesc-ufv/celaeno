@@ -43,7 +43,15 @@ FetchContent_Declare(
 )
 
 # Populate Libraries
-if(${PROJECT_NAME}_tests)
+if( CMAKE_BUILD_TYPE STREQUAL "Debug" )
   Fetch("catch;taygete;asterope")
 endif()
 Fetch("ranges")
+
+# Check if targets are defined
+if( TARGET range-v3 )
+  message(STATUS "${C_BLUE}Library targets found${C_RESET}")
+else()
+  message(FATAL_ERROR
+    "${C_RED}Missing targets after FetchContent_MakeAvailable${C_RESET}")
+endif()
