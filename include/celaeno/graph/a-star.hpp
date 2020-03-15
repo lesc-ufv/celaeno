@@ -41,6 +41,13 @@ class PriorityQueue : public std::priority_queue<T1, Container, Compare>
       }
     }
 
+#ifdef DEBUG
+    auto get_container() const noexcept
+    {
+      return this->c;
+    }
+#endif
+
     template<typename Comp>
     void erase(Comp&& comp) noexcept
     {
@@ -111,6 +118,19 @@ std::optional<std::vector<T>> a_star(
   // Main loop
   while( ! p_queue.empty() )
   {
+
+#ifdef DEBUG // Queue ordering test
+    auto const& c {p_queue.get_container()};
+    for(auto it{c.cbegin()}; it!=c.cend(); ++it)
+    {
+      if(it+1 == c.cend()) break;
+      assert(
+          std::get<0>(*it) < std::get<0>(*(it+1))
+          && "Unordered priority queue for A*"
+      );
+    }
+#endif
+
     auto current { p_queue.top() };
     auto& curr_id { std::get<0>(current) };
     auto& curr_g  { std::get<1>(current) };
