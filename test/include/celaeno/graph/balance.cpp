@@ -39,10 +39,10 @@ void run(T1&& circuit, T2&& alias)
   taygete::graph::reader::Reader reader(ss, callback);
 
   // Write graph to .png file
-  asterope::graph::to_png::to_png(
-    asterope::graph::dot_parser::dot_parser(g.data()),
-    original
-  );
+  // asterope::graph::to_png::to_png(
+  //   asterope::graph::dot_parser::dot_parser(g.data()),
+  //   original
+  // );
 
   // Create a depth view
   auto g_views
@@ -73,10 +73,10 @@ void run(T1&& circuit, T2&& alias)
   celaeno::graph::balance::balance(d_view, g, depth, pred);
 
   // Write the balance graph to .png file
-  asterope::graph::to_png::to_png(
-    asterope::graph::dot_parser::dot_parser(g.data()),
-    balanced
-  );
+  // asterope::graph::to_png::to_png(
+  //   asterope::graph::dot_parser::dot_parser(g.data()),
+  //   balanced
+  // );
 }
 
 TEST_CASE("balance.cpp")
