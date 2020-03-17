@@ -8,6 +8,7 @@
 # @description : C++ Algorithms Collection
 ######################################################################
 
+message(STATUS "${C_YELLOW} * ${C_RESET}Tests enabled")
 add_executable(${PROJECT_NAME}_tests tests.cpp)
 target_compile_definitions(${PROJECT_NAME}_tests PRIVATE DEBUG=1)
 target_link_libraries(${PROJECT_NAME}_tests celaeno taygete asterope Catch2)

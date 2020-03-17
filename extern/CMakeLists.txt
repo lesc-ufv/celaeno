@@ -42,6 +42,19 @@ FetchContent_Declare(
   GIT_REPOSITORY git@github.com:ericniebler/range-v3.git
 )
 
+# Avoid installation of subproject
+function(install)
+  if( ${PROJECT_NAME} STREQUAL ${CMAKE_PROJECT_NAME} )
+    _install(${ARGV})
+  endif()
+endfunction(install)
+
+function(export)
+  if( ${PROJECT_NAME} STREQUAL ${CMAKE_PROJECT_NAME} )
+    _export(${ARGV})
+  endif()
+endfunction(export)
+
 # Populate Libraries
 if( CMAKE_BUILD_TYPE STREQUAL "Debug" )
   Fetch("catch;taygete;asterope")

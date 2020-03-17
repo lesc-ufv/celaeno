@@ -45,13 +45,6 @@ message(
     "${C_BLUE}${CMAKE_BUILD_TYPE}${C_RESET}"
 )
 
-set(CMAKE_PREFIX_PATH "/prefix")
-set(as_subproject range-v3)
-macro(find_package)
-  if(NOT "${ARGV}" IN_LIST as_subproject)
-    _find_package("${ARGV}")
-  endif()
-endmacro()
 #
 # Source files
 #
@@ -67,6 +60,8 @@ add_subdirectory("extern")
 #
 if( CMAKE_BUILD_TYPE STREQUAL "Debug" )
   add_subdirectory("test")
+else()
+  message(STATUS "${C_MAGENTA} * ${C_RESET}Tests disabled")
 endif()
 
 #
@@ -74,47 +69,45 @@ endif()
 #
 include(GNUInstallDirs)
 
-# Export targets
-install(TARGETS celaeno range-v3 range-v3-concepts range-v3-meta
-  EXPORT ${PROJECT_NAME}-targets
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
-
-# Install exported targets
-install(EXPORT ${PROJECT_NAME}-targets
-  FILE ${PROJECT_NAME}-targets.cmake
-  NAMESPACE celaeno::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/celaeno
-)
-
 # Create celaeno-config.cmake
 set(cmakeModulesDir cmake)
 configure_package_config_file(
-  "${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}-config.cmake.in"
-  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
+  "${PROJECT_SOURCE_DIR}/cmake/celaeno-config.cmake.in"
+  "${PROJECT_BINARY_DIR}/celaeno-config.cmake"
   INSTALL_DESTINATION
-    ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-  PATH_VARS cmakeModulesDir
-  NO_SET_AND_CHECK_MACRO
-  NO_CHECK_REQUIRED_COMPONENTS_MACRO
+    ${CMAKE_INSTALL_LIBDIR}/cmake/celaeno
+)
+
+# Export targets
+install(
+  TARGETS celaeno range-v3 range-v3-meta range-v3-concepts
+  EXPORT celaeno-targets
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+# Install prefix
+set(CMAKE_INSTALL_PREFIX "/usr/local/")
+message("${C_BLUE} * ${C_RESET}Install prefix: ${CMAKE_INSTALL_PREFIX}")
+
+# Install exported targets
+install(EXPORT celaeno-targets
+  FILE celaeno-targets.cmake
+  NAMESPACE celaeno::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/celaeno
 )
 
 # Install celaeno-config.cmake
 install(
   FILES
-    "${PROJECT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
+    "${PROJECT_BINARY_DIR}/celaeno-config.cmake"
   DESTINATION
-    ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+    ${CMAKE_INSTALL_LIBDIR}/cmake/celaeno
 )
-
 
 # Install headers
 install(
   DIRECTORY
-    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/include/celaeno
   DESTINATION
-    ${CMAKE_INSTALL_PREFIX}
+    ${CMAKE_INSTALL_PREFIX}/include
 )
