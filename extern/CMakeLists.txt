@@ -20,27 +20,9 @@ function(Fetch args)
 endfunction()
 
 
+#
 # Submodules
-FetchContent_Declare(
-  taygete
-  GIT_REPOSITORY git@gitlab.com:formigoni/taygete.git
-)
-
-FetchContent_Declare(
-  asterope
-  GIT_REPOSITORY git@gitlab.com:formigoni/asterope.git
-  GIT_TAG origin/refactor
-)
-
-FetchContent_Declare(
-  catch
-  GIT_REPOSITORY git@github.com:catchorg/Catch2.git
-)
-
-FetchContent_Declare(
-  ranges
-  GIT_REPOSITORY git@github.com:ericniebler/range-v3.git
-)
+#
 
 # Avoid installation of subproject
 function(install)
@@ -54,6 +36,31 @@ function(export)
     _export(${ARGV})
   endif()
 endfunction(export)
+
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+  FetchContent_Declare(
+    taygete
+    GIT_REPOSITORY git@gitlab.com:formigoni/taygete.git
+  )
+
+  FetchContent_Declare(
+    asterope
+    GIT_REPOSITORY git@gitlab.com:formigoni/asterope.git
+    GIT_TAG origin/refactor
+  )
+
+  FetchContent_Declare(
+    catch
+    GIT_REPOSITORY git@github.com:catchorg/Catch2.git
+  )
+
+endif()
+
+FetchContent_Declare(
+  ranges
+  GIT_REPOSITORY git@github.com:ericniebler/range-v3.git
+)
 
 # Populate Libraries
 if( CMAKE_BUILD_TYPE STREQUAL "Debug" )
