@@ -69,6 +69,10 @@ endif()
 #
 include(GNUInstallDirs)
 
+# Install prefix
+set(CMAKE_INSTALL_PREFIX "/usr/local/")
+message("${C_BLUE} * ${C_RESET}Install prefix: ${CMAKE_INSTALL_PREFIX}")
+
 # Create celaeno-config.cmake
 set(cmakeModulesDir cmake)
 configure_package_config_file(
@@ -84,10 +88,6 @@ install(
   EXPORT celaeno-targets
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
-
-# Install prefix
-set(CMAKE_INSTALL_PREFIX "/usr/local/")
-message("${C_BLUE} * ${C_RESET}Install prefix: ${CMAKE_INSTALL_PREFIX}")
 
 # Install exported targets
 install(EXPORT celaeno-targets
