@@ -8,6 +8,9 @@
 // @description : C++ Algorithms Collection
 //
 
+#define CATCH_CONFIG_MAIN
+
+#include <catch2/catch.hpp>
 #include <celaeno/graph/bfs.hpp>
 #include <celaeno/graph/hvm.hpp>
 #include <taygete/graph.hpp>

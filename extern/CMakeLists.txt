@@ -42,12 +42,12 @@ endfunction(export)
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
   FetchContent_Declare(
     taygete
-    GIT_REPOSITORY git@gitlab.com:formigoni/taygete.git
+    GIT_REPOSITORY https://gitlab.com/formigoni/taygete.git
   )
 
   FetchContent_Declare(
     asterope
-    GIT_REPOSITORY git@gitlab.com:formigoni/asterope.git
+    GIT_REPOSITORY https://gitlab.com/formigoni/asterope.git
     GIT_TAG origin/refactor
   )
 endif()

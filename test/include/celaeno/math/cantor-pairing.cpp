@@ -4,9 +4,11 @@
  * @created     : Monday Jan 13, 2020 23:18:15 -03
  */
 
+#define CATCH_CONFIG_MAIN
+
+#include <catch2/catch.hpp>
 #include <utility>
 #include <celaeno/math/cantor-pairing.hpp>
-#include <iostream> // TODO remove
 #include <random>
 
 namespace celaeno::math::cantor_pairing::test

@@ -8,9 +8,6 @@
 // @description : C++ Algorithms Collection
 //
 
-#define CATCH_CONFIG_MAIN
-
-#include <catch2/catch.hpp>
 #include "include/celaeno/graph/bfs.cpp"
 #include "include/celaeno/graph/hvm.cpp"
 #include "include/celaeno/graph/a-star.cpp"

@@ -1,0 +1,8 @@
+# vim: set syntax=css :et
+
+[requires]
+range-v3/0.10.0@ericniebler/stable
+catch2/2.11.1
+
+[generators]
+cmake

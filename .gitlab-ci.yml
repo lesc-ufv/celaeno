@@ -1,0 +1,54 @@
+image: "archlinux"
+
+stages:
+  - build
+  - test
+
+before_script:
+  - pacman --noconfirm -Syu
+  - pacman --noconfirm -S make cmake clang git python-pip
+  - pip install conan
+
+build:
+  stage: build
+  script:
+    - mkdir build && cd build
+    - conan profile new default --detect
+    - conan profile update settings.compiler.libcxx=libstdc++11 default
+    - conan install
+      -s compiler=clang
+      -s compiler.version=9
+      -s compiler.libcxx=libstdc++11 .. && cd ..
+    - cmake -H. -Bbuild
+      -D CMAKE_BUILD_TYPE=Debug
+      -D CMAKE_CXX_COMPILER=clang++
+    - cmake --build build
+  artifacts:
+    paths:
+      - ./build/bin/
+
+
+bfs:
+  stage: test
+  script:
+    - ./build/bin/test_bfs
+
+hvm:
+  stage: test
+  script:
+    - ./build/bin/test_hvm
+
+graph_balance:
+  stage: test
+  script:
+    - ./build/bin/test_graph_balance
+
+a_star:
+  stage: test
+  script:
+    - ./build/bin/test_a_star
+
+cantor_pairing:
+  stage: test
+  script:
+    - ./build/bin/test_cantor_pairing

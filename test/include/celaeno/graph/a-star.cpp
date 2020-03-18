@@ -5,8 +5,9 @@
 // @created     : Thursday Feb 20, 2020 15:25:14 -03
 //
 
-#pragma once
+#define CATCH_CONFIG_MAIN
 
+#include <catch2/catch.hpp>
 #include <taygete/graph.hpp>
 #include <taygete/graph-reader.hpp>
 #include <celaeno/graph/a-star.hpp>
