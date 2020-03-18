@@ -33,7 +33,7 @@ bfs:
   script:
     - ./build/bin/test_bfs
 
-bfs:
+dfs:
   stage: test
   script:
     - ./build/bin/test_dfs
