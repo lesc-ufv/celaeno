@@ -17,6 +17,10 @@ project(
   LANGUAGES CXX
 )
 
+# Conan Package Manager
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup()
+
 #
 # Compiler Configuration
 #
@@ -74,6 +78,7 @@ set(CMAKE_INSTALL_PREFIX "/usr/local/")
 message("${C_BLUE} * ${C_RESET}Install prefix: ${CMAKE_INSTALL_PREFIX}")
 
 # Create celaeno-config.cmake
+include(CMakePackageConfigHelpers)
 set(cmakeModulesDir cmake)
 configure_package_config_file(
   "${PROJECT_SOURCE_DIR}/cmake/celaeno-config.cmake.in"
@@ -111,3 +116,12 @@ install(
   DESTINATION
     ${CMAKE_INSTALL_PREFIX}/include
 )
+
+# Packaging
+set(CPACK_PACKAGE_NAME                celaeno)
+set(CPACK_PACKAGE_VENDOR              "Ruan")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++ Algorithms Collection")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY   ${CPACK_PACKAGE_NAME})
+set(CPACK_GENERATOR                   "DEB"  )
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER   "Ruan")
+include(CPack)

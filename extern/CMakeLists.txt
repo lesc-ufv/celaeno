@@ -38,6 +38,7 @@ function(export)
 endfunction(export)
 
 
+# Fetch
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
   FetchContent_Declare(
     taygete
@@ -49,29 +50,9 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     GIT_REPOSITORY git@gitlab.com:formigoni/asterope.git
     GIT_TAG origin/refactor
   )
-
-  FetchContent_Declare(
-    catch
-    GIT_REPOSITORY git@github.com:catchorg/Catch2.git
-  )
-
 endif()
-
-FetchContent_Declare(
-  ranges
-  GIT_REPOSITORY git@github.com:ericniebler/range-v3.git
-)
 
 # Populate Libraries
 if( CMAKE_BUILD_TYPE STREQUAL "Debug" )
-  Fetch("catch;taygete;asterope")
-endif()
-Fetch("ranges")
-
-# Check if targets are defined
-if( TARGET range-v3 )
-  message(STATUS "${C_BLUE}Library targets found${C_RESET}")
-else()
-  message(FATAL_ERROR
-    "${C_RED}Missing targets after FetchContent_MakeAvailable${C_RESET}")
+  Fetch("taygete;asterope")
 endif()
