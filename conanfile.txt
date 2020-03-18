@@ -1,4 +1,4 @@
-# vim: set syntax=css :et
+# vim: set syntax=config :et
 
 # BSD 2-Clause License
 

@@ -82,8 +82,19 @@ target_link_libraries(test_cantor_pairing
   asterope
 )
 
+add_executable(
+  test_dfs
+    "include/celaeno/graph/dfs.cpp"
+)
+target_link_libraries(test_dfs
+  celaeno
+  taygete
+  asterope
+)
+
 target_compile_features(test_bfs PRIVATE cxx_std_20)
 target_compile_features(test_a_star PRIVATE cxx_std_20)
 target_compile_features(test_graph_balance PRIVATE cxx_std_20)
 target_compile_features(test_hvm PRIVATE cxx_std_20)
 target_compile_features(test_cantor_pairing PRIVATE cxx_std_20)
+target_compile_features(test_dfs PRIVATE cxx_std_20)

@@ -33,6 +33,11 @@ bfs:
   script:
     - ./build/bin/test_bfs
 
+bfs:
+  stage: test
+  script:
+    - ./build/bin/test_dfs
+
 hvm:
   stage: test
   script:
