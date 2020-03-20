@@ -29,6 +29,8 @@
 [requires]
 range-v3/0.10.0@ericniebler/stable
 catch2/2.11.1
+taygete/0.1@pleiades/testing
+asterope/0.1@pleiades/testing
 
 [generators]
 cmake

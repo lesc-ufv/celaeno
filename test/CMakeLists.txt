@@ -38,8 +38,8 @@ add_executable(
 )
 target_link_libraries(test_bfs
   celaeno
-  taygete
-  asterope
+  taygete::taygete
+  asterope::asterope
 )
 
 add_executable(
@@ -48,8 +48,8 @@ add_executable(
 )
 target_link_libraries(test_a_star
   celaeno
-  taygete
-  asterope
+  taygete::taygete
+  asterope::asterope
 )
 
 add_executable(
@@ -58,8 +58,8 @@ add_executable(
 )
 target_link_libraries(test_graph_balance
   celaeno
-  taygete
-  asterope
+  taygete::taygete
+  asterope::asterope
 )
 
 add_executable(
@@ -68,8 +68,8 @@ add_executable(
 )
 target_link_libraries(test_hvm
   celaeno
-  taygete
-  asterope
+  taygete::taygete
+  asterope::asterope
 )
 
 add_executable(
@@ -78,8 +78,8 @@ add_executable(
 )
 target_link_libraries(test_cantor_pairing
   celaeno
-  taygete
-  asterope
+  taygete::taygete
+  asterope::asterope
 )
 
 add_executable(
@@ -88,8 +88,8 @@ add_executable(
 )
 target_link_libraries(test_dfs
   celaeno
-  taygete
-  asterope
+  taygete::taygete
+  asterope::asterope
 )
 
 target_compile_features(test_bfs PRIVATE cxx_std_20)

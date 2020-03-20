@@ -52,21 +52,15 @@ message(STATUS "CXX flags Debug: ${CMAKE_CXX_FLAGS_DEBUG}")
 message(STATUS "CXX flags Release: ${CMAKE_CXX_FLAGS_RELEASE}")
 
 #
-# CMake Modules
+# External Projects
 #
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(colors)
-define_colors()
+find_package(taygete)
+find_package(asterope)
 
 #
 # Source files
 #
 add_subdirectory("include")
-
-#
-# External Libraries
-#
-add_subdirectory("extern")
 
 #
 # Tests
@@ -94,7 +88,7 @@ configure_package_config_file(
 
 # Export targets
 install(
-  TARGETS celaeno range-v3 range-v3-meta range-v3-concepts
+  TARGETS celaeno
   EXPORT celaeno-targets
   DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
@@ -125,7 +119,7 @@ install(
 # Packaging
 set(CPACK_PACKAGE_NAME                celaeno)
 set(CPACK_PACKAGE_VENDOR              "Ruan")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++ Algorithms Collection")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++ Data Visualization Tool")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY   ${CPACK_PACKAGE_NAME})
 set(CPACK_GENERATOR                   "DEB"  )
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER   "Ruan")
