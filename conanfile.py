@@ -1,4 +1,4 @@
-# vim: set syntax=config :et
+# vim: set ts=2 sw=2 tw=0 et :
 
 # BSD 2-Clause License
 
@@ -26,11 +26,42 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-[requires]
-range-v3/0.10.0@ericniebler/stable
-catch2/2.11.1
-taygete/0.1@pleiades/testing
-asterope/0.1@pleiades/testing
+from conans import ConanFile, CMake, tools
 
-[generators]
-cmake
+
+class CelaenoConan(ConanFile):
+  name = "celaeno"
+  version = "0.1"
+  license = "BSD 2-clause \"Simplified\" License"
+  author = "Ruan Evangelista Formigoni ruanformigoni@gmail.com"
+  url = "https://gitlab.com/formigoni/celaeno"
+  description = "C++ Computer Science Algorithms Collection"
+  topics = ("c++", "generic", "nanocomputing", "algorithms")
+  generators = "cmake"
+  exports_sources = "include/*", "cmake/*", "LICENSE", "CMakeLists.txt"
+  no_copy_source = True
+  requires = 'range-v3/0.10.0@ericniebler/stable', \
+    'catch2/2.5.0@bincrafters/stable', \
+    'taygete/0.1@pleiades/testing', \
+    'asterope/0.1@pleiades/testing'
+
+  def source(self):
+    self.run("git clone https://gitlab.com/formigoni/celaeno.git")
+
+    # Remove examples
+    tools.replace_in_file(
+      "CMakeLists.txt",
+      "add_subdirectory(test)",
+      '',
+      strict=True
+    )
+
+  def package(self):
+    cmake = CMake(self)
+    cmake.configure()
+    cmake.install()
+    self.copy("*.hpp", dst="include", src="include")
+    self.copy("LICENSE", ignore_case=True, keep_path=False)
+
+  def package_id(self):
+    self.info.header_only()

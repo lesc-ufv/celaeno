@@ -33,51 +33,45 @@
 cmake_minimum_required(VERSION 3.7..3.15)
 cmake_policy(VERSION 3.7..3.15)
 
-project(
-  celaeno
-  DESCRIPTION "C++ Algorithms Collection"
-  LANGUAGES CXX
-)
+project(celaeno DESCRIPTION "C++ Algorithms Collection" LANGUAGES CXX)
 
-# Conan Package Manager
+# Conan
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
 #
-# Compiler Configuration
+# External libraries
 #
-message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER}")
-message(STATUS "CXX compiler ID: ${CMAKE_CXX_COMPILER_ID}")
-message(STATUS "CXX flags Debug: ${CMAKE_CXX_FLAGS_DEBUG}")
-message(STATUS "CXX flags Release: ${CMAKE_CXX_FLAGS_RELEASE}")
-
-#
-# External Projects
-#
-find_package(taygete)
-find_package(asterope)
+if(NOT range-v3_FOUND)
+  find_package(range-v3 REQUIRED)
+endif()
+if(NOT taygete_FOUND)
+  find_package(taygete REQUIRED)
+endif()
+if(NOT asterope_FOUND)
+  find_package(asterope REQUIRED)
+endif()
+if(NOT Catch2_FOUND)
+  find_package(Catch2 REQUIRED)
+endif()
 
 #
 # Source files
 #
-add_subdirectory("include")
+add_subdirectory(include)
 
 #
 # Tests
 #
-add_subdirectory("test")
+add_subdirectory(test)
 
 #
 # Install
 #
 include(GNUInstallDirs)
-
-# Install prefix
-set(CMAKE_INSTALL_PREFIX "/usr/local/")
-message("${C_BLUE} * ${C_RESET}Install prefix: ${CMAKE_INSTALL_PREFIX}")
+include(CMakePackageConfigHelpers)
 
 # Create celaeno-config.cmake
-include(CMakePackageConfigHelpers)
 set(cmakeModulesDir cmake)
 configure_package_config_file(
   "${PROJECT_SOURCE_DIR}/cmake/celaeno-config.cmake.in"
@@ -100,10 +94,19 @@ install(EXPORT celaeno-targets
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/celaeno
 )
 
+# Create config file
+configure_package_config_file(
+  cmake/celaeno-config.cmake.in
+  celaeno-config.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/celaeno
+  NO_SET_AND_CHECK_MACRO
+  NO_CHECK_REQUIRED_COMPONENTS_MACRO
+)
+
 # Install celaeno-config.cmake
 install(
   FILES
-    "${PROJECT_BINARY_DIR}/celaeno-config.cmake"
+    ${CMAKE_CURRENT_BINARY_DIR}/celaeno-config.cmake
   DESTINATION
     ${CMAKE_INSTALL_LIBDIR}/cmake/celaeno
 )
