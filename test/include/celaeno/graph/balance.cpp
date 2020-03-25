@@ -36,7 +36,7 @@
 #include <catch2/catch.hpp>
 #include <taygete/graph.hpp>
 #include <taygete/graph-reader.hpp>
-#include <asterope/graph/dot-parser.hpp>
+#include <asterope/graph/to-dot.hpp>
 #include <asterope/graph/to-png.hpp>
 #include <celaeno/graph/balance.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -69,7 +69,7 @@ void run(T1&& circuit, T2&& alias)
 
   // Write graph to .png file
   // asterope::graph::to_png::to_png(
-  //   asterope::graph::dot_parser::dot_parser(g.data()),
+  //   asterope::graph::to_dot::to_dot(g.data()),
   //   original
   // );
 
@@ -102,10 +102,16 @@ void run(T1&& circuit, T2&& alias)
   celaeno::graph::balance::balance(d_view, g, depth, pred);
 
   // Write the balance graph to .png file
-  // asterope::graph::to_png::to_png(
-  //   asterope::graph::dot_parser::dot_parser(g.data()),
-  //   balanced
-  // );
+  asterope::graph::to_png::to_png(
+    asterope::graph::to_dot::to_dot(
+      g.data(),
+      [](auto&& os, auto&& k, auto& v)
+        {
+          os << k << " -> " << v << std::endl;
+        }
+    ),
+    balanced
+  );
 }
 
 TEST_CASE("balance.cpp")
@@ -141,20 +147,20 @@ TEST_CASE("balance.cpp")
 //   run(newtag,"newtag");
 // } // SECTION
 //
-// SECTION("xor_5")
-// {
-//   run(xor5_r,"xor5_r");
-// } // SECTION
+SECTION("xor_5")
+{
+  run(xor5_r,"xor5_r");
+} // SECTION
 //
 // SECTION("c432")
 // {
 //   run(c432,"c432");
 // } // SECTION
 //
-SECTION("c499")
-{
-  run(c499,"c499");
-} // SECTION: c499
+// SECTION("c499")
+// {
+//   run(c499,"c499");
+// } // SECTION: c499
 
 // SECTION("c3540")
 // {

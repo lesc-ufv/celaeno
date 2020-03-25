@@ -35,7 +35,7 @@
 #include <catch2/catch.hpp>
 #include <taygete/graph.hpp>
 #include <taygete/graph-reader.hpp>
-#include <asterope/graph/dot-parser.hpp>
+#include <asterope/graph/to-dot.hpp>
 #include <asterope/graph/to-png.hpp>
 #include <celaeno/graph/dfs.hpp>
 #include "circuits.hpp"
@@ -68,7 +68,7 @@ void run(Str&& graph)
   };
 
   // asterope::graph::to_png::to_png(
-  //   asterope::graph::dot_parser::dot_parser(g.data()),
+  //   asterope::graph::to_dot::to_dot(g.data()),
   //   "graph"
   // );
 

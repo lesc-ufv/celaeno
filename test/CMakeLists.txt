@@ -90,9 +90,31 @@ target_link_libraries(test_dfs
   asterope::asterope
 )
 
+# add_executable(
+#   test_depth_view
+#     "include/celaeno/graph/views/depth.cpp"
+# )
+# target_link_libraries(test_depth_view
+#   celaeno
+#   taygete::taygete
+#   asterope::asterope
+# )
+
+add_executable(
+  test_breadth_view
+    "include/celaeno/graph/views/breadth.cpp"
+)
+target_link_libraries(test_breadth_view
+  celaeno
+  taygete::taygete
+  asterope::asterope
+)
+
 target_compile_features(test_bfs PRIVATE cxx_std_20)
 target_compile_features(test_a_star PRIVATE cxx_std_20)
 target_compile_features(test_graph_balance PRIVATE cxx_std_20)
 target_compile_features(test_hvm PRIVATE cxx_std_20)
 target_compile_features(test_cantor_pairing PRIVATE cxx_std_20)
 target_compile_features(test_dfs PRIVATE cxx_std_20)
+# target_compile_features(test_depth_view PRIVATE cxx_std_20)
+target_compile_features(test_breadth_view PRIVATE cxx_std_20)
