@@ -50,6 +50,9 @@ auto breadth(
 )
 {
   using Vertex = std::remove_reference_t<T1>;
+  namespace rv = ranges::views;
+  namespace ra = ranges::actions;
+  namespace rg = ranges;
 
   std::deque<Vertex> deque;
 
@@ -74,41 +77,20 @@ auto breadth(
     auto pred {get_predecessors(current)};
     auto succ {get_successors(current)};
 
-    // If current vertex has labeled siblings,
-    // increase the column
-    auto siblings =
-        succ
-      | ranges::views::transform(get_predecessors)
-      | ranges::actions::join;
-    siblings =
-        siblings
-      | ranges::views::filter([&current](auto&& e){ return e != current; })
-      | ranges::views::filter([&hash](auto&& e){ return ! hash.contains(e); });
-
-    std::cout << "Current: " << current << " Siblings: " << ranges::views::all(siblings) << std::endl;
-
     // If there is another node in this column & depth
-    // go to next column
-    auto search {ranges::find_if(hash,
-        [&current,&depth_map,&column](auto&& e)
-        {
-          return (
-                 (depth_map.at(e.first) == depth_map.at(current))
-              && (e.second == column)
-          );
-        }
-      )
-    };
+    auto same_depth = [&depth_map,&current](auto&& e)
+      { return depth_map.at(e.first) == depth_map.at(current); };
+    auto same_column = [&column](auto&& e)
+      { return e.second == column; };
+    auto same_depth_column = [&same_depth,&same_column](auto&& e)
+      { return same_depth(e) && same_column(e); };
 
-    if( search != ranges::end(hash) )
-    {
-      ++column;
-    }
+    if( rg::find_if(hash, same_depth_column) != rg::end(hash) ) { ++column; }
 
     hash.insert({current,column});
 
-    ranges::for_each(pred, [&deque](auto&& e) {deque.push_back(e);});
-    ranges::for_each(succ, [&deque](auto&& e) {deque.push_front(e);});
+    rg::for_each(pred, [&deque](auto&& e){deque.push_front(e);});
+    rg::for_each(succ, [&deque](auto&& e){deque.push_back(e);});
   } // while: ! deque.empty()
   return hash;
 } // breadth
