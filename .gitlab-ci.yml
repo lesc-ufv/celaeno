@@ -14,13 +14,13 @@ build:
   script:
     - conan profile new default --detect
     - conan profile update settings.compiler.libcxx=libstdc++11 default
+    - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
+    - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
     - conan install .
       -s compiler=clang
       -s compiler.version=9
       -s compiler.libcxx=libstdc++11
       -if build
-    - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
-    - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
     - cmake -H. -Bbuild
     - cmake --build build
   artifacts:
