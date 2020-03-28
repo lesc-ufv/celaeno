@@ -33,36 +33,46 @@
 
 #define CATCH_CONFIG_MAIN
 
+#include <tuple>
 #include <catch2/catch.hpp>
 #include <array>
 #include <celaeno/graph/bfs.hpp>
 #include <taygete/graph.hpp>
-#include <taygete/graph/example.hpp>
+#include <taygete/graph-reader.hpp>
+#include <range/v3/all.hpp>
+#include "circuits.hpp"
 
 namespace celaeno::graph::bfs::test
 {
 
 TEST_CASE("Breadth-First Search", "[bfs]")
 {
-  using namespace taygete::graph::example;
+  namespace rg = ranges;
+  namespace rv = ranges::views;
+  namespace ra = ranges::actions;
 
-  SECTION("Multiplexer")
-  {
-    std::array<int32_t, 7> mux_res_0 { 0, 3, 4, 5, 6, 2, 1 };
+  // Use taygete data structure
+  taygete::graph::Graph<int64_t> g;
+  // Read circuit into a stream
+  std::stringstream ss; ss << clpl;
+  // Callback for populating the graph
+  auto insert = [&g]<typename T>(T&& a, T&& b) -> void
+    { g.emplace(std::make_pair(a,b)); };
 
-    celaeno::graph::bfs::bfs(0,
-      [](auto const& node) -> auto
-      {
-        return mux_2_1.get_adjacent(node);
-      },
-      [&mux_res_0](auto const& node) -> bool
-      {
-        static int32_t i{0};
-        REQUIRE(node == mux_res_0.at(i++));
-        return false; // Perform full BFS
-      }
-    );
-  }
+  // Read the graph into g
+  taygete::graph::reader::Reader reader(ss, insert);
+
+  // Perform a BFS
+  auto adj = [&g](auto&& v) -> auto { return g.get_adjacent(v); };
+  auto cont =  [&g](auto&& v) -> bool { return false; };
+
+  // std::cout <<
+  //   (
+  //     std::make_tuple(0,adj,cont)
+  //     | bfs
+  //     | rv::all
+  //   )
+  // << std::endl;
 }
 
 } // namespace celaeno::graph::bfs::test

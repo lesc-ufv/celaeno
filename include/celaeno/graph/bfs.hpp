@@ -38,49 +38,86 @@
 #include <vector>
 #include <queue>
 #include <set>
+#include <tuple>
 #include <range/v3/all.hpp>
 
 namespace celaeno::graph::bfs
 {
 
-template<typename T, typename F1, typename F2>
-T bfs(T&& root, F1&& get_adjacent, F2&& callback)
+
+template<typename T1, typename T2>
+decltype(auto) operator>>=(T1&& lhs, T2&& rhs)
 {
+  return rhs(std::forward<T1>(lhs));
+}
+
+template<typename T1, typename T2>
+T1 operator|=(T1 lhs, T2 rhs)
+{
+  return lhs | rhs | ranges::to<decltype(lhs)>;
+}
+
+
+//
+// Implementation
+//
+template<typename T, typename F1, typename F2>
+std::vector<T> bfs(T&& root, F1&& get_adjacent, F2&& callback)
+{
+  namespace rg = ranges;
+  namespace rv = ranges::views;
+  namespace ra = ranges::actions;
+
   // Static Assertions
   static_assert( std::is_integral<T>(),
     "\n\n\033[91;1m * \033[mThe type T is not an integral type.\n" );
 
-  std::queue<T> q;
-  std::set<T> vs; // Using std::set for log(n) query
+  std::queue<T> queue;
+  std::set<T> visited; // Using std::set for log(n) query
+  std::vector<T> result;
 
-  // Push initial node into the queue
-  q.push(root);
+  // Push initial vertex into the queue
+  queue.push(root);
 
-  decltype(root) node{};
-
-  while( ! q.empty() )
+  while( ! queue.empty() )
   {
-    // Get next node
-    node = q.front(); q.pop();
+    // Get next vertex
+    auto vertex {queue.front()}; queue.pop();
 
     // Mark as visited
-    vs.insert(node);
+    visited.insert(vertex);
 
-    // Get the adjacent nodes
-    auto adjs = get_adjacent(node);
+      // Get the adjacent vertices
+      (vertex >>= get_adjacent)
+      // Remove visited vertices
+    |= rv::filter([&visited](auto&& v){return ! visited.contains(v);})
+      // Insert non-visited into the queue
+    | ra::transform([&queue](auto&& v){ queue.push(v); return v; })
+      // Insert into the vertex in the result vector
+    | ra::transform([&result](auto&& v){ result.push_back(v); return v; });
 
-    // Remove visited nodes
-    auto marked = [&vs](auto const& n){ return vs.find(n) == vs.cend(); };
-    auto rng = adjs | ranges::views::filter(marked);
-
-    // Update the queue and visited set
-    ranges::for_each(rng, [&q,&vs](auto const& c){ q.push(c); vs.insert(c); });
-
-    // Execute callback on current node
-    if ( callback(node) ) return node;
+    // Execute callback on current vertex
+    if ( callback(vertex) ) result;
   }
-
-  return node;
+  return result;
 }
+
+//
+// Pipe Closure
+//
+template<typename T, typename F1, typename F2>
+decltype(auto) operator|(
+  std::tuple<T,F1,F2> args,
+  decltype(bfs<T,F1,F2>) const& bfs
+)
+{
+  static auto const& ret = bfs(
+      std::forward<T>(std::get<0>(args)),
+      std::forward<F1>(std::get<1>(args)),
+      std::forward<F2>(std::get<2>(args))
+    );
+
+  return ret;
+} // function: operator|
 
 } // namespace celaeno::graph::bfs
