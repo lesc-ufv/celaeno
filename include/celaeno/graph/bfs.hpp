@@ -52,9 +52,9 @@ decltype(auto) operator>>=(T1&& lhs, T2&& rhs)
 }
 
 template<typename T1, typename T2>
-T1 operator|=(T1 lhs, T2 rhs)
+T1 operator|=(T1&& lhs, T2&& rhs)
 {
-  return lhs | rhs | ranges::to<decltype(lhs)>;
+  return lhs | rhs | ranges::to<T1>;
 }
 
 
