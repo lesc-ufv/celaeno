@@ -1,3 +1,4 @@
+// vim: set expandtab ts=2 sw=2 tw=0 et ://
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : reduce-cardinality
@@ -31,6 +32,8 @@
 
 
 #pragma once
+#include <utility> // std::pair
+#include <functional> // std::reference_wrapper
 #include <vector>
 #include <algorithm>
 #include <map>
@@ -40,23 +43,24 @@
 
 namespace celaeno::graph::red_card
 {
+//
+// Definitions
+//
 
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::actions;
-using namespace fplus;
-
-template<typename T1, typename T2>
-decltype(auto) operator|=(T1&& lhs, T2&& rhs)
+namespace ref
 {
-  return lhs | rhs | rg::to<std::vector> ;
-}
+  template<typename T>
+  using ref = std::reference_wrapper<T>;
+  template<typename T>
+  using pair = std::pair<ref<T>,ref<T>>;
+} // namespace ref
 
-template<typename F, typename... Args>
-auto apply_as_lvalue(F&& f, Args&&... args)
-{
-  return f(std::forward<Args const&>(args)...);
-}
+//
+// Algorithm
+//
 
 template<
   typename T1,
@@ -65,7 +69,7 @@ template<
   typename F3,
   typename F4
 >
-auto red_card(
+void red_card(
   T1&& root,
   F1&& pred,
   F2&& succ,
@@ -75,22 +79,21 @@ auto red_card(
 )
 {
 
-  auto adj = [&pred,&succ](auto&& v)
-  {
-    return apply_as_lvalue(rv::concat,pred(v),succ(v)) | rg::to<std::vector>;
-  };
+  //
+  // Perform a breadth-first search
+  //
 
+  auto adj = [&pred,&succ](auto&& v) { return fplus::append(pred(v),succ(v)); };
   auto bfs {celaeno::graph::bfs::bfs(0,adj,[](auto&& v){return false;})};
 
   //
   // Predecessors balancing
   //
 
-  for (auto&& v : bfs)
+  for (T1 const& v : bfs)
   {
-    std::cout << "Parent: " << v << " ";
     // Get the successors
-    auto s{succ(v)};
+    auto s {succ(v)};
     // Group the successors into pairs
     auto p {fplus::split_every(2,s)};
     // Remove the ones with < 2 vertices
@@ -113,10 +116,6 @@ auto red_card(
         link(std::make_pair(v,start));
         --start;
       });
-    rg::for_each(t,
-      [](auto&& pair){std::cout << "Children: " << pair.first << " " << pair.second << " | "; }
-    );
-    std::cout << std::endl;
   } // for bfs
 
 } // function: red_card

@@ -39,6 +39,7 @@
 #include <asterope/graph/to-dot.hpp>
 #include <asterope/graph/to-png.hpp>
 #include <range/v3/all.hpp>
+#include <chrono>
 #include "circuits.hpp"
 
 TEST_CASE("reduce-cardinality","[reduce-cardinality.hpp]")
@@ -46,16 +47,18 @@ TEST_CASE("reduce-cardinality","[reduce-cardinality.hpp]")
   namespace rg = ranges;
   namespace rv = ranges::views;
   namespace ra = ranges::actions;
+  using float64_t = double;
   //
   // Read graph
   //
   taygete::graph::Graph<int64_t> g;
-  std::stringstream ss; ss << xor5_r;
+  std::stringstream ss; ss << c499;
   auto callback = [&g]<typename T>(T&& a, T&& b) -> void
   {
     g.emplace(std::make_pair(std::forward<T>(a),std::forward<T>(b)));
   };
   taygete::graph::reader::Reader reader(ss, callback);
+
 
   //
   // Provide operations
@@ -70,32 +73,36 @@ TEST_CASE("reduce-cardinality","[reduce-cardinality.hpp]")
     { g.erase_edge(pair); };
 
   // Write the balance graph to .png file
-  asterope::graph::to_png::to_png(
-    asterope::graph::to_dot::to_dot(
-      g.data(),
-      [](auto&& os, auto&& k, auto& v)
-        {
-          os << k << " -> " << v << std::endl;
-        }
-    ),
-    "green-card"
-  );
+  // asterope::graph::to_png::to_png(
+  //   asterope::graph::to_dot::to_dot(
+  //     g.data(),
+  //     [](auto&& os, auto&& k, auto& v)
+  //       {
+  //         os << k << " -> " << v << std::endl;
+  //       }
+  //   ),
+  //   "green-card"
+  // );
   //
   // Reduce card
   //
+  auto start {std::chrono::system_clock::now()};
   celaeno::graph::red_card::red_card(0,pred,succ,link,unlink);
+  auto end {std::chrono::system_clock::now()};
+  std::chrono::duration<float64_t> ellapsed_seconds {end-start};
+  std::cout << "Execution time: " << ellapsed_seconds.count() << std::endl;
 
   // Write the balance graph to .png file
-  asterope::graph::to_png::to_png(
-    asterope::graph::to_dot::to_dot(
-      g.data(),
-      [](auto&& os, auto&& k, auto& v)
-        {
-          os << k << " -> " << v << std::endl;
-        }
-    ),
-    "red-card"
-  );
+  // asterope::graph::to_png::to_png(
+  //   asterope::graph::to_dot::to_dot(
+  //     g.data(),
+  //     [](auto&& os, auto&& k, auto& v)
+  //       {
+  //         os << k << " -> " << v << std::endl;
+  //       }
+  //   ),
+  //   "red-card"
+  // );
 
   // std::cout << res << std::endl;
 
