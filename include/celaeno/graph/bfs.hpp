@@ -78,6 +78,7 @@ std::vector<T> bfs(T&& root, F1&& get_adjacent, F2&& callback)
 
   // Push initial vertex into the queue
   queue.push(root);
+  result.push_back(root);
 
   while( ! queue.empty() )
   {
