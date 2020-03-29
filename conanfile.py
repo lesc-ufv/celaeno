@@ -43,7 +43,8 @@ class CelaenoConan(ConanFile):
   requires = 'range-v3/0.10.0@ericniebler/stable', \
     'catch2/2.5.0@bincrafters/stable', \
     'taygete/0.1@pleiades/testing', \
-    'asterope/0.1@pleiades/testing'
+    'asterope/0.1@pleiades/testing', \
+    'functionalplus/v0.2.6-p0@dobiasd/stable'
 
   def source(self):
     self.run("git clone https://gitlab.com/formigoni/celaeno.git")
