@@ -84,40 +84,53 @@ void red_card(
   //
 
   auto adj = [&pred,&succ](auto&& v) { return fplus::append(pred(v),succ(v)); };
-  auto bfs {celaeno::graph::bfs::bfs(0,adj,[](auto&& v){return false;})};
 
   //
   // Predecessors balancing
   //
 
-  for (T1 const& v : bfs)
-  {
-    // Get the successors
-    auto s {succ(v)};
-    // Group the successors into pairs
-    auto p {fplus::split_every(2,s)};
-    // Remove the ones with < 2 vertices
-    auto f {fplus::drop_if([](auto&& e){ return e.size() < 2; },p)};
-    // Convert (list -> list) -> (list -> pairs)
-    auto t {f | rv::transform([](auto&& v)
-      {return std::make_pair(v.at(0),v.at(1));})};
-    // Unlink parent from children
-    rg::for_each(t, [&v,&unlink](auto&& pair)
-      {
-        unlink(std::make_pair(v,pair.first));
-        unlink(std::make_pair(v,pair.second));
-      });
-    // Connect each pair to a pseudonode
-    // and the pseudonode to parent
-    rg::for_each(t, [&link,&v,&start](auto&& pair)
-      {
-        link(std::make_pair(start,pair.first));
-        link(std::make_pair(start,pair.second));
-        link(std::make_pair(v,start));
-        --start;
-      });
-  } // for bfs
+  while(true){
+    auto bfs {celaeno::graph::bfs::bfs(0,adj,[](auto&& v){return false;})};
 
+    for (T1 const& v : bfs)
+    {
+      // Get the successors
+      auto s {succ(v)};
+      // Group the successors into pairs
+      auto p {fplus::split_every(2,s)};
+      // Remove the ones with < 2 vertices
+      auto f {fplus::drop_if([](auto&& e){ return e.size() < 2; },p)};
+      // Convert (list -> list) -> (list -> pairs)
+      auto t {f | rv::transform([](auto&& v)
+        {return std::make_pair(v.at(0),v.at(1));})};
+      // Unlink parent from children
+      rg::for_each(t, [&v,&unlink](auto&& pair)
+        {
+          unlink(std::make_pair(v,pair.first));
+          unlink(std::make_pair(v,pair.second));
+        });
+      // Connect each pair to a pseudonode
+      // and the pseudonode to parent
+      rg::for_each(t, [&link,&v,&start](auto&& pair)
+        {
+          link(std::make_pair(start,pair.first));
+          link(std::make_pair(start,pair.second));
+          link(std::make_pair(v,start));
+          --start;
+        });
+    } // for bfs
+
+    //
+    // If the graph still has vertices with card > 4
+    // continue
+    //
+    auto done{true};
+    bfs = celaeno::graph::bfs::bfs(0,adj,
+      [&done,&adj](auto&& v)
+      {if (adj(v).size() > 4){done = false; return true;}else{return false;}}
+    );
+    if(done) break;
+  } // while(true)
 } // function: red_card
 
 } // namespace celaeno::graph::red_card

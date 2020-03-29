@@ -52,7 +52,7 @@ TEST_CASE("reduce-cardinality","[reduce-cardinality.hpp]")
   // Read graph
   //
   taygete::graph::Graph<int64_t> g;
-  std::stringstream ss; ss << c499;
+  std::stringstream ss; ss << c3540;
   auto callback = [&g]<typename T>(T&& a, T&& b) -> void
   {
     g.emplace(std::make_pair(std::forward<T>(a),std::forward<T>(b)));
