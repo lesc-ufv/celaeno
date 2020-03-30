@@ -31,48 +31,5 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#define CATCH_CONFIG_MAIN
-
-#include <tuple>
-#include <catch2/catch.hpp>
-#include <array>
-#include <celaeno/graph/bfs.hpp>
-#include <taygete/graph.hpp>
-#include <taygete/graph-reader.hpp>
-#include <range/v3/all.hpp>
-#include "circuits.hpp"
-
-namespace celaeno::graph::bfs::test
-{
-
-TEST_CASE("Breadth-First Search", "[bfs]")
-{
-  namespace rg = ranges;
-  namespace rv = ranges::views;
-  namespace ra = ranges::actions;
-
-  // Use taygete data structure
-  taygete::graph::Graph<int64_t> g;
-  // Read circuit into a stream
-  std::stringstream ss; ss << clpl;
-  // Callback for populating the graph
-  auto insert = [&g]<typename T>(T&& a, T&& b) -> void
-    { g.emplace(std::make_pair(a,b)); };
-
-  // Read the graph into g
-  taygete::graph::reader::Reader reader(ss, insert);
-
-  // Perform a BFS
-  auto adj = [&g](auto&& v) -> auto { return g.get_adjacent(v); };
-  auto cont =  [&g](auto&& v) -> bool { return false; };
-
-  // std::cout <<
-  //   (
-  //     std::make_tuple(0,adj,cont)
-  //     | bfs
-  //     | rv::all
-  //   )
-  // << std::endl;
-}
-
-} // namespace celaeno::graph::bfs::test
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <doctest/doctest.h>
