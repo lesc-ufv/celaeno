@@ -46,17 +46,10 @@ namespace celaeno::graph::bfs
 
 
 template<typename T1, typename T2>
-decltype(auto) operator>>=(T1&& lhs, T2&& rhs)
-{
-  return rhs(std::forward<T1>(lhs));
-}
-
-template<typename T1, typename T2>
-T1 operator|=(T1&& lhs, T2&& rhs)
+auto operator|=(T1 const& lhs, T2 const& rhs)
 {
   return lhs | rhs | ranges::to<T1>;
 }
-
 
 //
 // Implementation
@@ -85,11 +78,13 @@ std::vector<T> bfs(T&& root, F1&& get_adjacent, F2&& callback)
     // Get next vertex
     auto vertex {queue.front()}; queue.pop();
 
+    if( visited.contains(vertex) ) continue;
+
     // Mark as visited
     visited.insert(vertex);
 
       // Get the adjacent vertices
-      (vertex >>= get_adjacent)
+    get_adjacent(vertex)
       // Remove visited vertices
     |= rv::filter([&visited](auto&& v){return ! visited.contains(v);})
       // Insert non-visited into the queue
@@ -113,10 +108,10 @@ decltype(auto) operator|(
 )
 {
   static auto const& ret = bfs(
-      std::forward<T>(std::get<0>(args)),
-      std::forward<F1>(std::get<1>(args)),
-      std::forward<F2>(std::get<2>(args))
-    );
+    std::forward<T>(std::get<0>(args)),
+    std::forward<F1>(std::get<1>(args)),
+    std::forward<F2>(std::get<2>(args))
+  );
 
   return ret;
 } // function: operator|
