@@ -45,12 +45,6 @@ namespace celaeno::graph::bfs
 {
 
 
-template<typename T1, typename T2>
-auto operator|=(T1 const& lhs, T2 const& rhs)
-{
-  return lhs | rhs | ranges::to<T1>;
-}
-
 //
 // Implementation
 //
@@ -83,17 +77,18 @@ std::vector<T> bfs(T&& root, F1&& get_adjacent, F2&& callback)
     // Mark as visited
     visited.insert(vertex);
 
+    auto adjacent{get_adjacent(vertex)};
       // Get the adjacent vertices
-    get_adjacent(vertex)
+    adjacent
       // Remove visited vertices
-    |= rv::filter([&visited](auto&& v){return ! visited.contains(v);})
+    | rv::filter([&visited](auto&& v){return ! visited.contains(v);})
       // Insert non-visited into the queue
     | ra::transform([&queue](auto&& v){ queue.push(v); return v; })
       // Insert into the vertex in the result vector
     | ra::transform([&result](auto&& v){ result.push_back(v); return v; });
 
     // Execute callback on current vertex
-    if ( callback(vertex) ) result;
+    if ( callback(vertex) ) return result;
   }
   return result;
 }
