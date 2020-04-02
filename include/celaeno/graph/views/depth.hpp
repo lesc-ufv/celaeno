@@ -34,35 +34,22 @@
 
 #include <set>
 #include <map>
-#include <unordered_map>
 #include <range/v3/all.hpp>
 #include <celaeno/graph/bfs.hpp>
 
 namespace celaeno::graph::views::depth
 {
 
-// Inputs
-//  → root node
-//  → get_successors nodes lambda
-//  → get_predecessors nodes lambda
-// Output
-//  ← Map: Level → Nodes
-//  ← Map: Node → Level
 template<typename T, typename F1, typename F2>
-std::pair<std::multimap<T,T>,std::unordered_map<T,T>>
-  depth(
-    T&& root,
-    F1&& get_successors,
-    F2&& get_predecessors
-  )
+std::pair<std::multimap<T,T>,std::map<T,T>>
+depth(T&& root, F1&& get_predecessors, F2&& get_successors)
 {
-
   static_assert(std::is_integral_v<T>, " * T must be of an integral type");
 
   // level -> nodes
   std::multimap<T,T> m;
   // node -> level
-  std::unordered_map<T,T> m_rev;
+  std::map<T,T> m_rev;
 
   auto curr_level{0};
   size_t size{};
@@ -117,10 +104,6 @@ std::pair<std::multimap<T,T>,std::unordered_map<T,T>>
           namespace views = ranges::views;
           // Predecessor nodes
           auto preds { get_predecessors(n) };
-          // Are the predecessors in the table (m_rev)?
-          auto in_preds{true};
-          // Skip inputs
-          if( preds.size() == 0 ) { in_preds = false; }
           // Check if any predecessor is not in the table
           auto is_not_in_table =
             [&m_rev](auto&& e) { return ! m_rev.contains(e); };
