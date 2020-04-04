@@ -23,32 +23,32 @@ build:
       - ./build/bin/
 
 
-bfs:
-  stage: test
-  script:
-    - ./build/bin/test_bfs
-
-dfs:
-  stage: test
-  script:
-    - ./build/bin/test_dfs
-
-hvm:
-  stage: test
-  script:
-    - ./build/bin/test_hvm
-
-graph_balance:
-  stage: test
-  script:
-    - ./build/bin/test_graph_balance
-
-a_star:
-  stage: test
-  script:
-    - ./build/bin/test_a_star
-
-cantor_pairing:
-  stage: test
-  script:
-    - ./build/bin/test_cantor_pairing
+# bfs:
+#   stage: test
+#   script:
+#     - ./build/bin/test_bfs
+#
+# dfs:
+#   stage: test
+#   script:
+#     - ./build/bin/test_dfs
+#
+# hvm:
+#   stage: test
+#   script:
+#     - ./build/bin/test_hvm
+#
+# graph_balance:
+#   stage: test
+#   script:
+#     - ./build/bin/test_graph_balance
+#
+# a_star:
+#   stage: test
+#   script:
+#     - ./build/bin/test_a_star
+#
+# cantor_pairing:
+#   stage: test
+#   script:
+#     - ./build/bin/test_cantor_pairing
