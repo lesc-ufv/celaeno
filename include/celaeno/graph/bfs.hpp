@@ -39,25 +39,36 @@
 #include <queue>
 #include <set>
 #include <tuple>
+#include <concepts>
+#include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
 namespace celaeno::graph::bfs
 {
 
+//
+// Concepts
+//
+template<typename T>
+concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
+
+template<typename T>
+concept SignedIntegral = std::signed_integral<T>;
+
+template<typename T>
+concept Fn = requires(T t){ {t(int64_t{})} -> Iterable; };
+
+template<typename T>
+concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 
 //
 // Implementation
 //
-template<typename T, typename F1, typename F2>
-std::vector<T> bfs(T&& root, F1&& get_adjacent, F2&& callback)
+template< SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)> >
+std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
 {
   namespace rg = ranges;
-  namespace rv = ranges::views;
-  namespace ra = ranges::actions;
-
-  // Static Assertions
-  static_assert( std::is_integral<T>(),
-    "\n\n\033[91;1m * \033[mThe type T is not an integral type.\n" );
+  namespace fw = fplus::fwd;
 
   std::queue<T> queue;
   std::set<T> visited; // Using std::set for log(n) query
@@ -65,50 +76,33 @@ std::vector<T> bfs(T&& root, F1&& get_adjacent, F2&& callback)
 
   // Push initial vertex into the queue
   queue.push(root);
-  result.push_back(root);
 
   while( ! queue.empty() )
   {
     // Get next vertex
     auto vertex {queue.front()}; queue.pop();
 
+    // Skip visited vertices
     if( visited.contains(vertex) ) continue;
+
+    // Insert the vertex in the result
+    result.push_back(vertex);
 
     // Mark as visited
     visited.insert(vertex);
 
-    auto adjacent{get_adjacent(vertex)};
-      // Get the adjacent vertices
-    adjacent
-      // Remove visited vertices
-    | rv::filter([&visited](auto&& v){return ! visited.contains(v);})
-      // Insert non-visited into the queue
-    | ra::transform([&queue](auto&& v){ queue.push(v); return v; })
-      // Insert into the vertex in the result vector
-    | ra::transform([&result](auto&& v){ result.push_back(v); return v; });
+    // Get the adjacent vertices
+    // Remove the visited ones
+    auto is_visited = [&visited](auto&& v){return visited.contains(v);};
+    auto not_visited {fw::apply(adj(vertex), fw::drop_if(is_visited))};
+
+    // Insert non-visited into the queue
+    rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
 
     // Execute callback on current vertex
-    if ( callback(vertex) ) return result;
+    if ( cb(vertex) ) return result;
   }
   return result;
 }
-
-//
-// Pipe Closure
-//
-template<typename T, typename F1, typename F2>
-decltype(auto) operator|(
-  std::tuple<T,F1,F2> args,
-  decltype(bfs<T,F1,F2>) const& bfs
-)
-{
-  static auto const& ret = bfs(
-    std::forward<T>(std::get<0>(args)),
-    std::forward<F1>(std::get<1>(args)),
-    std::forward<F2>(std::get<2>(args))
-  );
-
-  return ret;
-} // function: operator|
 
 } // namespace celaeno::graph::bfs
