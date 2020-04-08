@@ -36,34 +36,38 @@
 #include <optional> // std::optional
 #include <cstdint>  // int64_t, int32_t,...
 #include <utility>  // std::forward
+#include <fplus/fplus.hpp>
 #include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/bfs.hpp>
 #include <range/v3/all.hpp>
 
 namespace celaeno::graph::balance
 {
 
-template<typename T1, typename F1, typename F2, typename F3, typename F4>
-void balance(
-  T1&& root,
-  F1&& pred,
-  F2&& succ,
-  F3&& link,
-  F4&& unlink,
-  int64_t counter = -1
-)
+//
+// Aliases
+//
+
+namespace depth = celaeno::graph::views::depth;
+namespace bfs = celaeno::graph::bfs;
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace fw = fplus::fwd;
+
+template<typename T, typename F1, typename F2, typename F3, typename F4>
+void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
 {
-  namespace depth = celaeno::graph::views::depth;
-  namespace rg = ranges;
-  namespace rv = ranges::views;
-  namespace ra = ranges::actions;
+  //
+  // Get the pseudo vertex with the lowest value
+  //
+  auto adj = [&pred,&succ](auto&& v) { return fplus::append(pred(v),succ(v)); };
+  auto counter { fw::apply(bfs::bfs(root,adj), fw::sort(), fw::minimum()) };
 
   //
   // Build depth-map
   //
   auto [depth_vertex,vertex_depth] =
-    depth::depth(
-        std::forward<T1>(root),std::forward<F1>(pred),std::forward<F2>(succ)
-    );
+    depth::depth(root,std::forward<F1>(pred),std::forward<F2>(succ));
 
   //
   // Get the levels indexes
@@ -88,6 +92,7 @@ void balance(
         auto distance{d2-d1};
         while( distance > 1 )
         {
+          --counter;
           //
           // ↓         ↓
           // A         B
@@ -123,7 +128,7 @@ void balance(
           // A    C    B
           // * -> * -> *
           //
-          predecessor = counter--;
+          predecessor = counter;
           //
           // If the distance 'd' is still greater than one, more pseudo
           // vertices need to be inserted in-between C and B.

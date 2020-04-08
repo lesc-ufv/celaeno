@@ -1,7 +1,7 @@
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : bfs
-// @created     : Monday Apr 06, 2020 09:06:59 -03
+// @file        : balance
+// @created     : Wednesday Apr 01, 2020 21:24:23 -03
 //
 // BSD 2-Clause License
 
@@ -31,24 +31,26 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <celaeno/graph/bfs.hpp>
+#include <cstdlib>
+#include <concepts>
+#include <range/v3/all.hpp>
+#include <celaeno/graph/balance.hpp>
+#include <celaeno/graph/views/depth.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
-#include <fplus/fplus.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
-
-namespace celaeno::graph::bfs::test
-{
 
 //
 // Aliases
 //
-
-namespace bfs = celaeno::graph::bfs;
+namespace graph = taygete::graph;
 namespace cir = maia::circuits;
-namespace gra = taygete::graph;
-namespace fw = fplus::fwd;
+namespace balance = celaeno::graph::balance;
+namespace depth = celaeno::graph::views::depth;
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace ra = ranges::actions;
 
 //
 // Concepts
@@ -60,31 +62,66 @@ concept String = requires(T t){ std::string{t}; };
 //
 // Test Wrapper
 //
-
 template<String T>
 void TEST(T&& str)
 {
-  gra::Graph<int64_t> g;
+  graph::Graph<int64_t> g;
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  gra::reader::Reader reader{str,emplace};
+  taygete::graph::reader::Reader reader{str,emplace};
 
-  REQUIRE(g.get_node_count() > 0);
+  //
+  // Helpers
+  //
 
-  auto adj = [&g](auto&& v){ return g.get_adjacent(v); };
-  auto bfs {bfs::bfs(0,adj)};
+  auto pred = [&g](auto&& v){ return g.get_predecessors(v); };
+  auto succ = [&g](auto&& v){ return g.get_successors(v); };
+  auto link = [&g](auto&& pair){ g.emplace(pair); };
+  auto unlink = [&g](auto&& pair){ g.erase(pair); };
 
-  REQUIRE(g.get_node_count() == bfs.size());
+  // Execution
+  balance::balance(0,pred,succ,link,unlink);
 
-  REQUIRE(fw::apply(bfs,fw::unique()).size() == bfs.size());
-}
+  //
+  // Verification
+  //
+
+  // * Given a depth-view, each vertex must have a distance of one
+  // * to its successor or predecessor
+  auto dview {depth::depth(0,pred,succ)};
+  auto const& level_vert {dview.first};
+  auto const& vert_level {dview.second};
+
+  // Get the levels
+  auto levels { level_vert | rv::keys | rv::unique };
+
+    // Get the vertices on level l
+  for(auto const& l : levels)
+  {
+    auto rng{level_vert.equal_range(l)};
+    // For each vertex on level l
+    for(auto it{rng.first}; it!=rng.second; ++it)
+    {
+      // Current vertex
+      auto const& curr {it->second};
+      // The adjacent vertices
+      auto adj {g.get_adjacent(curr)};
+      // Verify if distance is one to each
+      auto is_dist_one = [&vert_level,&curr](auto&& a) -> void
+        { REQUIRE(std::abs(vert_level.at(a) - vert_level.at(curr)) == 1); };
+      // Execute tests
+      rg::for_each(adj, is_dist_one);
+    }
+  }
+
+} // function: TEST
 
 //
 // Test Cases
 //
 
-TEST_CASE("celaeno::graph::bfs"
-  * doctest::description("Breadth-First Search test")
-  * doctest::timeout(10.0f)
+TEST_CASE("celaeno::graph::balance"
+  * doctest::description("Depth-First Search test")
+  * doctest::timeout(100.0f)
 )
 {
   //
@@ -129,6 +166,4 @@ TEST_CASE("celaeno::graph::bfs"
   TEST(cir::synth_91::count);
   TEST(cir::synth_91::decod);
   TEST(cir::synth_91::my_adder);
-} // TEST_CASE: celaeno::graph::bfs
-
-} // namespace celaeno::graph::bfs::test
+} // TEST_CASE: celaeno::graph::balance

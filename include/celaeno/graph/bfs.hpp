@@ -47,6 +47,13 @@ namespace celaeno::graph::bfs
 {
 
 //
+// Aliases
+//
+namespace rg = ranges;
+namespace fw = fplus::fwd;
+
+
+//
 // Concepts
 //
 template<typename T>
@@ -62,16 +69,19 @@ template<typename T>
 concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 
 //
-// Implementation
+// Algorithm
 //
 template< SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)> >
 std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
 {
-  namespace rg = ranges;
-  namespace fw = fplus::fwd;
-
+  // Queue of vertices
   std::queue<T> queue;
+
+  // Visited vertices
   std::set<T> visited; // Using std::set for log(n) query
+
+  // Result that contains all the visited vertices
+  // until callback returns true
   std::vector<T> result;
 
   // Push initial vertex into the queue

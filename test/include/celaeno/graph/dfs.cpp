@@ -1,7 +1,7 @@
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : bfs
-// @created     : Monday Apr 06, 2020 09:06:59 -03
+// @file        : dfs
+// @created     : Wednesday Apr 08, 2020 08:07:08 -03
 //
 // BSD 2-Clause License
 
@@ -29,23 +29,24 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <celaeno/graph/bfs.hpp>
+#include <celaeno/graph/dfs.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
-#include <fplus/fplus.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
+#include <fplus/fplus.hpp>
 
-namespace celaeno::graph::bfs::test
+namespace celaeno::graph::dfs::test
 {
 
 //
 // Aliases
 //
 
-namespace bfs = celaeno::graph::bfs;
+namespace dfs = celaeno::graph::dfs;
 namespace cir = maia::circuits;
 namespace gra = taygete::graph;
 namespace fw = fplus::fwd;
@@ -71,19 +72,19 @@ void TEST(T&& str)
   REQUIRE(g.get_node_count() > 0);
 
   auto adj = [&g](auto&& v){ return g.get_adjacent(v); };
-  auto bfs {bfs::bfs(0,adj)};
+  auto dfs {dfs::dfs(0,adj)};
 
-  REQUIRE(g.get_node_count() == bfs.size());
+  REQUIRE(g.get_node_count() == dfs.size());
 
-  REQUIRE(fw::apply(bfs,fw::unique()).size() == bfs.size());
+  REQUIRE(fw::apply(dfs,fw::unique()).size() == dfs.size());
 }
 
 //
 // Test Cases
 //
 
-TEST_CASE("celaeno::graph::bfs"
-  * doctest::description("Breadth-First Search test")
+TEST_CASE("celaeno::graph::dfs"
+  * doctest::description("Depth-First Search test")
   * doctest::timeout(10.0f)
 )
 {
@@ -129,6 +130,6 @@ TEST_CASE("celaeno::graph::bfs"
   TEST(cir::synth_91::count);
   TEST(cir::synth_91::decod);
   TEST(cir::synth_91::my_adder);
-} // TEST_CASE: celaeno::graph::bfs
+} // TEST_CASE: celaeno::graph::dfs
 
-} // namespace celaeno::graph::bfs::test
+} // namespace celaeno::graph::dfs::test

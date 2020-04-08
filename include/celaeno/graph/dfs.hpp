@@ -32,36 +32,82 @@
 #pragma once
 
 #include <stack>
+#include <unordered_map>
 #include <type_traits> // std::remove_reference
-#include <functional>  // std::reference_wrapper
+#include <concepts>
+#include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
 namespace celaeno::graph::dfs
 {
+//
+// Aliases
+//
 
-template<typename T, typename F1, typename F2>
-void dfs(T&& root, F1&& get_neighbors, F2&& callback)
+namespace rg = ranges;
+namespace fw = fplus::fwd;
+
+
+//
+// concepts
+//
+template<typename T>
+concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
+
+template<typename T>
+concept SignedIntegral = std::signed_integral<T>;
+
+template<typename T>
+concept Fn = requires(T t){ {t(int64_t{})} -> Iterable; };
+
+template<typename T>
+concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+
+//
+// Algorithm
+//
+template<SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)>>
+std::vector<T> dfs(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
 {
-  using base_type = std::remove_reference_t<T>;
+  // Stack of vertices
+  std::stack<T> stack;
 
-  // Variables
-  std::stack<base_type> s;
-  std::unordered_map<base_type,bool> t;
+  // Map of visited vertices
+  std::unordered_map<T,bool> visited;
 
-  // Algorithm
-  s.push(root);
+  // Result that contains all visited vertices
+  // until callback returns true
+  std::vector<T> result;
 
-  while ( ! s.empty() )
+  // Push root vertex into the stack
+  stack.push(root);
+
+  while ( ! stack.empty() )
   {
-    auto&& c {s.top()}; s.pop();
-    if ( ! t.contains(c) )
-    {
-      t.emplace(c,true);
-      auto&& neighbors {get_neighbors(c)};
-      if( callback(c) ) break;
-      ranges::for_each(neighbors, [&s](auto&& v){ s.push(v); });
-    } // if
+    // Get the vertex at the top of the stack
+    auto vertex {stack.top()}; stack.pop();
+
+    // Check if it has been visited
+    if ( visited.contains(vertex) ) continue;
+
+    // Insert the vertex in the result
+    result.push_back(vertex);
+
+    // Mark the vertex as visited
+    visited.emplace(vertex,true);
+
+    // Get the adjacent vertices
+    // Remove the visited ones
+    auto is_visited = [&visited](auto&& v){ return visited.contains(v); };
+    auto not_visited {fw::apply(adj(vertex), fw::drop_if(is_visited))};
+
+    // Insert the unvisited vertices into the stack
+    rg::for_each(not_visited, [&stack](auto&& v){ stack.push(v); });
+
+    // Execute callback on current vertex
+    if( cb(vertex) ) return result;
   } // while
+  return result;
 } // dfs
 
 
