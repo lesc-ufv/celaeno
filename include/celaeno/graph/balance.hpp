@@ -82,14 +82,11 @@ void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
     auto range {depth_vertex.equal_range(i)};
     for( auto it{range.first}; it!=range.second; ++it )
     {
-      auto current{it->second};
+      auto const& current{it->second};
       // For each predecessor current
-      auto predecessors{pred(current)};
-      for( auto predecessor : predecessors )
+      for( auto p : pred(current) )
       {
-        auto d1{vertex_depth[predecessor]};
-        auto d2{vertex_depth[current]};
-        auto distance{d2-d1};
+        auto distance{vertex_depth.at(current)-vertex_depth.at(p)};
         while( distance > 1 )
         {
           --counter;
@@ -104,7 +101,7 @@ void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
           // * -> * -> *
           //  \_______/
           //
-          link(std::make_pair(predecessor,counter));
+          link(std::make_pair(p,counter));
           link(std::make_pair(counter,current));
           //
           // ↓         ↓
@@ -117,7 +114,7 @@ void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
           // A    C    B
           // * -> * -> *
           //
-          unlink(std::make_pair(predecessor,current));
+          unlink(std::make_pair(p,current));
           //
           // ↓
           // A    C    B
@@ -128,7 +125,7 @@ void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
           // A    C    B
           // * -> * -> *
           //
-          predecessor = counter;
+          p = counter;
           //
           // If the distance 'd' is still greater than one, more pseudo
           // vertices need to be inserted in-between C and B.
