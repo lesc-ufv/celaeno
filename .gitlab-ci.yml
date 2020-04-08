@@ -1,28 +1,28 @@
-image: "archlinux"
-
-stages:
-  - build
-  - test
-
-before_script:
-  - pacman --noconfirm -Syu
-  - pacman --noconfirm -S make cmake clang git python-pip
-  - pip install conan
-
-build:
-  stage: build
-  script:
-    - conan profile new default --detect
-    - conan profile update settings.compiler.libcxx=libstdc++11 default
-    - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
-    - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
-    - conan install . -if build
-    - cmake -H. -Bbuild && cmake --build build
-  artifacts:
-    paths:
-      - ./build/bin/
-
-
+# image: "archlinux"
+#
+# stages:
+#   - build
+#   - test
+#
+# before_script:
+#   - pacman --noconfirm -Syu
+#   - pacman --noconfirm -S make cmake clang git python-pip
+#   - pip install conan
+#
+# build:
+#   stage: build
+#   script:
+#     - conan profile new default --detect
+#     - conan profile update settings.compiler.libcxx=libstdc++11 default
+#     - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
+#     - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
+#     - conan install . -if build
+#     - cmake -H. -Bbuild && cmake --build build
+#   artifacts:
+#     paths:
+#       - ./build/bin/
+#
+#
 # bfs:
 #   stage: test
 #   script:
