@@ -32,6 +32,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <celaeno/graph/dfs.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
@@ -50,6 +52,7 @@ namespace dfs = celaeno::graph::dfs;
 namespace cir = maia::circuits;
 namespace gra = taygete::graph;
 namespace fw = fplus::fwd;
+using float64_t = double;
 
 //
 // Concepts
@@ -88,6 +91,13 @@ TEST_CASE("celaeno::graph::dfs"
   * doctest::timeout(10.0f)
 )
 {
+  //
+  // Logger
+  //
+  auto logger {spdlog::basic_logger_mt("graph::dfs", "logs/graph-dfs.txt")};
+  spdlog::set_default_logger(logger);
+  auto start {std::chrono::system_clock::now()};
+
   //
   // Iscas
   //
@@ -130,6 +140,16 @@ TEST_CASE("celaeno::graph::dfs"
   TEST(cir::synth_91::count);
   TEST(cir::synth_91::decod);
   TEST(cir::synth_91::my_adder);
+
+  //
+  // Log duration
+  //
+
+  auto end {std::chrono::system_clock::now()};
+  std::chrono::duration<float64_t> dur {end-start};
+  std::stringstream ss; ss << dur.count();
+  spdlog::info("Duration for dfs.cpp: {}", ss.str());
+
 } // TEST_CASE: celaeno::graph::dfs
 
 } // namespace celaeno::graph::dfs::test

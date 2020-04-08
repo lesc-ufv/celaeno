@@ -31,6 +31,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <celaeno/graph/bfs.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
@@ -49,6 +51,7 @@ namespace bfs = celaeno::graph::bfs;
 namespace cir = maia::circuits;
 namespace gra = taygete::graph;
 namespace fw = fplus::fwd;
+using float64_t = double;
 
 //
 // Concepts
@@ -87,6 +90,14 @@ TEST_CASE("celaeno::graph::bfs"
   * doctest::timeout(10.0f)
 )
 {
+  //
+  // Logger
+  //
+
+  auto logger {spdlog::basic_logger_mt("graph::bfs", "logs/graph-bfs.txt")};
+  spdlog::set_default_logger(logger);
+  auto start {std::chrono::system_clock::now()};
+
   //
   // Iscas
   //
@@ -129,6 +140,16 @@ TEST_CASE("celaeno::graph::bfs"
   TEST(cir::synth_91::count);
   TEST(cir::synth_91::decod);
   TEST(cir::synth_91::my_adder);
+
+  //
+  // Log duration
+  //
+
+  auto end {std::chrono::system_clock::now()};
+  std::chrono::duration<float64_t> dur {end-start};
+  std::stringstream ss; ss << dur.count();
+  spdlog::info("Duration for bfs.cpp: {}", ss.str());
+
 } // TEST_CASE: celaeno::graph::bfs
 
 } // namespace celaeno::graph::bfs::test

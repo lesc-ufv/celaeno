@@ -31,8 +31,11 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <cstdlib>
 #include <concepts>
+#include <chrono>
 #include <range/v3/all.hpp>
 #include <celaeno/graph/balance.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -40,6 +43,9 @@
 #include <taygete/graph/reader.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
+
+namespace celaeno::graph::balance::test
+{
 
 //
 // Aliases
@@ -51,6 +57,7 @@ namespace depth = celaeno::graph::views::depth;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::actions;
+using float64_t = double;
 
 //
 // Concepts
@@ -120,10 +127,17 @@ void TEST(T&& str)
 //
 
 TEST_CASE("celaeno::graph::balance"
-  * doctest::description("Depth-First Search test")
+  * doctest::description("Balance test")
   * doctest::timeout(100.0f)
 )
 {
+  //
+  // Logger
+  //
+  auto logger {spdlog::basic_logger_mt("graph::balance", "logs/graph-balance.txt")};
+  spdlog::set_default_logger(logger);
+  auto start {std::chrono::system_clock::now()};
+
   //
   // Iscas
   //
@@ -166,4 +180,16 @@ TEST_CASE("celaeno::graph::balance"
   TEST(cir::synth_91::count);
   TEST(cir::synth_91::decod);
   TEST(cir::synth_91::my_adder);
+
+  //
+  // Log Duration
+  //
+
+  auto end {std::chrono::system_clock::now()};
+  std::chrono::duration<float64_t> dur {end-start};
+  std::stringstream ss; ss << dur.count();
+  spdlog::info("Duration for balance.cpp: {}", ss.str());
+
 } // TEST_CASE: celaeno::graph::balance
+
+} // namespace celaeno::graph::balance::test
