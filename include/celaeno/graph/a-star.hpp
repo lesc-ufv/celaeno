@@ -35,173 +35,154 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
+#include <concepts>
 
 namespace celaeno::graph::a_star
 {
 
-template<
-    class T1,
-    class Container = std::vector<T1>,
-    class Compare = std::less<typename Container::value_type>
->
-class PriorityQueue : public std::priority_queue<T1, Container, Compare>
+//
+// Aliases
+//
+
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace ra = ranges::action;
+namespace fp = fplus;
+namespace fw = fplus::fwd;
+using float64_t = double;
+
+//
+// Concepts
+//
+template<typename T>
+concept SignedInt = std::signed_integral<T>;
+
+template<typename T>
+concept BaseType =
+requires(T t)
 {
-  public:
-    template<typename Comp>
-    std::optional<T1> find(Comp&& comp) const noexcept
-    {
-      auto search = std::find_if(
-        this->c.cbegin(),
-        this->c.cend(),
-        std::forward<Comp>(comp)
-      );
-
-      if( search != this->c.cend() )
-      {
-        return *search;
-      }
-      else
-      {
-        return std::nullopt;
-      }
-    }
-
-#ifdef DEBUG
-    auto get_container() const noexcept
-    {
-      return this->c;
-    }
-#endif
-
-    template<typename Comp>
-    void erase(Comp&& comp) noexcept
-    {
-      auto search = std::find_if(
-        this->c.cbegin(),
-        this->c.cend(),
-        std::forward<Comp>(comp)
-      );
-
-      if( search != this->c.cend() )
-      {
-        this->c.erase(search);
-      }
-    }
+  { t.first  } -> std::convertible_to<int64_t>;
+  { t.second } -> std::convertible_to<int64_t>;
+}
+||
+requires (T t)
+{
+  { t } -> std::signed_integral;
 };
 
-template<typename Map, typename T>
-std::vector<T> rebuild_path(Map&& m, T current)
+//
+// Helpers
+//
+
+// Compare distinct pairs of integrals
+template<SignedInt T1, SignedInt T2, SignedInt T3, SignedInt T4>
+  requires
+       (! std::same_as<T1,T3>)
+    || (! std::same_as<T2,T4>)
+    || (! std::same_as<T1,T4>)
+    || (! std::same_as<T2,T3>)
+bool operator==(std::pair<T1,T2> a, std::pair<T3,T4> b)
 {
-  std::vector<T> final_path;
-  auto comp{current};
+  return (a.first == b.first) && (a.second == b.second);
+}
 
-  final_path.emplace_back(comp);
+//
+// Algorithm
+//
 
-  while( m.contains( comp ) )
+template<typename Map, typename T>
+auto rebuild_path(Map& m, T curr)
+{
+  using Base = std::conditional_t<
+    std::is_integral_v<T>, int64_t, std::pair<int64_t,int64_t>
+  >;
+
+  m = fp::swap_keys_and_values(m);
+
+  std::deque<Base> final_path;
+
+  final_path.emplace_front(curr);
+
+  while( m.contains( curr ) )
   {
-    comp = m[comp];
-    final_path.emplace_back(comp);
+    curr = m.at(curr);
+    final_path.emplace_front(curr);
   }
-
-  std::reverse(final_path.begin(), final_path.end());
 
   return final_path;
 }
 
-// T must be default constructible
-template<typename T, typename F1, typename F2, typename F3>
-std::optional<std::vector<T>> a_star(
-  T start,
-  T end,
-  F1 f_neighbors,
-  F2 f_distance,
-  F3 f_heuristic
-  )
+template<BaseType T, typename F1, typename F2, typename F3>
+decltype(auto) a_star(T&& start, T&& end, F1&& f_neighbors, F2&& f_distance, F3&& f_heuristic)
 {
-  using float64_t = long double;
-  // id, g_score, f_score
-  using Entry = std::tuple<T,float64_t,float64_t>;
+  using Base = std::conditional_t<std::is_integral_v<T>,
+    int64_t, std::pair<int64_t,int64_t>
+  >;
 
-  // Comparison by f_score
-  auto comp = [](auto& a, auto& b)
-    {
-      return std::get<2>(a) > std::get<2>(b);
-    };
+  // Open set in ascending order
+  std::multimap<float64_t,Base> open;
 
-  // Open set
-  std::set<T> open;
+  // Closed set
+  std::set<Base> closed;
+
+  // G-Score
+  std::map<Base,float64_t> g_score;
 
   // Paths memory
-  std::map<T,T> mem;
+  std::map<Base,Base> mem;
 
-  // Ascending priority queue
-  PriorityQueue<Entry,std::vector<Entry>,decltype(comp)> p_queue;
+  // Insert initial vertex
+  open.emplace(f_heuristic(start), start);
+  g_score.emplace(start, 0.);
 
-  // Insert start node
-  p_queue.push({start,0,f_heuristic(start)});
+  // keep the previous vertex for final path
+  Base prev{start};
 
   // Main loop
-  while( ! p_queue.empty() )
+  while( ! open.empty() )
   {
 
-#ifdef DEBUG // Queue ordering test
-    auto const& c {p_queue.get_container()};
-    for(auto it{c.cbegin()}; it!=c.cend(); ++it)
+    // h == heuristic cost value
+    // id = vertex id
+    auto [h, id]  { *open.cbegin()  }; open.erase(open.cbegin());
+
+    // Update memory
+    if( id != start ) mem.emplace(prev,id);
+
+    // If it is the goal, rebuild the path and return
+    if ( id == end ) return rebuild_path(mem,end);
+
+    // Insert the vertex into the closed set
+    closed.insert(id);
+
+    // Update previous vertex
+    prev = id;
+
+    // For each neighbor of current vertex
+    for (auto&& n : f_neighbors(id))
     {
-      if(it+1 == c.cend()) break;
-      assert(
-          std::get<0>(*it) < std::get<0>(*(it+1))
-          && "Unordered priority queue for A*"
-      );
-    }
-#endif
+      // Do not explore vertices in the closed set
+      if( closed.contains(n) ) continue;
 
-    auto current { p_queue.top() };
-    auto& curr_id { std::get<0>(current) };
-    auto& curr_g  { std::get<1>(current) };
-    auto& curr_f  { std::get<2>(current) };
+      // Analyse the cost to goal
+      auto ng {g_score.at(id)+f_distance(n)};
 
-    if ( curr_id == end )
-      return rebuild_path(mem,curr_id);
-
-    p_queue.pop();
-    for( auto n : f_neighbors(curr_id) )
-    {
-      // If the first time exploring node, add to the open set
-      if( ! open.contains(n) ) open.insert(n);
-      // else, continue
-      else continue;
-
-      auto n_comp = [&n](auto&& v) { return std::get<0>(v) == n; };
-
-      if( auto search = p_queue.find(n_comp) )
+      // If the cost is infinite (there is not other path) or
+      // If the cost is better than an existing one
+      // Update the score
+      if ( ! g_score.contains(n) || ng < g_score.at(n) )
       {
-        // The node is already in the queue
-        // Must retrieve the original value
-        auto& n_g  {std::get<1>(*search)};
-        auto& n_f  {std::get<2>(*search)};
-        auto test_g {curr_g + f_distance(curr_id, n)};
-        if( test_g < n_g )
-        {
-          mem[n] = curr_id;
-          p_queue.erase(n_comp);
-          p_queue.push({n,test_g,test_g+f_heuristic(n)});
-        }
-      }
-      else
-      {
-        // There is no known path to new node,
-        // create a new path from the current
-        // node.
-        mem[n] = curr_id;
-        auto g {curr_g + f_distance(curr_id,n)};
-        p_queue.push({n,g,g+f_heuristic(n)});
-      }
-    }
-  }
+        // Update g_score
+        g_score.emplace(n,ng);
+        // Update f_score
+        open.emplace(ng+f_heuristic(n),n);
+      } // if
+    } // for f_neighbors(id)
+  } // while ! open.empty()
 
-  return std::nullopt;
+  return std::deque<Base>{};
 }
 
 } // namespace celaeno::graph::a_star
