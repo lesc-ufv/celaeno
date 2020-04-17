@@ -78,28 +78,28 @@ std::pair<std::multimap<T,T>,std::map<T,T>>
       std::forward<T>(root),
       std::forward<F1>(pred),
       std::forward<F2>(succ),
-      [&pred,&m,&m_rev](auto&& v) -> bool
+      [&pred,&m,&m_rev](auto&& v_curr) -> bool
       {
-        if( pred(v).size() == 0 )
+        if( pred(v_curr).size() == 0 )
         {
-          m.emplace(0,v);
-          m_rev.emplace(v,0);
+          m.emplace(0,v_curr);
+          m_rev.emplace(v_curr,0);
         } // if
         else
         {
-          // Get predecessors
+          // Get siblings
           // Get their levels
           // Get the max value
           auto level
           {
             fw::apply(
-              pred(v)
-              , fw::transform([&m_rev](auto&& v){ return m_rev.at(v); })
+              pred(v_curr)
+              , fw::transform([&m_rev](auto&& v_sib){ return m_rev.at(v_sib); })
               , fw::maximum()
             )
           };
-          m.emplace(level+1,v);
-          m_rev.emplace(v,level+1);
+          m.emplace(level+1,v_curr);
+          m_rev.emplace(v_curr,level+1);
         } // else
         return false;
       } // lambda
