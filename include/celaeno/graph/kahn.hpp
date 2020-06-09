@@ -1,7 +1,7 @@
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : dfs
-// @created     : Wednesday Mar 18, 2020 14:52:57 -03
+// @file        : kahn
+// @created     : Wednesday Apr 08, 2020 11:42:02 -03
 //
 // BSD 2-Clause License
 
@@ -31,25 +31,24 @@
 
 #pragma once
 
-#include <stack>
+#include <vector>
+#include <deque>
 #include <unordered_map>
-#include <type_traits> // std::remove_reference
-#include <concepts>
+#include <celaeno/graph/bfs.hpp>
 #include <fplus/fplus.hpp>
-#include <range/v3/all.hpp>
 
-namespace celaeno::graph::dfs
+namespace celaeno::graph::kahn
 {
+
 //
 // Aliases
 //
-
-namespace rg = ranges;
+namespace fp = fplus;
 namespace fw = fplus::fwd;
-
+namespace bfs = celaeno::graph::bfs;
 
 //
-// concepts
+// Concepts
 //
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
@@ -66,49 +65,49 @@ concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 //
 // Algorithm
 //
-template<SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)>>
-std::vector<T> dfs(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
+template< SignedIntegral T, Fn F1, Fn F2, Fc F3 = std::function<bool(int64_t)> >
+std::vector<T> kahn(T&& root, F1&& pred, F2&& succ, F3&& cb = [](auto&&){return false;})
 {
-  // Stack of vertices
-  std::stack<T> stack;
+  auto adj = [&pred,&succ](auto&& v){ return fp::append(pred(v),succ(v)); };
 
-  // Map of visited vertices
-  std::unordered_map<T,bool> visited;
-
-  // Result that contains all visited vertices
-  // until callback returns true
+  // Topologically sorted result
   std::vector<T> result;
 
-  // Push root vertex into the stack
-  stack.push(root);
+  // Vertices with no incomming edges
+  std::deque<T> deque;
 
-  while ( ! stack.empty() )
+  // Removed edges
+  std::set<std::pair<T,T>> re;
+
+  // Populate the deque
+  auto has_pred = [&pred](auto&& v){ return ! pred(v).empty(); };
+  bfs::bfs(root,adj,[&has_pred,&deque](auto&& v)
+    { if( ! has_pred(v) ){ deque.push_back(v); } return false; });
+
+  while (! deque.empty() )
   {
-    // Get the vertex at the top of the stack
-    auto vertex {stack.top()}; stack.pop();
+    // Get the current vertex
+    auto c{deque.front()}; deque.pop_front();
 
-    // Check if it has been visited
-    if ( visited.contains(vertex) ) continue;
+    // Include in the result
+    result.push_back(c);
 
-    // Insert the vertex in the result
-    result.push_back(vertex);
+    // Perform the callback
+    if( cb(c) ) return result;
 
-    // Mark the vertex as visited
-    visited.emplace(vertex,true);
-
-    // Get the adjacent vertices
-    // Remove the visited ones
-    auto is_visited = [&visited](auto&& v){ return visited.contains(v); };
-    auto not_visited {fw::apply(adj(vertex), fw::drop_if(is_visited))};
-
-    // Insert the unvisited vertices into the stack
-    rg::for_each(not_visited, [&stack](auto&& v){ stack.push(v); });
-
-    // Execute callback on current vertex
-    if( cb(vertex) ) return result;
-  } // while
+    // Get successors
+    for( auto s : succ(c) )
+    {
+      // remove edge c -> s
+      re.insert({c,s});
+      // If s has no more predecessors
+      auto is_rm = [&s,&re](auto&& v){ return re.contains({v,s}); };
+      auto preds_s {fp::drop_if(is_rm, pred(s))};
+      // Insert s into the queue
+      if( preds_s.empty() ) { deque.push_back(s); }
+    }
+  } // while: ! initial.empty()
   return result;
-} // dfs
+}
 
-
-} // namespace celaeno::graph::dfs
+} // namespace celaeno::graph::kahn

@@ -1,3 +1,4 @@
+/*vim: set expandtab ts=2 sw=2 tw=80 et :*/
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : balance
@@ -34,91 +35,110 @@
 #include <iostream> // std::cerr and std::endl
 #include <optional> // std::optional
 #include <cstdint>  // int64_t, int32_t,...
+#include <utility>  // std::forward
+#include <fplus/fplus.hpp>
+#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/bfs.hpp>
+#include <range/v3/all.hpp>
 
 namespace celaeno::graph::balance
 {
 
-template<typename M, typename T1, typename T2>
-std::optional<int64_t> find(M&& m, T1&& e, T2&& size)
+//
+// Aliases
+//
+
+namespace depth = celaeno::graph::views::depth;
+namespace bfs = celaeno::graph::bfs;
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace fw = fplus::fwd;
+
+template<typename T, typename F1, typename F2, typename F3, typename F4>
+void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
 {
-  auto depth{ m.size() };
-  for (auto i = 0; i < depth; ++i)
+  //
+  // Get the pseudo vertex with the lowest value
+  //
+  auto adj = [&pred,&succ](auto&& v) { return fplus::append(pred(v),succ(v)); };
+  auto counter { fw::apply(bfs::bfs(root,adj), fw::sort(), fw::minimum()) };
+
+  //
+  // Build depth-map
+  //
+  auto [depth_vertex,vertex_depth] =
+    depth::depth(root,std::forward<F1>(pred),std::forward<F2>(succ));
+
+  //
+  // Get the levels indexes
+  //
+  auto levels { depth_vertex | rv::keys | rv::unique | rg::to<std::vector> };
+
+  //
+  // Algorithm
+  //
+  for (auto const& i : levels)
   {
-    // For each node in level
-    auto range {m.equal_range(i)};
+    auto range {depth_vertex.equal_range(i)};
     for( auto it{range.first}; it!=range.second; ++it )
     {
-      if( it->second == e )
-        return i;
-    }
-  }
-  return std::nullopt;
-}
-
-template<typename M, typename T>
-void insert_in_between(M&& graph, T&& e1, T&& e2, T&& e3)
-{
-  graph.emplace( std::make_pair(std::forward<T>(e1), std::forward<T>(e2)) );
-  graph.emplace( std::make_pair(std::forward<T>(e2), std::forward<T>(e3)) );
-}
-
-
-template<typename T1, typename T2, typename T3, typename F1>
-void balance(T1&& depth_map, T2 &&graph, T3&& depth, F1&& get_predecessors)
-{
-
-  int64_t pseudo_counter{-1};
-
-  // For each level from 0 to max
-  for (auto i = 0; i < depth; ++i)
-  {
-    // For each node in level
-    auto range {depth_map.equal_range(i)};
-    for( auto it{range.first}; it!=range.second; ++it )
-    {
-      // For each input of node
-      auto inputs{ get_predecessors(it->second) };
-      for( auto const& input : inputs )
+      auto const& current{it->second};
+      // For each predecessor current
+      for( auto p : pred(current) )
       {
-        if( auto input_level = find(
-              std::forward<T1>(depth_map),
-              std::forward<decltype(input)>(input),
-              std::forward<T3>(depth)
-            )
-          )
+        auto distance{vertex_depth.at(current)-vertex_depth.at(p)};
+        while( distance > 1 )
         {
-          auto current{input};
-          while( *input_level != i-1 )
-          {
-            // Insert new intermediate connection
-            insert_in_between(
-              std::forward<T2>(graph),
-              std::forward<decltype(current)>(current),
-              std::forward<decltype(current)>(pseudo_counter),
-              std::forward<decltype(current)>(it->second)
-            );
-            // Remove old connection from current to node
-            graph.erase_edge(
-              {
-                std::forward<decltype(current)>(current),
-                std::forward<decltype(current)>(it->second)
-              }
-            );
-            // Update current
-            current = pseudo_counter;
-            // Decrease counter
-            --pseudo_counter;
-            // Update the input level
-            ++(*input_level);
-          }
-        }
-        else
-        {
-          std::cerr << " * Error: Could not find the input." << std::endl;
-        }
+          --counter;
+          //
+          // ↓         ↓
+          // A         B
+          // * ------> *
+          //
+          // Insert pseudo vertex in-between
+          //
+          // A    C    B
+          // * -> * -> *
+          //  \_______/
+          //
+          link(std::make_pair(p,counter));
+          link(std::make_pair(counter,current));
+          //
+          // ↓         ↓
+          // A    C    B
+          // * -> * -> *
+          //  \_______/
+          //
+          // Remove old connection
+          //
+          // A    C    B
+          // * -> * -> *
+          //
+          unlink(std::make_pair(p,current));
+          //
+          // ↓
+          // A    C    B
+          // * -> * -> *
+          //
+          // Update predecessor
+          //      ↓
+          // A    C    B
+          // * -> * -> *
+          //
+          p = counter;
+          //
+          // If the distance 'd' is still greater than one, more pseudo
+          // vertices need to be inserted in-between C and B.
+          // A    C    B
+          // * -> * -> *
+          //      |____|
+          //        d
+          //
+          --distance;
+        } // while
       } // for
     } // for
-  } // for
+  } // for: i
 
 } // balance
 
