@@ -40,11 +40,15 @@ class CelaenoConan(ConanFile):
   generators = "cmake"
   exports_sources = "include/*", "cmake/*", "LICENSE", "CMakeLists.txt"
   no_copy_source = True
-  requires = 'range-v3/0.10.0@ericniebler/stable', \
-    'catch2/2.5.0@bincrafters/stable', \
+  requires = \
+    'range-v3/0.10.0@ericniebler/stable', \
     'taygete/0.1@pleiades/testing', \
     'asterope/0.1@pleiades/testing', \
-    'functionalplus/v0.2.6-p0@dobiasd/stable'
+    'maia/0.1@pleiades/testing', \
+    'fmt/6.1.2', \
+    'doctest/2.3.4@bincrafters/stable', \
+    'spdlog/1.5.0', \
+    'functionalplus/v0.2.7-p0@dobiasd/stable'
 
   def source(self):
     self.run("git clone https://gitlab.com/formigoni/celaeno.git")

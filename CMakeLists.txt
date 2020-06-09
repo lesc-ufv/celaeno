@@ -45,15 +45,6 @@ conan_basic_setup()
 if(NOT range-v3_FOUND)
   find_package(range-v3 REQUIRED)
 endif()
-if(NOT taygete_FOUND)
-  find_package(taygete REQUIRED)
-endif()
-if(NOT asterope_FOUND)
-  find_package(asterope REQUIRED)
-endif()
-if(NOT Catch2_FOUND)
-  find_package(Catch2 REQUIRED)
-endif()
 
 #
 # Source files
