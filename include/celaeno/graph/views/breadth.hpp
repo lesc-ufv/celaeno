@@ -35,24 +35,33 @@
 #include <map>
 #include <deque>
 #include <unordered_map>
+#include <set>
 #include <type_traits>
+#include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
+#include <celaeno/graph/views/depth.hpp>
 
 namespace celaeno::graph::views::breadth
 {
 
-template<typename T1, typename T2, typename F1, typename F2>
+template<typename T, typename F1, typename F2>
 auto breadth(
-  T1&& root,
-  T2&& depth_map,
-  F1&& get_predecessors,
-  F2&& get_successors
+  T&& root,
+  F1&& pred,
+  F2&& succ
 )
 {
-  using Vertex = std::remove_reference_t<T1>;
+  using Vertex = std::decay_t<T>;
   namespace rv = ranges::views;
   namespace ra = ranges::actions;
   namespace rg = ranges;
+  namespace fp = fplus;
+  namespace fw = fplus::fwd;
+
+  // Create depth map
+  auto depth {celaeno::graph::views::depth::depth(root,pred,succ)};
+  auto& map_lv{depth.first};
+  auto& map_vl{depth.second};
 
   std::deque<Vertex> deque;
 
@@ -72,25 +81,61 @@ auto breadth(
   while (! deque.empty())
   {
     auto current {deque.front()}; deque.pop_front();
-    if( visited.contains(current) ) continue;
-    else visited.insert({current,true});
-    auto pred {get_predecessors(current)};
-    auto succ {get_successors(current)};
 
-    // If there is another node in this column & depth
-    auto same_depth = [&depth_map,&current](auto&& e)
-      { return depth_map.at(e.first) == depth_map.at(current); };
+    if( visited.contains(current) )
+    {
+      continue;
+    }
+    else
+    {
+      visited.insert({current,true});
+    }
+
+    auto p {pred(current)};
+    auto s {succ(current)};
+
+    // If there is another vertex in this column & depth
+    auto same_depth = [&map_vl,&current](auto&& e)
+      { return map_vl.at(e.first) == map_vl.at(current); };
     auto same_column = [&column](auto&& e)
       { return e.second == column; };
     auto same_depth_column = [&same_depth,&same_column](auto&& e)
       { return same_depth(e) && same_column(e); };
 
-    if( rg::find_if(hash, same_depth_column) != rg::end(hash) ) { ++column; }
+    if( rg::find_if(hash, same_depth_column) != rg::end(hash) )
+    {
+      // Get the depth of current
+      auto depth_of_current { map_vl.at(current) };
+      // Get all the vertices in level of current
+      auto range{map_lv.equal_range(depth_of_current)};
+      std::vector<T> siblings;
+      for(auto it{range.first}; it!=range.second; ++it)
+      {
+        siblings.push_back(it->second);
+      }
+      auto max_column{column};
+      for( auto const& s : siblings )
+      {
+        if( hash.contains(s) )
+        {
+          auto s_column{hash.at(s)};
+          if( s_column > max_column )
+          {
+            max_column = s_column;
+          }
+        }
+      }
+      hash.insert({current,max_column+1});
+    }
+    else
+    {
+      hash.insert({current,column});
+    }
 
-    hash.insert({current,column});
+    rg::for_each(p, [&deque](auto&& e){deque.push_back(e);});
+    rg::for_each(s, [&deque](auto&& e){deque.push_front(e);});
+    if( s.empty() ) ++column;
 
-    rg::for_each(pred, [&deque](auto&& e){deque.push_front(e);});
-    rg::for_each(succ, [&deque](auto&& e){deque.push_back(e);});
   } // while: ! deque.empty()
   return hash;
 } // breadth
