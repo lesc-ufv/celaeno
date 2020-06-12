@@ -57,7 +57,7 @@ void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
 ## Usage
 
 For a complete example of CMake and dependencies integration, see:
-[Graph Balancing Project Example](https://gitlab.com/formigoni/celaeno/-/raw/development/doc/mdbook/archives/sample-balance.tar.xz).
+[Graph Balancing Example](https://gitlab.com/formigoni/celaeno/-/raw/development/doc/mdbook/archives/sample-balance.tar.xz).
 
 To compile the example use:
 
