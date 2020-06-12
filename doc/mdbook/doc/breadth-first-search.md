@@ -42,7 +42,7 @@ std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
 For a complete example of CMake and dependencies integration, see:
 [BFS Project Example](https://gitlab.com/formigoni/celaeno/-/raw/master/doc/mdbook/archives/sample-bfs.tar.xz)
 
-To compile the source use:
+To compile the example use:
 ```sh
 // Create build directory
 mkdir build && cd build
