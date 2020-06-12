@@ -67,9 +67,27 @@ bfs(root, adj, callback)
 
 ## Usage
 
-### Graph to transverse
+For a complete example of CMake and dependencies integration, see:
+[BFS Project Example](https://gitlab.com/formigoni/celaeno/-/raw/master/doc/mdbook/archives/sample-bfs.tar.xz)
 
-![bfs](./figures/bfs-b1.png)
+To compile the source use:
+```sh
+// Create build directory
+mkdir build && cd build
+// Configure conan
+conan install -s compiler=gcc -s compiler.version=10 -s compiler.libcxx=libstdc++11 .. && cd ..
+// Configure CMake
+cmake -H. -Bbuild
+// Build the project
+cmake --build build
+// Run the executable
+./build/bin/main
+```
+
+
+> _Generated .png_
+> 
+> ![bfs](./figures/bfs-b1.png)
 
 > BFS Result: 0,2,3,7,9,4,1,14,6,13,8,10,11,5,12,15,16
 
