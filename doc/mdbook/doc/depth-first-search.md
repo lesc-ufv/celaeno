@@ -23,7 +23,7 @@ Edition. 2009._
 std::vector<T> dfs(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
 
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> root: A Signed integral that returns the root node.
+> root: A Signed integral.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
 > adj: A lambda to return adjacent nodes.

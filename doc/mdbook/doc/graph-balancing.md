@@ -40,7 +40,7 @@ of many algorithms.
 void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
 
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> root: A Signed integral that returns the root node.
+> root: A Signed integral.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
 > pred: A lambda that returns the predecessors of a given node.
@@ -55,3 +55,21 @@ void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
 > unlink: A lambda to remove an edge between two nodes.
 
 ## Usage
+
+For a complete example of CMake and dependencies integration, see:
+[Graph Balancing Project Example](https://gitlab.com/formigoni/celaeno/-/raw/development/doc/mdbook/archives/sample-balance.tar.xz).
+
+To compile the example use:
+
+```sh
+// Create build directory
+mkdir build && cd build
+// Configure conan
+conan install -s compiler=gcc -s compiler.version=10 -s compiler.libcxx=libstdc++11 .. && cd ..
+// Configure CMake
+cmake -H. -Bbuild
+// Build the project
+cmake --build build
+// Run the executable
+./build/bin/main
+```
