@@ -42,6 +42,9 @@ conan_basic_setup()
 #
 # External libraries
 #
+if(NOT fmt_FOUND)
+  find_package(fmt REQUIRED)
+endif()
 if(NOT range-v3_FOUND)
   find_package(range-v3 REQUIRED)
 endif()
