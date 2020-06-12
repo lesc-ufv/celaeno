@@ -1,0 +1,10 @@
+[book]
+authors = ["Ruan Evangelista Formigoni"]
+language = "en"
+multilingual = false
+src = "doc"
+title = "Celaeno - C++ Algorithms Collection"
+
+[output.html]
+default-theme = "navy"
+
