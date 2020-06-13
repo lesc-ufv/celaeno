@@ -1,3 +1,5 @@
+>  vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
+
 # Depth-First Search
 
 ## Definition
@@ -17,21 +19,43 @@ Edition. 2009._
 
 <iframe width="750" height="500" src="https://www.youtube.com/embed/7fujbpJ0LB4" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
-## Parameters
+
+## Interface
 
 > <i class="fa fa-bars" style="color:steelblue"></i>&nbsp;&nbsp;
-std::vector<T> dfs(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
+template<SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)>>
+>
+> <i class="fa fa-bars" style="color:steelblue"></i>&nbsp;&nbsp;
+> std::vector<T> dfs(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
+
+## Parameters
 
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
 > root: A Signed integral.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> adj: A lambda to return adjacent nodes.
+> adj: `T → [T...]` A lambda to return adjacent nodes.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> cb: An optional callback to call in a depth-first manner.
+> cb: `T → bool` An optional callback to call in a depth-first manner.
 > The search stops if the condition returns true or all nodes
 > have been explored.
+
+## Constraints
+```cpp
+template<typename T>
+concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
+
+template<typename T>
+concept SignedIntegral = std::signed_integral<T>;
+
+template<typename T>
+concept Fn = requires(T t){ {t(int64_t{})} -> Iterable; };
+
+template<typename T>
+concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+```
+
 
 ## Usage
 

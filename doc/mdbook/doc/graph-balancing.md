@@ -34,25 +34,30 @@ of many algorithms.
 <img src=./figures/graph-balancing/KLBG.png width=50%>
 </p>
 
-## Parameters
+## Interface
 
 > <i class="fa fa-bars" style="color:steelblue"></i>&nbsp;&nbsp;
-void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
+> template<typename T, typename F1, typename F2, typename F3, typename F4>
+>
+> <i class="fa fa-bars" style="color:steelblue"></i>&nbsp;&nbsp;
+> void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
+
+## Parameters
 
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
 > root: A Signed integral.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> pred: A lambda that returns the predecessors of a given node.
+> pred: `T → [T...]` A lambda that returns the predecessors of a given node.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> succ: A lambda that returns the successors of a given node.
+> succ: `T → [T...]` A lambda that returns the successors of a given node.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> link: A lambda to insert an edge between two nodes.
+> link: `[T,T] -> void` A lambda to insert an edge between two nodes.
 >
 > <i class="fa fa-cog" style="color:steelblue"></i>&nbsp;&nbsp;
-> unlink: A lambda to remove an edge between two nodes.
+> unlink: `[T,T] -> void` A lambda to remove an edge between two nodes.
 
 ## Usage
 
