@@ -36,4 +36,4 @@ target_include_directories(celaeno INTERFACE
   $<INSTALL_INTERFACE:include>
 )
 target_compile_features(celaeno INTERFACE cxx_std_20)
-target_link_libraries(celaeno INTERFACE range-v3::range-v3)
+target_link_libraries(celaeno INTERFACE range-v3::range-v3 fmt::fmt)
