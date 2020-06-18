@@ -53,6 +53,11 @@ a_star:
   script:
     - ./build/bin/test_a_star
 
+matrix_realization:
+  stage: test
+  script:
+    - ./build/bin/test_m_real
+
 pages:
   stage: doc
   before_script:

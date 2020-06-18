@@ -1,3 +1,4 @@
+/* vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :*/
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : a-star
