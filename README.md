@@ -28,8 +28,11 @@ and can guide you to follow consistent project conventions throughout
 your C++ project.
 
 
+<br><br><br>
+
 ## Functionalities
 
-You can read the full api documentation in my [gitlab pages](#).
+You can read the full api documentation in my
+  [gitlab pages](https://formigoni.gitlab.io/celaeno/).
 
 For a quick summary, here's my list of implemented algorithms:
