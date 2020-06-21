@@ -69,7 +69,7 @@ namespace celaeno::graph::barycenter
     };
 
   //
-  // Algorithm
+  // Algorithms
   //
   template<Matrix M, Integral T>
   auto row(M&& m,  T i_row)
@@ -87,7 +87,7 @@ namespace celaeno::graph::barycenter
     return static_cast<double>(a)/b;
   } // function: row
 
-  template<typename M, typename T>
+  template<Matrix M, Integral T>
   auto col(M&& m, T i_col)
   {
     auto index_mult = [i=1](auto&& e) mutable { return e*i++; };
