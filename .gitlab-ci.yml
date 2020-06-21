@@ -58,6 +58,11 @@ matrix_realization:
   script:
     - ./build/bin/test_m_real
 
+barycenter:
+  stage: test
+  script:
+    - ./build/bin/test_barycenter
+
 pages:
   stage: doc
   before_script:
