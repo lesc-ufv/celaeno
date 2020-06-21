@@ -7,6 +7,8 @@
 # pragma once
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
+#include <concepts>
+#include <type_traits>
 
 namespace celaeno::graph::barycenter
 {
@@ -19,16 +21,64 @@ namespace celaeno::graph::barycenter
   namespace rv = ranges::views;
 
   //
+  // Concepts
+  //
+  // M must has .at with integral param type
+  // M must be iterable
+  // M must return a iterable
+  //    - That supports multiplication
+  //    - That supports division
+  //    - That supports .at param
+  // T must be of an integral type
+  template<typename T>
+  concept Iterable =
+    requires(T t)
+    {
+      {t.begin()};
+      {t.end()};
+      {t.cbegin()};
+      {t.cend()};
+    };
+
+  template<typename T>
+  concept Integral = std::is_integral_v<T>;
+
+  template<typename T>
+  concept Arithmetic =
+    requires(T t)
+    {
+      { t+t } -> std::same_as<T>;
+      { t-t } -> std::same_as<T>;
+      { t*t } -> std::same_as<T>;
+      { t/t } -> std::same_as<T>;
+    };
+
+  template<typename M>
+  concept Matrix =
+    Iterable<M>
+  &&
+    requires(M m)
+    {
+      {m.at(int32_t{})};
+
+      {m.at(int32_t{}).at(int32_t{})};
+
+      {Iterable<decltype(m.at(int32_t{}))>};
+
+      {Arithmetic<decltype( m.at(int32_t{}).at(int32_t{}) )>};
+    };
+
+  //
   // Algorithm
   //
-  template<typename M, typename T>
+  template<Matrix M, Integral T>
   auto row(M&& m,  T i_row)
   {
-    auto index_sum = [i=1](auto&& e) mutable { return e*i++; };
+    auto index_mult = [i=1](auto&& e) mutable { return e*i++; };
 
     auto a {fw::apply(
       m.at(i_row)
-      , fw::transform(index_sum)
+      , fw::transform(index_mult)
       , fw::sum()
     )};
 
@@ -40,7 +90,7 @@ namespace celaeno::graph::barycenter
   template<typename M, typename T>
   auto col(M&& m, T i_col)
   {
-    auto index_sum = [i=1](auto&& e) mutable { return e*i++; };
+    auto index_mult = [i=1](auto&& e) mutable { return e*i++; };
 
     auto m_col =
       rv::all(m)
@@ -49,7 +99,7 @@ namespace celaeno::graph::barycenter
 
     auto a {fw::apply(
       m_col
-      , fw::transform(index_sum)
+      , fw::transform(index_mult)
       , fw::sum()
     )};
 
