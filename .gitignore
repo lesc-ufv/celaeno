@@ -1,4 +1,5 @@
 # Ignore build directory
 build/
+logs/
 /.gtm/
-session.vim
+Session.vim
