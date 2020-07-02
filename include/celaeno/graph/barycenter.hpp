@@ -84,7 +84,7 @@ namespace celaeno::graph::barycenter
 
     auto b { fp::sum(m.at(i_row)) };
 
-    return static_cast<double>(a)/b;
+    return (b != 0)? static_cast<double>(a)/b : 0;
   } // function: row
 
   template<Matrix M, Integral T>
@@ -105,7 +105,7 @@ namespace celaeno::graph::barycenter
 
     auto b { fp::sum(m_col) };
 
-    return static_cast<double>(a)/b;
+    return (b != 0)? static_cast<double>(a)/b : 0;
   } // function: col
 
 } // namespace celaeno::graph::barycenter
