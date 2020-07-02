@@ -89,7 +89,7 @@ concept HasEdge =
 template<Layer L, HasEdge E>
 auto matrix_realization(L&& get_layer, E&& has_edge, uint64_t height)
 {
-  using Matrix = std::vector<std::vector<bool>>;
+  using Matrix = std::vector<std::vector<int32_t>>;
 
   // Result
   std::vector<Matrix> result;
@@ -100,7 +100,7 @@ auto matrix_realization(L&& get_layer, E&& has_edge, uint64_t height)
     auto [l1,l2] = std::make_pair(get_layer(i),get_layer(i+1));
 
     // Create the incidence matrix
-    Matrix m( l1.size(), std::vector<bool>(l2.size(), 0) );
+    Matrix m( l1.size(), std::vector<int32_t>(l2.size(), 0) );
 
     // Enumerate layers
     auto [l1e,l2e] { std::make_pair(fp::enumerate(l1),fp::enumerate(l2)) };
