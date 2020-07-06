@@ -63,10 +63,10 @@ barycenter:
   script:
     - ./build/bin/test_barycenter
 
-imatrix_crossings:
+crossings:
   stage: test
   script:
-    - ./build/bin/test_imatrix_crossings
+    - ./build/bin/test_crossings
 
 pages:
   stage: doc
