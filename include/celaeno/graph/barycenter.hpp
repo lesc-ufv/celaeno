@@ -53,59 +53,34 @@ namespace celaeno::graph::barycenter
       { t/t } -> std::same_as<T>;
     };
 
-  template<typename M>
-  concept Matrix =
-    Iterable<M>
+  template<typename V>
+  concept Vector =
+    Iterable<V>
   &&
-    requires(M m)
+    requires(V v)
     {
-      {m.at(int32_t{})};
+      {v.at(int32_t{})};
 
-      {m.at(int32_t{}).at(int32_t{})};
-
-      {Iterable<decltype(m.at(int32_t{}))>};
-
-      {Arithmetic<decltype( m.at(int32_t{}).at(int32_t{}) )>};
+      {Arithmetic<decltype( v.at(int32_t{}) )>};
     };
 
   //
   // Algorithms
   //
-  template<Matrix M, Integral T>
-  auto row(M&& m,  T i_row)
+
+  template<Vector V>
+  auto run(V&& v)
   {
     auto index_mult = [i=1](auto&& e) mutable { return e*i++; };
 
-    auto a {fw::apply(
-      m.at(i_row)
+    auto a {fw::apply(v
       , fw::transform(index_mult)
       , fw::sum()
     )};
 
-    auto b { fp::sum(m.at(i_row)) };
+    auto b { fp::sum(v) };
 
     return (b != 0)? static_cast<double>(a)/b : 0;
-  } // function: row
-
-  template<Matrix M, Integral T>
-  auto col(M&& m, T i_col)
-  {
-    auto index_mult = [i=1](auto&& e) mutable { return e*i++; };
-
-    auto m_col =
-      rv::all(m)
-      | rv::transform([&i_col](auto&& row){ return row.at(i_col); })
-      | rg::to<std::vector>();
-
-    auto a {fw::apply(
-      m_col
-      , fw::transform(index_mult)
-      , fw::sum()
-    )};
-
-    auto b { fp::sum(m_col) };
-
-    return (b != 0)? static_cast<double>(a)/b : 0;
-  } // function: col
+  } // function: run
 
 } // namespace celaeno::graph::barycenter
