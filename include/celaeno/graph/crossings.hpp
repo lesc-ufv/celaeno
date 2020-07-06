@@ -99,11 +99,11 @@ int64_t run(M const& m)
 
   try
   {
-    for (size_t j = 1; j < p-1; j++)
+    for (size_t j = 0; j < p-1; j++)
     {
       for (size_t k = j+1; k < p; k++)
       {
-        for (size_t a = 1; a < q-1; a++)
+        for (size_t a = 0; a < q-1; a++)
         {
           for (size_t b = a+1; b < q; b++)
           {
