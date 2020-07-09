@@ -32,6 +32,7 @@ build:
   artifacts:
     paths:
       - ./build/bin/
+    expire_in: 1 week
 
 bfs:
   stage: test
