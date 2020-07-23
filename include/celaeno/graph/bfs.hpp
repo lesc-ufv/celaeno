@@ -40,7 +40,6 @@
 #include <set>
 #include <tuple>
 #include <concepts>
-#include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
 namespace celaeno::graph::bfs
@@ -50,7 +49,7 @@ namespace celaeno::graph::bfs
 // Aliases
 //
 namespace rg = ranges;
-namespace fw = fplus::fwd;
+namespace ra = ranges::actions;
 
 
 //
@@ -104,7 +103,7 @@ std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
     // Get the adjacent vertices
     // Remove the visited ones
     auto is_visited = [&visited](auto&& v){return visited.contains(v);};
-    auto not_visited {fw::apply(adj(vertex), fw::drop_if(is_visited))};
+    auto not_visited {adj(vertex) | ra::drop_while(is_visited)};
 
     // Insert non-visited into the queue
     rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
