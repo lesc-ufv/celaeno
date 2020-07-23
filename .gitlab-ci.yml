@@ -11,8 +11,10 @@ before_script:
   - pip install conan
 
 build:
-  when: manual
   stage: build
+  rules:
+    - when: manual
+      allow_failure: false
   script:
     - mkdir build && cd build
     - conan profile new default --detect
