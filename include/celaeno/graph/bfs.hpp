@@ -40,7 +40,6 @@
 #include <set>
 #include <tuple>
 #include <concepts>
-#include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
 namespace celaeno::graph::bfs
@@ -50,7 +49,7 @@ namespace celaeno::graph::bfs
 // Aliases
 //
 namespace rg = ranges;
-namespace fw = fplus::fwd;
+namespace ra = ranges::actions;
 
 
 //
@@ -72,7 +71,7 @@ concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // Algorithm
 //
 template< SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)> >
-std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
+std::vector<T> run(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
 {
   // Queue of vertices
   std::queue<T> queue;
@@ -104,7 +103,7 @@ std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
     // Get the adjacent vertices
     // Remove the visited ones
     auto is_visited = [&visited](auto&& v){return visited.contains(v);};
-    auto not_visited {fw::apply(adj(vertex), fw::drop_if(is_visited))};
+    auto not_visited {adj(vertex) | ra::drop_while(is_visited)};
 
     // Insert non-visited into the queue
     rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
@@ -113,6 +112,6 @@ std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
     if ( cb(vertex) ) return result;
   }
   return result;
-}
+} // function: run
 
 } // namespace celaeno::graph::bfs

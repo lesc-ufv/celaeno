@@ -1,8 +1,8 @@
-/* vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :*/
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : matrix-realization
-// @created     : domingo jun 14, 2020 15:43:43 -03
+// @created     : sunday jun 14, 2020 15:43:43 -03
 //
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -21,12 +21,15 @@
 namespace celaeno::graph::matrix_realization::test
 {
 
-//
-// Aliases
-//
+// Namespaces {{{
 namespace graph = taygete::graph;
 namespace matrix_realization = celaeno::graph::matrix_realization;
 namespace fw = fplus::fwd;
+// }}}
+
+// Aliases {{{
+
+// }}}
 
 //
 // Helpers
@@ -85,35 +88,37 @@ TEST_CASE("celaeno::graph::matrix_realization"
 
   SUBCASE("Even number of layers")
   {
-    graph::Graph<int64_t> g;
-    // Layer 1 → 2
-    g.emplace(std::make_pair(1,3));
-    g.emplace(std::make_pair(1,4));
-    g.emplace(std::make_pair(1,5));
-    g.emplace(std::make_pair(1,6));
-    g.emplace(std::make_pair(2,3));
-    g.emplace(std::make_pair(2,6));
-    // Layer 2 → 3
-    g.emplace(std::make_pair(3,7));
-    g.emplace(std::make_pair(5,7));
-    g.emplace(std::make_pair(5,10));
-    g.emplace(std::make_pair(4,8));
-    g.emplace(std::make_pair(4,9));
-    g.emplace(std::make_pair(4,10));
-    // Layer 3 → 4
-    g.emplace(std::make_pair(7,11));
-    g.emplace(std::make_pair(9,11));
-    g.emplace(std::make_pair(9,13));
-    g.emplace(std::make_pair(10,11));
-    g.emplace(std::make_pair(10,12));
+    graph::Graph<int32_t> g;
+    g.emplace(
+      // Layer 1 → 2
+      std::make_pair(1,3),
+      std::make_pair(1,4),
+      std::make_pair(1,5),
+      std::make_pair(1,6),
+      std::make_pair(2,3),
+      std::make_pair(2,6),
+      // Layer 2 → 3
+      std::make_pair(3,7),
+      std::make_pair(5,7),
+      std::make_pair(5,10),
+      std::make_pair(4,8),
+      std::make_pair(4,9),
+      std::make_pair(4,10),
+      // Layer 3 → 4
+      std::make_pair(7,11),
+      std::make_pair(9,11),
+      std::make_pair(9,13),
+      std::make_pair(10,11),
+      std::make_pair(10,12)
+  );
 
 
     //
     // Create hierarchical graph
     //
-    auto pred = [&g](auto&& v){ return g.get_predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.get_successors(v); };
-    auto [h,_] = celaeno::graph::views::depth::depth(1,pred,succ);
+    auto pred = [&g](auto&& v){ return g.predecessors(v); };
+    auto succ = [&g](auto&& v){ return g.successors(v); };
+    auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
 
     //
     // Get the key type
@@ -136,7 +141,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
     //
     // Lambda to verify if an edge between v → u exists
     //
-    auto has_edge = [&g](node_t v, node_t u){ return g.exists_edge(v,u); };
+    auto has_edge = [&g](node_t v, node_t u){ return g.adjacent(v,u); };
 
     //
     // Lambda to get the height of the graph
@@ -151,8 +156,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
       )
     };
 
-    auto matrices
-      {matrix_realization::matrix_realization(get_layer, has_edge, height)};
+    auto matrices {matrix_realization::run(get_layer, has_edge, height)};
 
     //
     // TESTS
@@ -167,27 +171,29 @@ TEST_CASE("celaeno::graph::matrix_realization"
   SUBCASE("Odd number of layers")
   {
     graph::Graph<int64_t> g;
-    // Layer 1 → 2
-    g.emplace(std::make_pair(1,3));
-    g.emplace(std::make_pair(1,4));
-    g.emplace(std::make_pair(1,5));
-    g.emplace(std::make_pair(1,6));
-    g.emplace(std::make_pair(2,3));
-    g.emplace(std::make_pair(2,6));
-    // Layer 2 → 3
-    g.emplace(std::make_pair(3,7));
-    g.emplace(std::make_pair(5,7));
-    g.emplace(std::make_pair(5,10));
-    g.emplace(std::make_pair(4,8));
-    g.emplace(std::make_pair(4,9));
-    g.emplace(std::make_pair(4,10));
+    g.emplace(
+      // Layer 1 → 2
+      std::make_pair(1,3),
+      std::make_pair(1,4),
+      std::make_pair(1,5),
+      std::make_pair(1,6),
+      std::make_pair(2,3),
+      std::make_pair(2,6),
+      // Layer 2 → 3
+      std::make_pair(3,7),
+      std::make_pair(5,7),
+      std::make_pair(5,10),
+      std::make_pair(4,8),
+      std::make_pair(4,9),
+      std::make_pair(4,10)
+    );
 
     //
     // Create hierarchical graph
     //
-    auto pred = [&g](auto&& v){ return g.get_predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.get_successors(v); };
-    auto [h,_] = celaeno::graph::views::depth::depth(1,pred,succ);
+    auto pred = [&g](auto&& v){ return g.predecessors(v); };
+    auto succ = [&g](auto&& v){ return g.successors(v); };
+    auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
 
     //
     // Get the key type
@@ -210,7 +216,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
     //
     // Lambda to verify if an edge between v → u exists
     //
-    auto has_edge = [&g](node_t v, node_t u){ return g.exists_edge(v,u); };
+    auto has_edge = [&g](node_t v, node_t u){ return g.adjacent(v,u); };
 
     //
     // Lambda to get the height of the graph
@@ -225,8 +231,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
       )
     };
 
-    auto matrices
-      {matrix_realization::matrix_realization(get_layer, has_edge, height)};
+    auto matrices {matrix_realization::run(get_layer, has_edge, height)};
 
     //
     // TESTS

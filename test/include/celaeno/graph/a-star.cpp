@@ -82,7 +82,7 @@ decltype(auto) path(T1&& p1, T2&& p2) noexcept
       }};
   };
 
-  return a_star::a_star(
+  return a_star::run(
       std::forward<T1>(p1),
       std::forward<T2>(p2),
       neighbors,

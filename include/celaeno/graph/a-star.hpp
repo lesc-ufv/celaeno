@@ -116,7 +116,7 @@ auto rebuild_path(Map& m, T curr)
 }
 
 template<BaseType T, typename F1, typename F2, typename F3>
-decltype(auto) a_star(T&& start, T&& end, F1&& f_neighbors, F2&& f_distance, F3&& f_heuristic)
+decltype(auto) run(T&& start, T&& end, F1&& f_neighbors, F2&& f_distance, F3&& f_heuristic)
 {
   using Base = std::conditional_t<std::is_integral_v<T>,
     int64_t, std::pair<int64_t,int64_t>
@@ -184,6 +184,6 @@ decltype(auto) a_star(T&& start, T&& end, F1&& f_neighbors, F2&& f_distance, F3&
   } // while ! open.empty()
 
   return std::deque<Base>{};
-}
+} // function: run
 
 } // namespace celaeno::graph::a_star

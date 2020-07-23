@@ -44,13 +44,19 @@ namespace celaeno::graph::bfs::test
 {
 
 //
-// Aliases
+// Namespaces
 //
 
 namespace bfs = celaeno::graph::bfs;
 namespace cir = maia::circuits;
-namespace gra = taygete::graph;
+namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader;
 namespace fw = fplus::fwd;
+
+//
+// Aliases
+//
+
 using float64_t = double;
 
 //
@@ -67,16 +73,16 @@ concept String = requires(T t){ std::string{t}; };
 template<String T>
 void TEST(T&& str)
 {
-  gra::Graph<int64_t> g;
-  auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  gra::reader::Reader reader{str,emplace};
+  graph::Graph<int64_t> g;
+  auto emplace = [&g](auto&& edge) -> void { g.emplace(edge); };
+  reader::Reader{std::string(str),emplace};
 
-  REQUIRE(g.get_node_count() > 0);
+  REQUIRE(g.vertices_count() > 0);
 
-  auto adj = [&g](auto&& v){ return g.get_adjacent(v); };
-  auto bfs {bfs::bfs(0,adj)};
+  auto adj = [&g](auto&& v){ return g.neighbors(v); };
+  auto bfs {bfs::run(0,adj)};
 
-  REQUIRE(g.get_node_count() == bfs.size());
+  REQUIRE(g.vertices_count() == bfs.size());
 
   REQUIRE(fw::apply(bfs,fw::unique()).size() == bfs.size());
 }

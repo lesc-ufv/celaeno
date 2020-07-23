@@ -67,7 +67,7 @@ concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // Algorithm
 //
 template<SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)>>
-std::vector<T> dfs(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
+std::vector<T> run(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
 {
   // Stack of vertices
   std::stack<T> stack;
@@ -108,7 +108,7 @@ std::vector<T> dfs(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
     if( cb(vertex) ) return result;
   } // while
   return result;
-} // dfs
+} // function: run
 
 
 } // namespace celaeno::graph::dfs

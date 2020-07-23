@@ -50,7 +50,7 @@ namespace celaeno::graph::dfs::test
 
 namespace dfs = celaeno::graph::dfs;
 namespace cir = maia::circuits;
-namespace gra = taygete::graph;
+namespace graph = taygete::graph;
 namespace fw = fplus::fwd;
 using float64_t = double;
 
@@ -68,16 +68,16 @@ concept String = requires(T t){ std::string{t}; };
 template<String T>
 void TEST(T&& str)
 {
-  gra::Graph<int64_t> g;
+  graph::Graph<int64_t> g;
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  gra::reader::Reader reader{str,emplace};
+  graph::reader::Reader{std::string(str),emplace};
 
-  REQUIRE(g.get_node_count() > 0);
+  REQUIRE(g.vertices_count() > 0);
 
-  auto adj = [&g](auto&& v){ return g.get_adjacent(v); };
-  auto dfs {dfs::dfs(0,adj)};
+  auto adj = [&g](auto&& v){ return g.neighbors(v); };
+  auto dfs {dfs::run(0,adj)};
 
-  REQUIRE(g.get_node_count() == dfs.size());
+  REQUIRE(g.vertices_count() == dfs.size());
 
   REQUIRE(fw::apply(dfs,fw::unique()).size() == dfs.size());
 }

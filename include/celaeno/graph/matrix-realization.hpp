@@ -87,7 +87,7 @@ concept HasEdge =
 //
 
 template<Layer L, HasEdge E>
-auto matrix_realization(L&& get_layer, E&& has_edge, uint64_t height)
+auto run(L&& get_layer, E&& has_edge, uint64_t height)
 {
   using Matrix = std::vector<std::vector<int32_t>>;
 
@@ -125,6 +125,6 @@ auto matrix_realization(L&& get_layer, E&& has_edge, uint64_t height)
   } // for: i
 
   return result;
-}
+} // function: run
 
 } // namespace celaeno::graph::matrix_realization

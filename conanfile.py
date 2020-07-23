@@ -37,17 +37,16 @@ class CelaenoConan(ConanFile):
   url = "https://gitlab.com/formigoni/celaeno"
   description = "C++ Computer Science Algorithms Collection"
   topics = ("c++", "generic", "nanocomputing", "algorithms")
-  generators = "cmake"
+  generators = "cmake_find_package"
   exports_sources = "include/*", "cmake/*", "LICENSE", "CMakeLists.txt"
   no_copy_source = True
   requires = \
-    'range-v3/0.10.0@ericniebler/stable', \
-    'taygete/0.1@pleiades/testing', \
-    'asterope/0.1@pleiades/testing', \
+    'spdlog/1.7.0', \
+    'taygete/1.0@ruanformigoni/stable', \
     'maia/0.1@pleiades/testing', \
-    'fmt/6.2.1@fmt/testing', \
+    'fmt/6.0.0@bincrafters/stable', \
     'doctest/2.3.4@bincrafters/stable', \
-    'spdlog/1.6.1@spdlog/testing', \
+    'spdlog/1.7.0', \
     'functionalplus/v0.2.7-p0@dobiasd/stable'
 
   def source(self):

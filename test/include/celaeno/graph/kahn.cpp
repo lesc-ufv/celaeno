@@ -48,7 +48,7 @@ namespace celaeno::graph::kahn::test
 // Aliases
 //
 namespace cir = maia::circuits;
-namespace gra = taygete::graph;
+namespace graph = taygete::graph;
 namespace fw = fplus::fwd;
 using float64_t = double;
 
@@ -65,33 +65,33 @@ concept String = requires(T t){ std::string{t}; };
 template<String T>
 void TEST(T&& str)
 {
-  gra::Graph<int64_t> g;
+  graph::Graph<int64_t> g;
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  gra::reader::Reader reader{str,emplace};
+  graph::reader::Reader{std::string(str),emplace};
 
   //
   // Helpers
   //
 
-  auto pred = [&g](auto&& v){ return g.get_predecessors(v); };
-  auto succ = [&g](auto&& v){ return g.get_successors(v); };
+  auto pred = [&g](auto&& v){ return g.predecessors(v); };
+  auto succ = [&g](auto&& v){ return g.successors(v); };
 
   //
   // Execution
   //
 
-  auto result {celaeno::graph::kahn::kahn(0,pred,succ)};
+  auto result {celaeno::graph::kahn::run(0,pred,succ)};
 
   //
   // Tests
   //
 
-  REQUIRE(g.get_node_count() > 0);
+  REQUIRE(g.vertices_count() > 0);
 
-  auto adj = [&g](auto&& v){ return g.get_adjacent(v); };
-  auto bfs {bfs::bfs(0,adj)};
+  auto adj = [&g](auto&& v){ return g.neighbors(v); };
+  auto bfs {bfs::run(0,adj)};
 
-  REQUIRE(g.get_node_count() == result.size());
+  REQUIRE(g.vertices_count() == result.size());
 
   REQUIRE(fw::apply(result,fw::unique()).size() == result.size());
 
