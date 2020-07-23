@@ -75,7 +75,7 @@ void TEST(T&& str)
   REQUIRE(g.vertices_count() > 0);
 
   auto adj = [&g](auto&& v){ return g.neighbors(v); };
-  auto dfs {dfs::dfs(0,adj)};
+  auto dfs {dfs::run(0,adj)};
 
   REQUIRE(g.vertices_count() == dfs.size());
 

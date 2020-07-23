@@ -80,7 +80,7 @@ void TEST(T&& str)
   REQUIRE(g.vertices_count() > 0);
 
   auto adj = [&g](auto&& v){ return g.neighbors(v); };
-  auto bfs {bfs::bfs(0,adj)};
+  auto bfs {bfs::run(0,adj)};
 
   REQUIRE(g.vertices_count() == bfs.size());
 

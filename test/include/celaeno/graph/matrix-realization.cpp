@@ -1,4 +1,4 @@
-/* vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :*/
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : matrix-realization
@@ -118,7 +118,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
     //
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [h,_] = celaeno::graph::views::depth::depth(1,pred,succ);
+    auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
 
     //
     // Get the key type
@@ -156,8 +156,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
       )
     };
 
-    auto matrices
-      {matrix_realization::matrix_realization(get_layer, has_edge, height)};
+    auto matrices {matrix_realization::run(get_layer, has_edge, height)};
 
     //
     // TESTS
@@ -194,7 +193,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
     //
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [h,_] = celaeno::graph::views::depth::depth(1,pred,succ);
+    auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
 
     //
     // Get the key type
@@ -232,8 +231,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
       )
     };
 
-    auto matrices
-      {matrix_realization::matrix_realization(get_layer, has_edge, height)};
+    auto matrices {matrix_realization::run(get_layer, has_edge, height)};
 
     //
     // TESTS

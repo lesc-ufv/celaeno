@@ -65,7 +65,7 @@ concept Function = requires(T t) { {t(int64_t{})} -> Iterable; };
 
 template<std::signed_integral T, Function F1, Function F2>
 std::pair<std::multimap<T,T>,std::map<T,T>>
-  depth(T root, F1&& pred, F2&& succ)
+  run(T root, F1&& pred, F2&& succ)
 {
   // level -> nodes
   std::multimap<T,T> m;
@@ -74,7 +74,7 @@ std::pair<std::multimap<T,T>,std::map<T,T>>
 
   auto topo_sort
   {
-    kahn::kahn(
+    kahn::run(
       std::forward<T>(root),
       std::forward<F1>(pred),
       std::forward<F2>(succ),
@@ -107,6 +107,6 @@ std::pair<std::multimap<T,T>,std::map<T,T>>
   };
 
   return std::make_pair(m,m_rev);
-} // depth_view
+} // function: run
 
 } // namespace celaeno::graph::view::depth

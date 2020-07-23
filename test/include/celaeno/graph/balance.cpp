@@ -86,7 +86,7 @@ void TEST(T&& str)
   auto unlink = [&g](auto&& pair){ g.erase(pair); };
 
   // Execution
-  balance::balance(0,pred,succ,link,unlink);
+  balance::run(0,pred,succ,link,unlink);
 
   //
   // Verification
@@ -94,7 +94,7 @@ void TEST(T&& str)
 
   // * Given a depth-view, each vertex must have a distance of one
   // * to its successor or predecessor
-  auto dview {depth::depth(0,pred,succ)};
+  auto dview {depth::run(0,pred,succ)};
   auto const& level_vert {dview.first};
   auto const& vert_level {dview.second};
 

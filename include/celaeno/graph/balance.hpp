@@ -55,19 +55,19 @@ namespace rv = ranges::views;
 namespace fw = fplus::fwd;
 
 template<typename T, typename F1, typename F2, typename F3, typename F4>
-void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
+void run(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
 {
   //
   // Get the pseudo vertex with the lowest value
   //
   auto adj = [&pred,&succ](auto&& v) { return fplus::append(pred(v),succ(v)); };
-  auto counter { fw::apply(bfs::bfs(root,adj), fw::sort(), fw::minimum()) };
+  auto counter { fw::apply(bfs::run(root,adj), fw::sort(), fw::minimum()) };
 
   //
   // Build depth-map
   //
   auto [depth_vertex,vertex_depth] =
-    depth::depth(root,std::forward<F1>(pred),std::forward<F2>(succ));
+    depth::run(root,std::forward<F1>(pred),std::forward<F2>(succ));
 
   //
   // Get the levels indexes
@@ -140,6 +140,6 @@ void balance(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
     } // for
   } // for: i
 
-} // balance
+} // function: run
 
 } // namespace celaeno::graph::balance

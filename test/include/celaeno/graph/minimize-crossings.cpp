@@ -44,7 +44,7 @@ namespace celaeno::graph::minimize_crossings::test
   //
   // Aliases
   //
-  namespace minimize = celaeno::graph::minimize_crossings;
+  namespace minimize_crossings = celaeno::graph::minimize_crossings;
   namespace graph = taygete::graph;
   namespace depth = celaeno::graph::views::depth;
   namespace fp = fplus;
@@ -63,7 +63,7 @@ namespace celaeno::graph::minimize_crossings::test
     // Create hierarchical graph
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [h,_] = depth::depth(1,pred,succ);
+    auto [h,_] = depth::run(1,pred,succ);
 
     // Get the key type
     using node_t = decltype(h)::key_type;
@@ -85,11 +85,11 @@ namespace celaeno::graph::minimize_crossings::test
     auto depth {fw::apply(h,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
 
     // Matrix realization of the graph
-    auto matrices {matrix_realization::matrix_realization(get_layer, has_edge, depth)};
+    auto matrices {matrix_realization::run(get_layer, has_edge, depth)};
 
     SUBCASE("Test vertices as matrices labels")
     {
-      auto ordering{minimize::minimize_crossings(matrices, get_layer, depth)};
+      auto ordering{minimize_crossings::run(matrices, get_layer, depth)};
       for (auto const& i : ordering)
       {
         std::cout << rv::all(i) << std::endl;

@@ -80,7 +80,7 @@ void TEST(T&& str)
   // Execution
   //
 
-  auto result {celaeno::graph::kahn::kahn(0,pred,succ)};
+  auto result {celaeno::graph::kahn::run(0,pred,succ)};
 
   //
   // Tests
@@ -89,7 +89,7 @@ void TEST(T&& str)
   REQUIRE(g.vertices_count() > 0);
 
   auto adj = [&g](auto&& v){ return g.neighbors(v); };
-  auto bfs {bfs::bfs(0,adj)};
+  auto bfs {bfs::run(0,adj)};
 
   REQUIRE(g.vertices_count() == result.size());
 

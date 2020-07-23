@@ -71,7 +71,7 @@ concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // Algorithm
 //
 template< SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)> >
-std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
+std::vector<T> run(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
 {
   // Queue of vertices
   std::queue<T> queue;
@@ -112,6 +112,6 @@ std::vector<T> bfs(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
     if ( cb(vertex) ) return result;
   }
   return result;
-}
+} // function: run
 
 } // namespace celaeno::graph::bfs

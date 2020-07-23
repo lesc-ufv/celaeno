@@ -66,7 +66,7 @@ concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // Algorithm
 //
 template< SignedIntegral T, Fn F1, Fn F2, Fc F3 = std::function<bool(int64_t)> >
-std::vector<T> kahn(T&& root, F1&& pred, F2&& succ, F3&& cb = [](auto&&){return false;})
+std::vector<T> run(T&& root, F1&& pred, F2&& succ, F3&& cb = [](auto&&){return false;})
 {
   auto adj = [&pred,&succ](auto&& v){ return fp::append(pred(v),succ(v)); };
 
@@ -81,7 +81,7 @@ std::vector<T> kahn(T&& root, F1&& pred, F2&& succ, F3&& cb = [](auto&&){return 
 
   // Populate the deque
   auto has_pred = [&pred](auto&& v){ return ! pred(v).empty(); };
-  bfs::bfs(root,adj,[&has_pred,&deque](auto&& v)
+  bfs::run(root,adj,[&has_pred,&deque](auto&& v)
     { if( ! has_pred(v) ){ deque.push_back(v); } return false; });
 
   while (! deque.empty() )
@@ -108,6 +108,6 @@ std::vector<T> kahn(T&& root, F1&& pred, F2&& succ, F3&& cb = [](auto&&){return 
     }
   } // while: ! initial.empty()
   return result;
-}
+} // function: run
 
 } // namespace celaeno::graph::kahn
