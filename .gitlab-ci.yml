@@ -11,6 +11,7 @@ before_script:
   - pip install conan
 
 build:
+  when: manual
   stage: build
   script:
     - mkdir build && cd build
@@ -35,36 +36,43 @@ build:
     expire_in: 1 week
 
 bfs:
+  needs: ["build"]
   stage: test
   script:
     - ./build/bin/test_bfs
 
 dfs:
+  needs: ["build"]
   stage: test
   script:
     - ./build/bin/test_dfs
 
 graph_balance:
+  needs: ["build"]
   stage: test
   script:
     - ./build/bin/test_balance
 
 a_star:
+  needs: ["build"]
   stage: test
   script:
     - ./build/bin/test_a_star
 
 matrix_realization:
+  needs: ["build"]
   stage: test
   script:
     - ./build/bin/test_m_real
 
 barycenter:
+  needs: ["build"]
   stage: test
   script:
     - ./build/bin/test_barycenter
 
 crossings:
+  needs: ["build"]
   stage: test
   script:
     - ./build/bin/test_crossings
