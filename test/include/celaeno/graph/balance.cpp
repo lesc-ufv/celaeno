@@ -74,14 +74,14 @@ void TEST(T&& str)
 {
   graph::Graph<int64_t> g;
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  taygete::graph::reader::Reader reader{str,emplace};
+  taygete::graph::reader::Reader reader{std::string(str),emplace};
 
   //
   // Helpers
   //
 
-  auto pred = [&g](auto&& v){ return g.get_predecessors(v); };
-  auto succ = [&g](auto&& v){ return g.get_successors(v); };
+  auto pred = [&g](auto&& v){ return g.predecessors(v); };
+  auto succ = [&g](auto&& v){ return g.successors(v); };
   auto link = [&g](auto&& pair){ g.emplace(pair); };
   auto unlink = [&g](auto&& pair){ g.erase(pair); };
 
@@ -111,7 +111,7 @@ void TEST(T&& str)
       // Current vertex
       auto const& curr {it->second};
       // The adjacent vertices
-      auto adj {g.get_adjacent(curr)};
+      auto adj {g.neighbors(curr)};
       // Verify if distance is one to each
       auto is_dist_one = [&vert_level,&curr](auto&& a) -> void
         { REQUIRE(std::abs(vert_level.at(a) - vert_level.at(curr)) == 1); };
