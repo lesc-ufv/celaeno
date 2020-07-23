@@ -33,35 +33,47 @@
 cmake_minimum_required(VERSION 3.7..3.15)
 cmake_policy(VERSION 3.7..3.15)
 
-project(celaeno DESCRIPTION "C++ Algorithms Collection" LANGUAGES CXX)
+project(celaeno DESCRIPTION "C++ 20 Generic Algorithms" LANGUAGES CXX)
 
 # Conan
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-conan_basic_setup()
+set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 
-#
 # External libraries
-#
+if(NOT spdlog_FOUND)
+  find_package(spdlog REQUIRED)
+endif()
+
+if(NOT taygete_FOUND)
+  find_package(taygete REQUIRED)
+endif()
+
+if(NOT maia_FOUND)
+  find_package(maia REQUIRED)
+endif()
+
 if(NOT fmt_FOUND)
   find_package(fmt REQUIRED)
 endif()
+
+if(NOT doctest_FOUND)
+  find_package(doctest REQUIRED)
+endif()
+
+if(NOT spdlog_FOUND)
+  find_package(spdlog REQUIRED)
+endif()
+
 if(NOT range-v3_FOUND)
   find_package(range-v3 REQUIRED)
 endif()
 
-#
 # Source files
-#
 add_subdirectory(include)
 
-#
 # Tests
-#
 add_subdirectory(test)
 
-#
 # Install
-#
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
