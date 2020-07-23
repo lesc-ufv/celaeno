@@ -53,7 +53,7 @@ graph_balance:
   needs: ["build"]
   stage: test
   script:
-    - ./build/test/test_balance -s
+    - ./build/test/test_balance
 
 a_star:
   needs: ["build"]
