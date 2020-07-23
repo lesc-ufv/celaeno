@@ -34,50 +34,50 @@ build:
     - cmake --build build
   artifacts:
     paths:
-      - ./build/bin/
+      - ./build/test/
     expire_in: 1 week
 
 bfs:
   needs: ["build"]
   stage: test
   script:
-    - ./build/bin/test_bfs
+    - ./build/test/test_bfs -s
 
 dfs:
   needs: ["build"]
   stage: test
   script:
-    - ./build/bin/test_dfs
+    - ./build/test/test_dfs -s
 
 graph_balance:
   needs: ["build"]
   stage: test
   script:
-    - ./build/bin/test_balance
+    - ./build/test/test_balance -s
 
 a_star:
   needs: ["build"]
   stage: test
   script:
-    - ./build/bin/test_a_star
+    - ./build/test/test_a_star -s
 
 matrix_realization:
   needs: ["build"]
   stage: test
   script:
-    - ./build/bin/test_m_real
+    - ./build/test/test_m_real -s
 
 barycenter:
   needs: ["build"]
   stage: test
   script:
-    - ./build/bin/test_barycenter
+    - ./build/test/test_barycenter -s
 
 crossings:
   needs: ["build"]
   stage: test
   script:
-    - ./build/bin/test_crossings
+    - ./build/test/test_crossings -s
 
 pages:
   stage: doc
