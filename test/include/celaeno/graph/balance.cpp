@@ -128,7 +128,7 @@ void TEST(T&& str)
 
 TEST_CASE("celaeno::graph::balance"
   * doctest::description("Balance test")
-  * doctest::timeout(100.0f)
+  * doctest::timeout(1000.0f)
 )
 {
   //
