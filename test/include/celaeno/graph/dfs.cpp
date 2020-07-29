@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : dfs
@@ -34,122 +35,119 @@
 #include <doctest/doctest.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <celaeno/aliases.hpp>
 #include <celaeno/graph/dfs.hpp>
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader.hpp>
+#include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
 #include <fplus/fplus.hpp>
 
+// namespace: celaeno::graph::dfs::test {{{
+
 namespace celaeno::graph::dfs::test
 {
 
-//
-// Aliases
-//
-
+// Aliases {{{
+namespace reader = taygete::graph::reader::verilog;
+namespace graph = taygete::graph;
 namespace dfs = celaeno::graph::dfs;
 namespace cir = maia::circuits;
-namespace graph = taygete::graph;
 namespace fw = fplus::fwd;
-using float64_t = double;
+// }}}
 
-//
-// Concepts
-//
-
+// Concepts {{{
 template<typename T>
 concept String = requires(T t){ std::string{t}; };
+// }}}
 
-//
-// Test Wrapper
-//
-
-template<String T>
-void TEST(T&& str)
-{
-  graph::Graph<int64_t> g;
-  auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  graph::reader::Reader{std::string(str),emplace};
-
-  REQUIRE(g.vertices_count() > 0);
-
-  auto adj = [&g](auto&& v){ return g.neighbors(v); };
-  auto dfs {dfs::run(0,adj)};
-
-  REQUIRE(g.vertices_count() == dfs.size());
-
-  REQUIRE(fw::apply(dfs,fw::unique()).size() == dfs.size());
-}
-
-//
-// Test Cases
-//
+// test_case: celaeno::graph::dfs {{{
 
 TEST_CASE("celaeno::graph::dfs"
   * doctest::description("Depth-First Search test")
   * doctest::timeout(10.0f)
 )
 {
-  //
-  // Logger
-  //
-  auto logger {spdlog::basic_logger_mt("graph::dfs", "logs/graph-dfs.txt")};
+  // Logger {{{
+  auto logger {spdlog::basic_logger_mt("graph::dfs", "logs/celaeno/graph/dfs.csv")};
   spdlog::set_default_logger(logger);
-  auto start {std::chrono::system_clock::now()};
+  spdlog::set_pattern("%v");
+  spdlog::info("date,time,vertices,edges,runtime");
+  spdlog::set_pattern("%d/%m/%Y,%T,%v");
+  // }}}
 
-  //
-  // Iscas
-  //
+  // test lambda {{{
+  auto test = [&]<String S>(S&& str)
+  {
+    //  Read graph {{{
+    graph::Graph<i64> g;
+    auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
+    reader::Reader{str,emplace};
+    // }}}
 
-  TEST(cir::iscas::s27);
-  TEST(cir::iscas::s298);
-  TEST(cir::iscas::s349);
-  TEST(cir::iscas::s208);
-  TEST(cir::iscas::s420);
-  TEST(cir::iscas::s838);
-  TEST(cir::iscas::s386);
-  TEST(cir::iscas::s510);
-  TEST(cir::iscas::s1494);
-  TEST(cir::iscas::s832);
+    // Test if vertices_count > 0 {{{
+    REQUIRE(g.vertices_count() > 0);
+    // }}}
 
-  //
-  // LGSynth 91
-  //
-  TEST(cir::synth_91::alu2);
-  TEST(cir::synth_91::alu4);
-  TEST(cir::synth_91::dalu);
-  TEST(cir::synth_91::apex6);
-  TEST(cir::synth_91::apex7);
-  TEST(cir::synth_91::b1);
-  TEST(cir::synth_91::c8);
-  TEST(cir::synth_91::cc);
-  TEST(cir::synth_91::cht);
-  TEST(cir::synth_91::cm138a);
-  TEST(cir::synth_91::cm150a);
-  TEST(cir::synth_91::cm151a);
-  TEST(cir::synth_91::cm162a);
-  TEST(cir::synth_91::cm163a);
-  TEST(cir::synth_91::cm42a);
-  TEST(cir::synth_91::cm82a);
-  TEST(cir::synth_91::cm85a);
-  TEST(cir::synth_91::cmb);
-  TEST(cir::synth_91::comp);
-  TEST(cir::synth_91::cordic);
-  TEST(cir::synth_91::cu);
-  TEST(cir::synth_91::count);
-  TEST(cir::synth_91::decod);
-  TEST(cir::synth_91::my_adder);
+    // Test dfs {{{
+    auto adj = [&g](auto&& v){ return g.neighbors(v); };
+    auto start {std::chrono::system_clock::now()};
+    auto dfs {dfs::run(0,adj)};
+    auto end {std::chrono::system_clock::now()};
+    std::chrono::duration<f64> dur {end-start};
+    std::stringstream ss; ss << dur.count();
+    // }}}
 
-  //
-  // Log duration
-  //
+    // Test vertices count with bfs size {{{
+    REQUIRE(g.vertices_count() == dfs.size());
+    // }}}
 
-  auto end {std::chrono::system_clock::now()};
-  std::chrono::duration<float64_t> dur {end-start};
-  std::stringstream ss; ss << dur.count();
-  spdlog::info("Duration for dfs.cpp: {}", ss.str());
+    // Test dfs vector size  {{{
+    REQUIRE(fw::apply(dfs,fw::unique()).size() == dfs.size());
+    // }}}
 
-} // TEST_CASE: celaeno::graph::dfs
+    // Log results {{{
+    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    // }}}
+  }; // lamb: test
+  // }}}
+
+  // Forwarding test folding lambda {{{
+  auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
+
+  // }}}
+
+  // LGSynth 91 tests {{{
+  tests(cir::synth_91::alu2,
+    cir::synth_91::alu4,
+    cir::synth_91::dalu,
+    cir::synth_91::apex6,
+    cir::synth_91::apex7,
+    cir::synth_91::b1,
+    cir::synth_91::c8,
+    cir::synth_91::cc,
+    cir::synth_91::cht,
+    cir::synth_91::cm138a,
+    cir::synth_91::cm150a,
+    cir::synth_91::cm151a,
+    cir::synth_91::cm162a,
+    cir::synth_91::cm163a,
+    cir::synth_91::cm42a,
+    cir::synth_91::cm82a,
+    cir::synth_91::cm85a,
+    cir::synth_91::cmb,
+    cir::synth_91::comp,
+    cir::synth_91::cordic,
+    cir::synth_91::cu,
+    cir::synth_91::count,
+    cir::synth_91::decod,
+    cir::synth_91::my_adder
+  );
+  // }}}
+
+} // TEST_CASE: celaeno::graph::dfs }}}
+
 
 } // namespace celaeno::graph::dfs::test
+
+// }}}
