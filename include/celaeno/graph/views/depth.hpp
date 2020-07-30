@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : depth
@@ -42,13 +43,18 @@
 namespace celaeno::graph::views::depth
 {
 //
-// Aliases
+// Namespaces
 //
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
 namespace rv = ranges::views;
+namespace ra = ranges::actions;
 namespace kahn = celaeno::graph::kahn;
+
+// Aliases {{{
+
+// }}}
 
 //
 // Concepts
@@ -68,45 +74,35 @@ std::pair<std::multimap<T,T>,std::map<T,T>>
   run(T root, F1&& pred, F2&& succ)
 {
   // level -> nodes
-  std::multimap<T,T> m;
+  std::multimap<T,T> ln;
+
   // node -> level
-  std::map<T,T> m_rev;
+  std::map<T,T> nl;
 
-  auto topo_sort
+  // Emplace in ln and nl
+  auto emplace = [&](auto&& l, auto&& n) { ln.emplace(l,n); nl.emplace(n,l); };
+
+  // Perform Topological sorting
+  auto topo {kahn::run(std::forward<T>(root),std::forward<F1>(pred),std::forward<F2>(succ))};
+
+  // lambda to get all levels of a set vertices
+  auto levels = [&](auto&& vs) { return fp::transform([&](auto&& n){ return nl.at(n); }, vs);};
+
+  // lambda to get the predecessor ps with max level
+  auto max = [&](auto&& ps) { return fw::apply(levels(ps),fw::maximum()); };
+
+  // Split by level
+  fw::apply(topo,fw::transform(([&](auto&& n)
   {
-    kahn::run(
-      std::forward<T>(root),
-      std::forward<F1>(pred),
-      std::forward<F2>(succ),
-      [&pred,&m,&m_rev](auto&& v_curr) -> bool
-      {
-        if( pred(v_curr).size() == 0 )
-        {
-          m.emplace(0,v_curr);
-          m_rev.emplace(v_curr,0);
-        } // if
-        else
-        {
-          // Get siblings
-          // Get their levels
-          // Get the max value
-          auto level
-          {
-            fw::apply(
-              pred(v_curr)
-              , fw::transform([&m_rev](auto&& v_sib){ return m_rev.at(v_sib); })
-              , fw::maximum()
-            )
-          };
-          m.emplace(level+1,v_curr);
-          m_rev.emplace(v_curr,level+1);
-        } // else
-        return false;
-      } // lambda
-    ) // kahn's algorithm
-  };
+    auto preds {pred(n)};
+    // If is in the first level (has no predecessors), emplace 0
+    if( preds.size() == 0 ) { emplace(0,n); }
+    // else, emplace max level of the predecessors + 1
+    else{ emplace(max(preds)+1,n); }
+    return true;
+  })));
 
-  return std::make_pair(m,m_rev);
+  return std::make_pair(ln,nl);
 } // function: run
 
 } // namespace celaeno::graph::view::depth
