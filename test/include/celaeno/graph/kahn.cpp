@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : kahn
@@ -35,33 +36,35 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <fplus/fplus.hpp>
 #include <celaeno/graph/kahn.hpp>
+#include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
 
 
+// namespace celaeno::graph::kahn::test {{{
+
 namespace celaeno::graph::kahn::test
 {
 
-//
-// Aliases
-//
+// namespaces {{{
+
 namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace fw = fplus::fwd;
-using float64_t = double;
 
-//
-// Concepts
-//
+// }}}
+
+// Concepts {{{
 
 template<typename T>
 concept String = requires(T t){ std::string{t}; };
 
-//
-// Test Wrapper
-//
+// }}}
+
+// Test Wrapper {{{
+
 template<String T>
 void TEST(T&& str)
 {
@@ -69,69 +72,39 @@ void TEST(T&& str)
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
   graph::reader::Reader{std::string(str),emplace};
 
-  //
   // Helpers
-  //
-
   auto pred = [&g](auto&& v){ return g.predecessors(v); };
   auto succ = [&g](auto&& v){ return g.successors(v); };
 
-  //
   // Execution
-  //
-
   auto result {celaeno::graph::kahn::run(0,pred,succ)};
 
-  //
-  // Tests
-  //
-
+  // Check if graph was populated
   REQUIRE(g.vertices_count() > 0);
 
+  // Check if no nodes are missing
   auto adj = [&g](auto&& v){ return g.neighbors(v); };
   auto bfs {bfs::run(0,adj)};
-
   REQUIRE(g.vertices_count() == result.size());
 
+  // Check if no nodes are duplicates
   REQUIRE(fw::apply(result,fw::unique()).size() == result.size());
 
-} // function: TEST
+} // function: TEST }}}
 
-//
-// Test Cases
-//
+// Test Case celaeno::graph::kahn {{{
 
 TEST_CASE("celaeno::graph::kahn"
   * doctest::description("Kahn's algorithm test")
   * doctest::timeout(10.0f)
 )
 {
-  //
   // Logger
-  //
-
   auto logger {spdlog::basic_logger_mt("graph::kahn", "logs/graph-kahn.txt")};
   spdlog::set_default_logger(logger);
   auto start {std::chrono::system_clock::now()};
 
-  //
-  // Iscas
-  //
-
-  TEST(cir::iscas::s27);
-  TEST(cir::iscas::s298);
-  TEST(cir::iscas::s349);
-  TEST(cir::iscas::s208);
-  TEST(cir::iscas::s420);
-  TEST(cir::iscas::s838);
-  TEST(cir::iscas::s386);
-  TEST(cir::iscas::s510);
-  TEST(cir::iscas::s1494);
-  TEST(cir::iscas::s832);
-
-  //
   // LGSynth 91
-  //
   TEST(cir::synth_91::alu2);
   TEST(cir::synth_91::alu4);
   TEST(cir::synth_91::dalu);
@@ -157,15 +130,12 @@ TEST_CASE("celaeno::graph::kahn"
   TEST(cir::synth_91::decod);
   TEST(cir::synth_91::my_adder);
 
-  //
   // Log duration
-  //
-
   auto end {std::chrono::system_clock::now()};
-  std::chrono::duration<float64_t> dur {end-start};
+  std::chrono::duration<f64> dur {end-start};
   std::stringstream ss; ss << dur.count();
   spdlog::info("Duration for khan.cpp: {}", ss.str());
 
-} // TEST_CASE: celaeno::graph::kahn
+} // TEST_CASE: celaeno::graph::kahn }}}
 
-} // namespace celaeno::graph::kahn::test
+} // namespace celaeno::graph::kahn::test }}}

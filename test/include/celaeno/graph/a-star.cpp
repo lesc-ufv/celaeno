@@ -1,4 +1,4 @@
-// vim: set ts=2 sw=2 tw=0 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : a-star
@@ -35,30 +35,32 @@
 #include <doctest/doctest.h>
 #include <celaeno/graph/a-star.hpp>
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader.hpp>
+#include <taygete/graph/reader/verilog.hpp>
 
 #include <vector>
 #include <utility>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
+//  namespace celaeno::graph::a_star::test {{{
+
 namespace celaeno::graph::a_star::test
 {
 
-//
-// Aliases
-//
+// Namespaces {{{
 namespace a_star = celaeno::graph::a_star;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::action;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-using float64_t = double;
+// }}}
 
-//
-// Helpers
-//
+// Aliases {{{
+using float64_t = double;
+// }}}
+
+// Helpers {{{
 template<typename T1, typename T2>
 decltype(auto) constexpr manhattan(T1&& p1, T2&& p2) noexcept
 {
@@ -95,9 +97,9 @@ decltype(auto) path(T1&& p1, T2&& p2) noexcept
     );
 }
 
-//
-// Tests
-//
+// }}}
+
+// testcase: celaeno::graph::a_star {{{
 
 TEST_CASE("celaeno::graph::a_star")
 {
@@ -171,6 +173,7 @@ TEST_CASE("celaeno::graph::a_star")
 
   } // SUB_CASE: Path size checks
 
-} // TEST_CASE: celaeno::graph::a_star
+} // TEST_CASE: celaeno::graph::a_star }}}
 
-} // namespace celaeno::graph::bfs::test
+
+} // namespace celaeno::graph::bfs::test }}}

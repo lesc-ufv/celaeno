@@ -33,19 +33,17 @@
 #include <doctest/doctest.h>
 #include <celaeno/graph/crossings.hpp>
 
-//
-// Aliases
-//
+
+// namespace celaeno::graph::crossings::test {{{
 
 namespace celaeno::graph::crossings::test
 {
 
-//
-// Tests
-//
+// Tests case celaeno::graph::crossings {{{
 
 TEST_CASE("celaeno::graph::crossings")
 {
+  // Subcase Edge crossings count {{{
   SUBCASE("Edge crossings count")
   {
     std::array<std::array<int32_t,5>,4> m0
@@ -111,7 +109,8 @@ TEST_CASE("celaeno::graph::crossings")
     REQUIRE(c4 == 8);
     REQUIRE(c5 == 7);
 
-  } // SUBCASE: "Edge crossings count"
-} // TEST_CASE: "celaeno::graph::crossings"
+  } // SUBCASE: "Edge crossings count" }}}
 
-} // namespace celaeno::graph::crossings::test
+} // TEST_CASE: "celaeno::graph::crossings" }}}
+
+} // namespace celaeno::graph::crossings::test }}}
