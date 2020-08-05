@@ -33,42 +33,29 @@
 
 #pragma once
 
-#include <set>
 #include <map>
-#include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 #include <celaeno/graph/kahn.hpp>
 #include <type_traits>
 
+// namespace celaeno::graph::views::depth {{{
 namespace celaeno::graph::views::depth
 {
-//
-// Namespaces
-//
+
+// Namespaces {{{
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-namespace rg = ranges;
-namespace rv = ranges::views;
-namespace ra = ranges::actions;
 namespace kahn = celaeno::graph::kahn;
-
-// Aliases {{{
-
 // }}}
 
-//
-// Concepts
-//
-
+// Concepts {{{
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 template<typename T>
 concept Function = requires(T t) { {t(int64_t{})} -> Iterable; };
+// }}}
 
-//
-// Algorithm
-//
-
+// Algorithm {{{
 template<std::signed_integral T, Function F1, Function F2>
 std::pair<std::multimap<T,T>,std::map<T,T>>
   run(T root, F1&& pred, F2&& succ)
@@ -96,13 +83,16 @@ std::pair<std::multimap<T,T>,std::map<T,T>>
   {
     auto preds {pred(n)};
     // If is in the first level (has no predecessors), emplace 0
-    if( preds.size() == 0 ) { emplace(0,n); }
+    if( preds.size() == 0 ) [[unlikely]] { emplace(0,n); }
     // else, emplace max level of the predecessors + 1
-    else{ emplace(max(preds)+1,n); }
+    else [[likely]] { emplace(max(preds)+1,n); }
     return true;
   })));
 
-  return std::make_pair(ln,nl);
+  return { ln, nl };
 } // function: run
+// }}}
 
 } // namespace celaeno::graph::view::depth
+
+// }}}
