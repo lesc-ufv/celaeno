@@ -42,7 +42,7 @@
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader.hpp>
+#include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
 
@@ -51,9 +51,10 @@
 namespace celaeno::graph::balance::test
 {
 
-// Aliases {{{
+// namespaces {{{
 
 namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
 namespace cir = maia::circuits;
 namespace balance = celaeno::graph::balance;
 namespace depth = celaeno::graph::views::depth;
@@ -76,7 +77,7 @@ void TEST(T&& str)
 {
   graph::Graph<int64_t> g;
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  taygete::graph::reader::Reader{str,emplace};
+  reader::Reader{str,emplace};
 
   //
   // Helpers

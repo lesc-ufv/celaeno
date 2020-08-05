@@ -38,7 +38,7 @@
 #include <celaeno/graph/kahn.hpp>
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader.hpp>
+#include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
 
@@ -52,6 +52,7 @@ namespace celaeno::graph::kahn::test
 
 namespace cir = maia::circuits;
 namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
 namespace fw = fplus::fwd;
 
 // }}}
@@ -70,7 +71,7 @@ void TEST(T&& str)
 {
   graph::Graph<int64_t> g;
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  graph::reader::Reader{std::string(str),emplace};
+  reader::Reader{str,emplace};
 
   // Helpers
   auto pred = [&g](auto&& v){ return g.predecessors(v); };
