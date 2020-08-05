@@ -13,113 +13,116 @@
 #include <iomanip>
 #include <fplus/fplus.hpp>
 
+// namespace celaeno::graph::barycenter::test {{{
+
 namespace celaeno::graph::barycenter::test
 {
 
-  //
-  // Aliases
-  //
-  namespace barycenter = celaeno::graph::barycenter;
-  namespace fp = fplus;
-  namespace fw = fplus::fwd;
+// namespaces {{{
 
-  //
-  // Helpers
-  //
-  template<typename M>
-  auto swap_rows_and_cols(M&& m)
-  {
-    // Get a column by index
-    auto col = [&](auto i){return fp::transform([&i](auto&& v){return v.at(i);},m);};
+namespace barycenter = celaeno::graph::barycenter;
+namespace fp = fplus;
+namespace fw = fplus::fwd;
 
-    // Get the number of columns
-    size_t sz{};
-    try{ sz = m.at(0).size(); }
-    catch(std::exception const& e) { std::cerr << "Empty matrix" << std::endl; }
+// }}}
 
-    // Return new container with columns as rows
-    return fw::apply(fp::numbers(size_t{},sz),fw::transform([&](auto i){return col(i);}));
+// Helpers {{{
 
-  } // function: swap_rows_and_cols
+template<typename M>
+auto swap_rows_and_cols(M&& m)
+{
+  // Get a column by index
+  auto col = [&](auto i){return fp::transform([&i](auto&& v){return v.at(i);},m);};
 
-  template<typename V>
-  auto compare(V&& v)
-  {
-    std::stringstream ss;
-    ss << std::setprecision(2);
-    ss << barycenter::run(v);
-    auto exec{std::stod(ss.str())};
+  // Get the number of columns
+  size_t sz{};
+  try{ sz = m.at(0).size(); }
+  catch(std::exception const& e) { std::cerr << "Empty matrix" << std::endl; }
 
-    return exec;
-  } // function: compare
+  // Return new container with columns as rows
+  return fw::apply(fp::numbers(size_t{},sz),fw::transform([&](auto i){return col(i);}));
 
-  //
-  // Tests
-  //
-  TEST_CASE("celaeno::graph::barycenter")
-  {
-    std::array<std::array<int32_t,5>,4> m0
-    {{
-      {1,1,0,0,0},
-      {1,0,0,1,1},
-      {0,1,0,1,1},
-      {1,0,1,0,1},
-    }};
-    std::array<double,4> r0 {1.5,3.3,3.7,3};
-    std::array<double,5> c0 {2.3,2,4,2.5,3};
+} // function: swap_rows_and_cols
 
-    std::array<std::array<int32_t,5>,4> m1
-    {{
-      {1,1,0,1,0},
-      {0,1,1,0,0},
-      {0,1,0,1,1},
-      {0,0,1,1,1},
-    }};
-    std::array<double,4> r1 {2.3, 2.5, 3.7, 4};
-    std::array<double,5> c1 {1, 2, 3, 2.7, 3.5};
+template<typename V>
+auto compare(V&& v)
+{
+  std::stringstream ss;
+  ss << std::setprecision(2);
+  ss << barycenter::run(v);
+  auto exec{std::stod(ss.str())};
 
-        // auto col = [&](auto i){return fp::transform([&i](auto&& v){return v.at(i);},m);};
+  return exec;
+} // function: compare
+
+// }}}
+
+// Test case: celaeno::graph::barycenter {{{
+
+TEST_CASE("celaeno::graph::barycenter")
+{
+  std::array<std::array<int32_t,5>,4> m0
+  {{
+    {1,1,0,0,0},
+    {1,0,0,1,1},
+    {0,1,0,1,1},
+    {1,0,1,0,1},
+  }};
+  std::array<double,4> r0 {1.5,3.3,3.7,3};
+  std::array<double,5> c0 {2.3,2,4,2.5,3};
+
+  std::array<std::array<int32_t,5>,4> m1
+  {{
+    {1,1,0,1,0},
+    {0,1,1,0,0},
+    {0,1,0,1,1},
+    {0,0,1,1,1},
+  }};
+  std::array<double,4> r1 {2.3, 2.5, 3.7, 4};
+  std::array<double,5> c1 {1, 2, 3, 2.7, 3.5};
+
+      // auto col = [&](auto i){return fp::transform([&i](auto&& v){return v.at(i);},m);};
 
 
-    // Rows
-    fw::apply(m0
-      , fw::zip(r0)
-      , fw::transform([](auto&& e){
-          CHECK( compare(e.second) == e.first );
-          return EXIT_SUCCESS;
-      })
-    );
+  // Rows
+  fw::apply(m0
+    , fw::zip(r0)
+    , fw::transform([](auto&& e){
+        CHECK( compare(e.second) == e.first );
+        return EXIT_SUCCESS;
+    })
+  );
 
-    fw::apply(m1
-      , fw::zip(r1)
-      , fw::transform([](auto&& e){
-          CHECK( compare(e.second) == e.first );
-          return EXIT_SUCCESS;
-      })
-    );
+  fw::apply(m1
+    , fw::zip(r1)
+    , fw::transform([](auto&& e){
+        CHECK( compare(e.second) == e.first );
+        return EXIT_SUCCESS;
+    })
+  );
 
-    // Cols
-    fw::apply(swap_rows_and_cols(m0)
-      , fw::zip(c0)
-      , fw::transform([](auto&& e){
-          CHECK( compare(e.second) == e.first );
-          return EXIT_SUCCESS;
-      })
-    );
+  // Cols
+  fw::apply(swap_rows_and_cols(m0)
+    , fw::zip(c0)
+    , fw::transform([](auto&& e){
+        CHECK( compare(e.second) == e.first );
+        return EXIT_SUCCESS;
+    })
+  );
 
-    fw::apply(swap_rows_and_cols(m1)
-      , fw::zip(c1)
-      , fw::transform([](auto&& e){
-          CHECK( compare(e.second) == e.first );
-          return EXIT_SUCCESS;
-      })
-    );
+  fw::apply(swap_rows_and_cols(m1)
+    , fw::zip(c1)
+    , fw::transform([](auto&& e){
+        CHECK( compare(e.second) == e.first );
+        return EXIT_SUCCESS;
+    })
+  );
 
-    // compare(m0.at(0),r0.at(0));
-    // compare(m0,c0,fn_col);
-    // compare(m1.at(0),r1.at(0));
-    // compare(m1,c1,fn_col);
+  // compare(m0.at(0),r0.at(0));
+  // compare(m0,c0,fn_col);
+  // compare(m1.at(0),r1.at(0));
+  // compare(m1,c1,fn_col);
 
-  } // TEST_CASE: "celaeno::graph::barycenter"
+} // TEST_CASE: "celaeno::graph::barycenter" }}}
 
-} // namespace celaeno::graph::barycenter::test
+} // namespace celaeno::graph::barycenter::test }}}

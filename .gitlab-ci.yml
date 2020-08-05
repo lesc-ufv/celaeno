@@ -79,6 +79,18 @@ crossings:
   script:
     - ./build/test/test_crossings -s
 
+graph_depth_view:
+  needs: ["build"]
+  stage: test
+  script:
+    - ./build/test/test_views_depth -s
+
+graph_proximity_view:
+  needs: ["build"]
+  stage: test
+  script:
+    - ./build/test/test_views_proximity -s
+
 pages:
   stage: doc
   before_script:

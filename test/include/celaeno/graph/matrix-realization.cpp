@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : matrix-realization
@@ -18,6 +18,8 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
+// namespace: celaeno::graph::matrix_realization::test {{{
+
 namespace celaeno::graph::matrix_realization::test
 {
 
@@ -27,13 +29,8 @@ namespace matrix_realization = celaeno::graph::matrix_realization;
 namespace fw = fplus::fwd;
 // }}}
 
-// Aliases {{{
+// Helpers {{{
 
-// }}}
-
-//
-// Helpers
-//
 template<typename C1, typename C2>
 void compare(C1&& c1, C2&& c2)
 {
@@ -48,22 +45,16 @@ void compare(C1&& c1, C2&& c2)
   } // for: i
 } // function: compare
 
-//
-// Tests
-//
+// }}}
+
+// Test case celaeno::graph::matrix_realization {{{
 
 TEST_CASE("celaeno::graph::matrix_realization"
   * doctest::description("Matrix Realization Test")
   * doctest::timeout(100.0f))
 {
-  //
-  // Create graph available at
+  // Used graph available at:
   // https://gitlab.com/formigoni/celaeno/-/blob/development/doc/celaeno/graph/matrix-realization-test.png
-  //
-
-  //
-  // Verification
-  //
   std::array<std::array<bool,4>,2> m1
   {{
     {1,1,1,1},
@@ -86,6 +77,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
     {1,1,0},
   }};
 
+  // Subcase: Even number of layers {{{
   SUBCASE("Even number of layers")
   {
     graph::Graph<int32_t> g;
@@ -113,21 +105,15 @@ TEST_CASE("celaeno::graph::matrix_realization"
   );
 
 
-    //
     // Create hierarchical graph
-    //
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
     auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
 
-    //
     // Get the key type
-    //
     using node_t = decltype(h)::key_type;
 
-    //
     // Lambda to obtain a layer by index
-    //
     auto get_layer = [&h](node_t idx)
     {
       return fw::apply(
@@ -138,35 +124,24 @@ TEST_CASE("celaeno::graph::matrix_realization"
       );
     };
 
-    //
     // Lambda to verify if an edge between v → u exists
-    //
     auto has_edge = [&g](node_t v, node_t u){ return g.adjacent(v,u); };
 
-    //
     // Lambda to get the height of the graph
-    //
-    auto height
-    {
-      fw::apply(
-        h
-        , fw::get_map_keys()
-        , fw::unique()
-        , fw::size_of_cont()
-      )
-    };
+    auto height {fw::apply(h, fw::get_map_keys(), fw::unique(), fw::size_of_cont())};
 
+    // Execute the algorithm
     auto matrices {matrix_realization::run(get_layer, has_edge, height)};
 
-    //
-    // TESTS
-    //
+    // Test against expected result
     REQUIRE(matrices.size() == 3);
     compare(matrices.at(0),m1);
     compare(matrices.at(1),m2);
     compare(matrices.at(2),m3);
 
-  } // SUBCASE: "Even number of layers"
+  } // SUBCASE: "Even number of layers" }}}
+
+  // Subcase: Odd number of layers {{{
 
   SUBCASE("Odd number of layers")
   {
@@ -188,21 +163,15 @@ TEST_CASE("celaeno::graph::matrix_realization"
       std::make_pair(4,10)
     );
 
-    //
     // Create hierarchical graph
-    //
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
     auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
 
-    //
     // Get the key type
-    //
     using node_t = decltype(h)::key_type;
 
-    //
     // Lambda to obtain a layer by index
-    //
     auto get_layer = [&h](node_t idx)
     {
       return fw::apply(
@@ -213,35 +182,21 @@ TEST_CASE("celaeno::graph::matrix_realization"
       );
     };
 
-    //
     // Lambda to verify if an edge between v → u exists
-    //
     auto has_edge = [&g](node_t v, node_t u){ return g.adjacent(v,u); };
 
-    //
     // Lambda to get the height of the graph
-    //
-    auto height
-    {
-      fw::apply(
-        h
-        , fw::get_map_keys()
-        , fw::unique()
-        , fw::size_of_cont()
-      )
-    };
+    auto height{fw::apply(h, fw::get_map_keys(), fw::unique(),fw::size_of_cont())};
 
     auto matrices {matrix_realization::run(get_layer, has_edge, height)};
 
-    //
     // TESTS
-    //
     REQUIRE(matrices.size() == 2);
     compare(matrices.at(0),m1);
     compare(matrices.at(1),m2);
 
-  } // SUBCASE: "Odd number of layers"
+  } // SUBCASE: "Odd number of layers" }}}
 
-} // TEST_CASE: celaeno::graph::matrix_realization
+} // TEST_CASE: celaeno::graph::matrix_realization }}}
 
-} // namespace celaeno::graph::matrix_realization::test
+} // namespace celaeno::graph::matrix_realization::test }}}

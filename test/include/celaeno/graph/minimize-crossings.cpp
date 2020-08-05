@@ -34,7 +34,7 @@
 #include <doctest/doctest.h>
 #include <celaeno/graph/minimize-crossings.hpp>
 #include <celaeno/graph/matrix-realization.hpp>
-#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/views/proximity.hpp>
 #include <taygete/graph/graph.hpp>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
@@ -46,7 +46,7 @@ namespace celaeno::graph::minimize_crossings::test
   //
   namespace minimize_crossings = celaeno::graph::minimize_crossings;
   namespace graph = taygete::graph;
-  namespace depth = celaeno::graph::views::depth;
+  namespace proximity = celaeno::graph::views::proximity;
   namespace fp = fplus;
   namespace fw = fplus::fwd;
   namespace rv = ranges::views;
@@ -54,16 +54,23 @@ namespace celaeno::graph::minimize_crossings::test
   TEST_CASE("celaeno::graph::minimize_crossings")
   {
 
+    // graph::Graph<int64_t> g
+    // {
+    //   {1,5},{1,6},{2,5},{2,8},{2,9},{3,6},{3,8},
+    //   {3,9},{4,5},{4,7},{4,9}
+    // };
+
     graph::Graph<int64_t> g
     {
-      {1,5},{1,6},{2,5},{2,8},{2,9},{3,6},{3,8},
-      {3,9},{4,5},{4,7},{4,9}
+      {1,5},{2,4},{3,4},{6,8},
+      {4,7},{5,7},{5,8},{5,9},
+      {7,12},{8,10},{8,11},
     };
 
     // Create hierarchical graph
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [h,_] = depth::run(1,pred,succ);
+    auto [h,_] = proximity::run(1,pred,succ);
 
     // Get the key type
     using node_t = decltype(h)::key_type;
@@ -79,13 +86,26 @@ namespace celaeno::graph::minimize_crossings::test
     };
 
     // Lambda to verify if an edge between v → u exists
-    auto has_edge = [&g](node_t v, node_t u){ return g.adjacent(v,u); };
+    auto has_edge = [&g](node_t v, node_t u)
+    {
+      std::cout << std::boolalpha << "[" << v << "," << u << "] : " << g.adjacent(v,u) << std::endl;
+      return g.adjacent(v,u);
+    };
 
     // Lambda to get the depth of the graph
     auto depth {fw::apply(h,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
 
     // Matrix realization of the graph
     auto matrices {matrix_realization::run(get_layer, has_edge, depth)};
+
+    for (auto&& m : matrices)
+    {
+      for (auto&& row : m)
+      {
+        std::cout << rv::all(row) << std::endl;
+      } // for row : m
+      std::cout << std::endl;
+    } // for [l,m] : ret
 
     SUBCASE("Test vertices as matrices labels")
     {

@@ -46,7 +46,6 @@ class CelaenoConan(ConanFile):
     'maia/0.1@pleiades/testing', \
     'fmt/6.0.0@bincrafters/stable', \
     'doctest/2.3.4@bincrafters/stable', \
-    'spdlog/1.7.0', \
     'functionalplus/v0.2.7-p0@dobiasd/stable'
 
   def source(self):

@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : balance
@@ -39,42 +40,44 @@
 #include <range/v3/all.hpp>
 #include <celaeno/graph/balance.hpp>
 #include <celaeno/graph/views/depth.hpp>
+#include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader.hpp>
+#include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
+
+// namespace celaeno::graph::balance::test {{{
 
 namespace celaeno::graph::balance::test
 {
 
-//
-// Aliases
-//
+// namespaces {{{
+
 namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
 namespace cir = maia::circuits;
 namespace balance = celaeno::graph::balance;
 namespace depth = celaeno::graph::views::depth;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::actions;
-using float64_t = double;
 
-//
-// Concepts
-//
+// }}}
+
+// Concepts {{{
 
 template<typename T>
 concept String = requires(T t){ std::string{t}; };
 
-//
-// Test Wrapper
-//
+// }}}
+
+// Test Wrapper {{{
 template<String T>
 void TEST(T&& str)
 {
   graph::Graph<int64_t> g;
   auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  taygete::graph::reader::Reader reader{std::string(str),emplace};
+  reader::Reader{str,emplace};
 
   //
   // Helpers
@@ -120,11 +123,10 @@ void TEST(T&& str)
     }
   }
 
-} // function: TEST
+} // function: TEST }}}
 
-//
-// Test Cases
-//
+// Test Cases {{{
+
 
 TEST_CASE("celaeno::graph::balance"
   * doctest::description("Balance test")
@@ -137,21 +139,6 @@ TEST_CASE("celaeno::graph::balance"
   auto logger {spdlog::basic_logger_mt("graph::balance", "logs/graph-balance.txt")};
   spdlog::set_default_logger(logger);
   auto start {std::chrono::system_clock::now()};
-
-  //
-  // Iscas
-  //
-
-  TEST(cir::iscas::s27);
-  TEST(cir::iscas::s298);
-  TEST(cir::iscas::s349);
-  TEST(cir::iscas::s208);
-  TEST(cir::iscas::s420);
-  TEST(cir::iscas::s838);
-  TEST(cir::iscas::s386);
-  TEST(cir::iscas::s510);
-  TEST(cir::iscas::s1494);
-  TEST(cir::iscas::s832);
 
   //
   // LGSynth 91
@@ -186,10 +173,10 @@ TEST_CASE("celaeno::graph::balance"
   //
 
   auto end {std::chrono::system_clock::now()};
-  std::chrono::duration<float64_t> dur {end-start};
+  std::chrono::duration<f64> dur {end-start};
   std::stringstream ss; ss << dur.count();
   spdlog::info("Duration for balance.cpp: {}", ss.str());
 
-} // TEST_CASE: celaeno::graph::balance
+} // TEST_CASE: celaeno::graph::balance }}}
 
-} // namespace celaeno::graph::balance::test
+} // namespace celaeno::graph::balance::test }}}
