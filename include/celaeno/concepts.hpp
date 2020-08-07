@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <concepts>
+#include <celaeno/aliases.hpp>
+
 namespace celaeno::concepts
 {
 
@@ -35,13 +38,13 @@ concept Matrix =
 &&
   requires(M m)
   {
-    {m.at(int32_t{})};
+    {m.at(i32{})};
 
-    {m.at(int32_t{}).at(int32_t{})};
+    {m.at(i32{}).at(i32{})};
 
-    {Iterable<decltype(m.at(int32_t{}))>};
+    {Iterable<decltype(m.at(i32{}))>};
 
-    {Arithmetic<decltype( m.at(int32_t{}).at(int32_t{}) )>};
+    {Arithmetic<decltype( m.at(i32{}).at(i32{}) )>};
   };
 
 template<typename MS>
@@ -50,17 +53,17 @@ concept Matrices =
 &&
   requires(MS ms)
   {
-    {ms.at(int32_t{})};
+    {ms.at(i32{})};
 
-    {ms.at(int32_t{}).at(int32_t{})};
+    {ms.at(i32{}).at(i32{})};
 
-    {ms.at(int32_t{}).at(int32_t{}).at(int32_t{})};
+    {ms.at(i32{}).at(i32{}).at(i32{})};
 
-    {Iterable<decltype(ms.at(int32_t{}))>};
+    {Iterable<decltype(ms.at(i32{}))>};
 
-    {Arithmetic<decltype( ms.at(int32_t{}).at(int32_t{}) )>};
+    {Arithmetic<decltype( ms.at(i32{}).at(i32{}) )>};
 
-    {Arithmetic<decltype( ms.at(int32_t{}).at(int32_t{}).at(int32_t{}) )>};
+    {Arithmetic<decltype( ms.at(i32{}).at(i32{}).at(i32{}) )>};
   };
 
 
