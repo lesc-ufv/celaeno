@@ -43,7 +43,6 @@
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
-#include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
 
 // namespace celaeno::graph::balance::test {{{
@@ -71,111 +70,112 @@ concept String = requires(T t){ std::string{t}; };
 
 // }}}
 
-// Test Wrapper {{{
-template<String T>
-void TEST(T&& str)
-{
-  graph::Graph<int64_t> g;
-  auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  reader::Reader{str,emplace};
-
-  //
-  // Helpers
-  //
-
-  auto pred = [&g](auto&& v){ return g.predecessors(v); };
-  auto succ = [&g](auto&& v){ return g.successors(v); };
-  auto link = [&g](auto&& pair){ g.emplace(pair); };
-  auto unlink = [&g](auto&& pair){ g.erase(pair); };
-
-  // Execution
-  balance::run(0,pred,succ,link,unlink);
-
-  //
-  // Verification
-  //
-
-  // * Given a depth-view, each vertex must have a distance of one
-  // * to its successor or predecessor
-  auto dview {depth::run(0,pred,succ)};
-  auto const& level_vert {dview.first};
-  auto const& vert_level {dview.second};
-
-  // Get the levels
-  auto levels { level_vert | rv::keys | rv::unique };
-
-    // Get the vertices on level l
-  for(auto const& l : levels)
-  {
-    auto rng{level_vert.equal_range(l)};
-    // For each vertex on level l
-    for(auto it{rng.first}; it!=rng.second; ++it)
-    {
-      // Current vertex
-      auto const& curr {it->second};
-      // The adjacent vertices
-      auto adj {g.neighbors(curr)};
-      // Verify if distance is one to each
-      auto is_dist_one = [&vert_level,&curr](auto&& a) -> void
-        { REQUIRE(std::abs(vert_level.at(a) - vert_level.at(curr)) == 1); };
-      // Execute tests
-      rg::for_each(adj, is_dist_one);
-    }
-  }
-
-} // function: TEST }}}
-
 // Test Cases {{{
-
 
 TEST_CASE("celaeno::graph::balance"
   * doctest::description("Balance test")
   * doctest::timeout(1000.0f)
 )
 {
-  //
-  // Logger
-  //
-  auto logger {spdlog::basic_logger_mt("graph::balance", "logs/graph-balance.txt")};
+  // Logger {{{
+  auto logger {spdlog::basic_logger_mt("graph::balance", "logs/celaeno/graph/balance.csv")};
   spdlog::set_default_logger(logger);
-  auto start {std::chrono::system_clock::now()};
+  spdlog::set_pattern("%v");
+  spdlog::info("date,time,vertices,edges,runtime");
+  spdlog::set_pattern("%d/%m/%Y,%T,%v");
+  // }}}
 
-  //
-  // LGSynth 91
-  //
-  TEST(cir::synth_91::alu2);
-  TEST(cir::synth_91::alu4);
-  TEST(cir::synth_91::dalu);
-  TEST(cir::synth_91::apex6);
-  TEST(cir::synth_91::apex7);
-  TEST(cir::synth_91::b1);
-  TEST(cir::synth_91::c8);
-  TEST(cir::synth_91::cc);
-  TEST(cir::synth_91::cht);
-  TEST(cir::synth_91::cm138a);
-  TEST(cir::synth_91::cm150a);
-  TEST(cir::synth_91::cm151a);
-  TEST(cir::synth_91::cm162a);
-  TEST(cir::synth_91::cm163a);
-  TEST(cir::synth_91::cm42a);
-  TEST(cir::synth_91::cm82a);
-  TEST(cir::synth_91::cm85a);
-  TEST(cir::synth_91::cmb);
-  TEST(cir::synth_91::comp);
-  TEST(cir::synth_91::cordic);
-  TEST(cir::synth_91::cu);
-  TEST(cir::synth_91::count);
-  TEST(cir::synth_91::decod);
-  TEST(cir::synth_91::my_adder);
+  // test lambda {{{
+  auto test = [&]<String S>(S&& str)
+  {
+    // Read graph {{{
+    graph::Graph<int64_t> g;
+    auto emplace = [&g](auto&& pair){ g.emplace(pair); };
+    reader::Reader{str,emplace};
+    // }}}
 
-  //
-  // Log Duration
-  //
+    // Helpers {{{
+    auto pred = [&g](auto&& v){ return g.predecessors(v); };
+    auto succ = [&g](auto&& v){ return g.successors(v); };
+    auto link = [&g](auto&& pair){ g.emplace(pair); };
+    auto unlink = [&g](auto&& pair){ g.erase(pair); };
+    // }}}
 
-  auto end {std::chrono::system_clock::now()};
-  std::chrono::duration<f64> dur {end-start};
-  std::stringstream ss; ss << dur.count();
-  spdlog::info("Duration for balance.cpp: {}", ss.str());
+    // Test Balance {{{
+    auto start {std::chrono::system_clock::now()};
+    balance::run(0,pred,succ,link,unlink);
+    auto end {std::chrono::system_clock::now()};
+    std::chrono::duration<f64> dur {end-start};
+    std::stringstream ss; ss << dur.count();
+    // }}}
+
+    // More tests {{{
+    // * Given a depth-view, each vertex must have a distance of one
+    // * to its successor or predecessor
+    auto dview {depth::run(0,pred,succ)};
+    auto const& level_vert {dview.first};
+    auto const& vert_level {dview.second};
+
+    // Get the levels
+    auto levels { level_vert | rv::keys | rv::unique };
+
+      // Get the vertices on level l
+    for(auto const& l : levels)
+    {
+      auto rng{level_vert.equal_range(l)};
+      // For each vertex on level l
+      for(auto it{rng.first}; it!=rng.second; ++it)
+      {
+        // Current vertex
+        auto const& curr {it->second};
+        // The adjacent vertices
+        auto adj {g.neighbors(curr)};
+        // Verify if distance is one to each
+        auto is_dist_one = [&vert_level,&curr](auto&& a) -> void
+          { REQUIRE(std::abs(vert_level.at(a) - vert_level.at(curr)) == 1); };
+        // Execute tests
+        rg::for_each(adj, is_dist_one);
+      } // for it{rng.first}; it!=rng.second
+    } // for auto const& l : levels
+    // }}}
+
+    // Log results {{{
+    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    // }}}
+
+  }; // lamb: test }}}
+
+  // Forwarding test folding lambda {{{
+  auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
+  // }}}
+
+  // LGSynth 91 tests {{{
+  tests(cir::synth_91::alu2,
+    cir::synth_91::alu4,
+    cir::synth_91::dalu,
+    cir::synth_91::apex6,
+    cir::synth_91::apex7,
+    cir::synth_91::b1,
+    cir::synth_91::c8,
+    cir::synth_91::cc,
+    cir::synth_91::cht,
+    cir::synth_91::cm138a,
+    cir::synth_91::cm150a,
+    cir::synth_91::cm151a,
+    cir::synth_91::cm162a,
+    cir::synth_91::cm163a,
+    cir::synth_91::cm42a,
+    cir::synth_91::cm82a,
+    cir::synth_91::cm85a,
+    cir::synth_91::cmb,
+    cir::synth_91::comp,
+    cir::synth_91::cordic,
+    cir::synth_91::cu,
+    cir::synth_91::count,
+    cir::synth_91::decod,
+    cir::synth_91::my_adder
+  );
+  // }}}
 
 } // TEST_CASE: celaeno::graph::balance }}}
 
