@@ -64,35 +64,6 @@ concept String = requires(T t){ std::string{t}; };
 
 // }}}
 
-// Test Wrapper {{{
-
-template<String T>
-void TEST(T&& str)
-{
-  graph::Graph<int64_t> g;
-  auto emplace = [&g](auto&& pair){ g.emplace(pair); };
-  reader::Reader{str,emplace};
-
-  // Helpers
-  auto pred = [&g](auto&& v){ return g.predecessors(v); };
-  auto succ = [&g](auto&& v){ return g.successors(v); };
-
-  // Execution
-  auto result {celaeno::graph::kahn::run(0,pred,succ)};
-
-  // Check if graph was populated
-  REQUIRE(g.vertices_count() > 0);
-
-  // Check if no nodes are missing
-  auto adj = [&g](auto&& v){ return g.neighbors(v); };
-  auto bfs {bfs::run(0,adj)};
-  REQUIRE(g.vertices_count() == result.size());
-
-  // Check if no nodes are duplicates
-  REQUIRE(fw::apply(result,fw::unique()).size() == result.size());
-
-} // function: TEST }}}
-
 // Test Case celaeno::graph::kahn {{{
 
 TEST_CASE("celaeno::graph::kahn"
@@ -100,42 +71,89 @@ TEST_CASE("celaeno::graph::kahn"
   * doctest::timeout(10.0f)
 )
 {
-  // Logger
-  auto logger {spdlog::basic_logger_mt("graph::kahn", "logs/graph-kahn.txt")};
+
+  // Logger {{{
+  auto logger {spdlog::basic_logger_mt("graph::kahn", "logs/celaeno/graph/kahn.csv")};
   spdlog::set_default_logger(logger);
-  auto start {std::chrono::system_clock::now()};
+  spdlog::set_pattern("%v");
+  spdlog::info("date,time,vertices,edges,runtime");
+  spdlog::set_pattern("%d/%m/%Y,%T,%v");
+  // }}}
 
-  // LGSynth 91
-  TEST(cir::synth_91::alu2);
-  TEST(cir::synth_91::alu4);
-  TEST(cir::synth_91::dalu);
-  TEST(cir::synth_91::apex6);
-  TEST(cir::synth_91::apex7);
-  TEST(cir::synth_91::b1);
-  TEST(cir::synth_91::c8);
-  TEST(cir::synth_91::cc);
-  TEST(cir::synth_91::cht);
-  TEST(cir::synth_91::cm138a);
-  TEST(cir::synth_91::cm150a);
-  TEST(cir::synth_91::cm151a);
-  TEST(cir::synth_91::cm162a);
-  TEST(cir::synth_91::cm163a);
-  TEST(cir::synth_91::cm42a);
-  TEST(cir::synth_91::cm82a);
-  TEST(cir::synth_91::cm85a);
-  TEST(cir::synth_91::cmb);
-  TEST(cir::synth_91::comp);
-  TEST(cir::synth_91::cordic);
-  TEST(cir::synth_91::cu);
-  TEST(cir::synth_91::count);
-  TEST(cir::synth_91::decod);
-  TEST(cir::synth_91::my_adder);
+  // test lambda {{{
+  auto test = [&]<String S>(S&& str)
+  {
+    // Read Graph {{{
+    graph::Graph<int64_t> g;
+    auto emplace = [&g](auto&& pair){ g.emplace(pair); };
+    reader::Reader{str,emplace};
+    // }}}
 
-  // Log duration
-  auto end {std::chrono::system_clock::now()};
-  std::chrono::duration<f64> dur {end-start};
-  std::stringstream ss; ss << dur.count();
-  spdlog::info("Duration for khan.cpp: {}", ss.str());
+    // Check if graph was populated {{{
+    REQUIRE(g.vertices_count() > 0);
+    // }}}
+
+    // Helpers {{{
+    auto pred = [&g](auto&& v){ return g.predecessors(v); };
+    auto succ = [&g](auto&& v){ return g.successors(v); };
+    // }}}
+
+    // Execution {{{
+    auto start {std::chrono::system_clock::now()};
+    auto result {celaeno::graph::kahn::run(0,pred,succ)};
+    auto end {std::chrono::system_clock::now()};
+    std::chrono::duration<f64> dur {end-start};
+    std::stringstream ss; ss << dur.count();
+    // }}}
+
+    // Check if no nodes are missing {{{
+    auto adj = [&g](auto&& v){ return g.neighbors(v); };
+    auto bfs {bfs::run(0,adj)};
+    REQUIRE(g.vertices_count() == result.size());
+    // }}}
+
+    // Check if no nodes are duplicates {{{
+    REQUIRE(fw::apply(result,fw::unique()).size() == result.size());
+    // }}}
+
+    // Log results {{{
+    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    // }}}
+  }; // lamb: test }}}
+
+  // Forwarding test folding lambda {{{
+  auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
+  // }}}
+
+  // LGSynth 91 tests {{{
+  tests(
+    cir::synth_91::alu2,
+    cir::synth_91::alu4,
+    cir::synth_91::dalu,
+    cir::synth_91::apex6,
+    cir::synth_91::apex7,
+    cir::synth_91::b1,
+    cir::synth_91::c8,
+    cir::synth_91::cc,
+    cir::synth_91::cht,
+    cir::synth_91::cm138a,
+    cir::synth_91::cm150a,
+    cir::synth_91::cm151a,
+    cir::synth_91::cm162a,
+    cir::synth_91::cm163a,
+    cir::synth_91::cm42a,
+    cir::synth_91::cm82a,
+    cir::synth_91::cm85a,
+    cir::synth_91::cmb,
+    cir::synth_91::comp,
+    cir::synth_91::cordic,
+    cir::synth_91::cu,
+    cir::synth_91::count,
+    cir::synth_91::decod,
+    cir::synth_91::my_adder
+  );
+  // }}}
+
 
 } // TEST_CASE: celaeno::graph::kahn }}}
 
