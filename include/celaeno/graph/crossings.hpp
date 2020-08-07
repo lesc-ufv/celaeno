@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : crossings
@@ -31,96 +32,70 @@
 
 #pragma once
 
+#include <concepts>
+#include <utility>
+#include <exception>
+#include <iostream>
+#include <celaeno/concepts.hpp>
+#include <celaeno/aliases.hpp>
+
+// namespace celaeno::graph::crossings {{{
+
 namespace celaeno::graph::crossings
 {
-//
-// Concepts
-//
-template<typename T>
-concept Iterable =
-  requires(T t)
-  {
-    {t.begin()};
-    {t.end()};
-    {t.cbegin()};
-    {t.cend()};
-  };
 
-template<typename T>
-concept Arithmetic =
-  requires(T t)
-  {
-    { t+t } -> std::same_as<T>;
-    { t-t } -> std::same_as<T>;
-    { t*t } -> std::same_as<T>;
-    { t/t } -> std::same_as<T>;
-  };
+// Namespaces {{{
+namespace cp = celaeno::concepts;
+// }}}
 
-template<typename M>
-concept Matrix =
-  Iterable<M>
-&&
-  requires(M m)
-  {
-    {m.at(int32_t{})};
+// Algorithm {{{
 
-    {m.at(int32_t{}).at(int32_t{})};
-
-    {Iterable<decltype(m.at(int32_t{}))>};
-
-    {Arithmetic<decltype( m.at(int32_t{}).at(int32_t{}) )>};
-  };
-
-//
-// Algorithm
-//
-template<Matrix M>
-int64_t run(M const& m)
+// Impl {{{
+template<cp::Matrix M>
+decltype(auto) impl(M&& m)
 {
-  if( m.size() == 0)
-  {
-    std::cerr << "Empty incidence matrix" << std::endl;
-  }
+  // Count the number of crossings
+  i64 crossings{};
 
-  // Assumption that level i has its vertices in the
-  // rows and level i+1 has its vertices in the columns
+  // Check if matrix is empty
+  if( m.empty() ) { return crossings; }
 
-  // Number of vertices in the ith layer
-  // is equal to the number of rows
+  // Number of rows
   auto p{m.size()};
 
-  // Number of vertices in the i+1th layer
-  // is equal to the number of columns, take a
-  // column and get its size, they should be
-  // equal
+  // Number of columns
   auto q{m.at(0).size()};
-
-  int64_t crossings{};
 
   try
   {
-    for (size_t j = 0; j < p-1; j++)
+    for (siz j{0}; j < p-1; j++)
     {
-      for (size_t k = j+1; k < p; k++)
+      for (siz k{j+1}; k < p; k++)
       {
-        for (size_t a = 0; a < q-1; a++)
+        for (siz a{0}; a < q-1; a++)
         {
-          for (size_t b = a+1; b < q; b++)
+          for (siz b{a+1}; b < q; b++)
           {
             crossings += m.at(j).at(b) * m.at(k).at(a);
           } // for: b
         } // for: a
       } // for: k
     } // for: j
-
   } // try
   catch (std::exception const& e)
   {
     std::cerr << "Degenerate incidence matrix" << std::endl;
   } // catch
-
   return crossings;
+} // function: impl }}}
 
-} // function: run
+// Variadic parameters {{{
+template<typename... MS>
+i64 run(MS&&... ms)
+{
+  return (impl(std::forward<MS>(ms)) + ...);
+} // function: run }}}
 
-} // namespace celaeno::graph::crossings
+// }}}
+
+} // namespace celaeno::graph::crossings }}}
