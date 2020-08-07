@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : crossings
@@ -31,14 +32,28 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+#include <fplus/fplus.hpp>
+#include <range/v3/all.hpp>
+#include <taygete/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/graph/crossings.hpp>
+#include <celaeno/graph/views/proximity.hpp>
+#include <celaeno/graph/matrix-realization.hpp>
 
 
 // namespace celaeno::graph::crossings::test {{{
 
 namespace celaeno::graph::crossings::test
 {
+
+// namespaces {{{
+namespace rv = ranges::views;
+namespace fw = fplus::fwd;
+namespace graph = taygete::graph;
+namespace proximity = celaeno::graph::views::proximity;
+namespace crossings = celaeno::graph::crossings;
+namespace realization = celaeno::graph::matrix_realization;
+// }}}
 
 // Tests case celaeno::graph::crossings {{{
 
@@ -112,6 +127,7 @@ TEST_CASE("celaeno::graph::crossings")
 
   } // SUBCASE: "Two-layered Bipartite graph" }}}
 
+  // SUBCASE:"h-layered graph"  {{{
   SUBCASE("h-layered graph")
   {
     std::array<std::array<i8,3>,3> g01
@@ -260,8 +276,54 @@ TEST_CASE("celaeno::graph::crossings")
     }};
 
     REQUIRE(crossings::run(g61,g62,g63) == 0);
+  } // SUBCASE: h-layered graph }}}
 
-  } // SUBCASE: h-layered graph
+  // Taygete graphs {{{
+  SUBCASE("Taygete Graphs")
+  {
+    graph::Graph<i64> g
+    {{
+       // Layer 1
+      {1,5},{2,4},{3,4},{6,8},
+       // Layer 2
+      {4,7},{5,7},{5,8},{5,9},
+       // Layer 3
+      {7,12},{8,10},{8,11},
+    }};
+
+    auto pred = [&g](auto&& v){ return g.predecessors(v); };
+    auto succ = [&g](auto&& v){ return g.successors(v); };
+    auto [l,_] = proximity::run(1,pred,succ);
+
+    // Get the key type
+    using node_t = decltype(l)::key_type;
+
+    auto layer = [&l](node_t idx)
+    {
+      return fw::apply(
+        l
+        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
+        , fw::get_map_values()
+        , fw::sort()
+      );
+    };
+
+    // Matrix realization
+    auto adjacent = [&g](auto&& u, auto&& v) -> bool { return g.adjacent(u,v); };
+    auto depth {fw::apply(l,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+    auto ms {matrix_realization::run(layer, adjacent, depth)};
+
+    // Calculate cost
+    i64 cost{};
+    for (decltype(ms.size()) i{}; i < ms.size(); ++i)
+    {
+      cost += crossings::run(ms.at(i));
+    } // for: i < l.size()
+
+    REQUIRE(cost == 5);
+  } // SUBCASE: "Taygete Graphs"
+
+  // }}}
 
 } // TEST_CASE: "celaeno::graph::crossings" }}}
 
