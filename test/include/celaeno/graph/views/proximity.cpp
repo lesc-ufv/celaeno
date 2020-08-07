@@ -7,6 +7,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <iostream>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
@@ -43,6 +45,16 @@ TEST_CASE("celaeno::graph::view::proximity"
 )
 {
 
+  // Logger {{{
+  auto logger {spdlog::basic_logger_mt("graph::views::proximity",
+      "logs/celaeno/graph/views/proximity.csv")};
+  spdlog::set_default_logger(logger);
+  spdlog::set_pattern("%v");
+  spdlog::info("date,time,vertices,edges,runtime");
+  spdlog::set_pattern("%d/%m/%Y,%T,%v");
+
+  // }}}
+
   // test_lambda {{{
   auto test = [&]<String S>(S&& str)
   {
@@ -55,7 +67,11 @@ TEST_CASE("celaeno::graph::view::proximity"
     // Execute proximity view algorithm {{{
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
+    auto start {std::chrono::system_clock::now()};
     auto [dv,vd] {proximity::run(0, pred, succ)};
+    auto end {std::chrono::system_clock::now()};
+    std::chrono::duration<f64> dur {end-start};
+    std::stringstream ss; ss << dur.count();
     // }}}
 
     // Perform tests {{{
@@ -71,13 +87,14 @@ TEST_CASE("celaeno::graph::view::proximity"
           , fw::minimum()
         )};
         // Check distance of v and topologically nearest successor is one
-        std::cout << "sssrs: " << rv::all(successors) << std::endl;
-        std::cout << "v: " << v << " d: " << d << " minimum: " << minimum << std::endl;
         CHECK( minimum-d == 1 );
       } // if: ! successors.empty()
     } // for [v,d] : vd
     // }}}
 
+    // Log results {{{
+    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    // }}}
   }; // lamb: test }}}
 
   // Forwarding test folding lambda {{{
