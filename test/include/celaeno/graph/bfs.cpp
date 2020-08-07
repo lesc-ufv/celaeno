@@ -108,8 +108,8 @@ TEST_CASE("celaeno::graph::bfs"
     // Log results {{{
     spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
     // }}}
-  }; // lamb: test
-  // }}}
+
+  }; // lamb: test }}}
 
   // Forwarding test folding lambda {{{
   auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
