@@ -73,7 +73,7 @@ TEST_CASE("celaeno::graph::kahn"
 {
 
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::kahn", "logs/celaeno/graph/kahn.csv")};
+  auto logger {spdlog::basic_logger_mt("graph::kahn", "logs/celaeno/graph/kahn.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");

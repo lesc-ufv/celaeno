@@ -47,7 +47,7 @@ TEST_CASE("celaeno::graph::view::proximity"
 
   // Logger {{{
   auto logger {spdlog::basic_logger_mt("graph::views::proximity",
-      "logs/celaeno/graph/views/proximity.csv")};
+      "logs/celaeno/graph/views/proximity.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");

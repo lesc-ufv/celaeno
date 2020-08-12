@@ -69,7 +69,7 @@ TEST_CASE("celaeno::graph::dfs"
 )
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::dfs", "logs/celaeno/graph/dfs.csv")};
+  auto logger {spdlog::basic_logger_mt("graph::dfs", "logs/celaeno/graph/dfs.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
