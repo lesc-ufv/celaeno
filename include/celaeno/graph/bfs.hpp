@@ -42,6 +42,7 @@
 #include <concepts>
 #include <range/v3/all.hpp>
 
+// namespace celaeno::graph::bfs {{{
 namespace celaeno::graph::bfs
 {
 
@@ -110,4 +111,4 @@ std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
   return result;
 } // function: run }}}
 
-} // namespace celaeno::graph::bfs
+} // namespace celaeno::graph::bfs }}}
