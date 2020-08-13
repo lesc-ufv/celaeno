@@ -51,7 +51,6 @@ namespace rg = ranges;
 namespace ra = ranges::actions;
 // }}}
 
-
 // Concepts {{{
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
