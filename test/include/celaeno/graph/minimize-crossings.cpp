@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : minimize-crossings
@@ -30,93 +31,164 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <random>
+#include <chrono>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <doctest/doctest.h>
-#include <celaeno/graph/minimize-crossings.hpp>
-#include <celaeno/graph/matrix-realization.hpp>
-#include <celaeno/graph/views/proximity.hpp>
-#include <taygete/graph/graph.hpp>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
+#include <taygete/graph/graph.hpp>
+#include <taygete/graph/reader/verilog.hpp>
+#include <maia/circuits/synth-91.hpp>
+#include <celaeno/graph/balance.hpp>
+#include <celaeno/graph/minimize-crossings.hpp>
+#include <celaeno/graph/crossings.hpp>
+#include <celaeno/graph/matrix-realization.hpp>
+#include <celaeno/graph/views/proximity.hpp>
 
+// namespace celaeno::graph::minimize_crossings::test {{{
 namespace celaeno::graph::minimize_crossings::test
 {
-  //
-  // Aliases
-  //
-  namespace minimize_crossings = celaeno::graph::minimize_crossings;
-  namespace graph = taygete::graph;
-  namespace proximity = celaeno::graph::views::proximity;
-  namespace fp = fplus;
-  namespace fw = fplus::fwd;
-  namespace rv = ranges::views;
 
-  TEST_CASE("celaeno::graph::minimize_crossings")
+// namespaces {{{
+namespace fw = fplus::fwd;
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace cir = maia::circuits;
+namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
+namespace crossings = celaeno::graph::crossings;
+namespace proximity = celaeno::graph::views::proximity;
+namespace realization = celaeno::graph::matrix_realization;
+namespace minimize = celaeno::graph::minimize_crossings;
+// }}}
+
+// Concepts {{{
+template<typename T>
+concept String = requires(T t){ std::string{t}; };
+// }}}
+
+TEST_CASE("celaeno::graph::minimize_crossings"
+  * doctest::description("Graph crossing minimization test")
+)
+{
+
+  // Logger {{{
+  auto logger {spdlog::basic_logger_mt("graph::minimize_crossings", "logs/celaeno/graph/minimize-crossings.csv", true)};
+  spdlog::set_default_logger(logger);
+  spdlog::set_pattern("%v");
+  spdlog::info("date,time,vertices,edges,prev_crossings,new_crossings,runtime");
+  spdlog::set_pattern("%d/%m/%Y,%T,%v");
+  // }}}
+
+  // test_lambda {{{
+  auto test = [&]<String S>(S&& str)
   {
+    //  Read graph {{{
+    graph::Graph<i64> g;
+    auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
+    reader::Reader{str,emplace};
+    // }}}
 
-    // graph::Graph<int64_t> g
-    // {
-    //   {1,5},{1,6},{2,5},{2,8},{2,9},{3,6},{3,8},
-    //   {3,9},{4,5},{4,7},{4,9}
-    // };
-
-    graph::Graph<int64_t> g
-    {
-      {1,5},{2,4},{3,4},{6,8},
-      {4,7},{5,7},{5,8},{5,9},
-      {7,12},{8,10},{8,11},
-    };
-
-    // Create hierarchical graph
+    // Create a proximity view {{{
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [h,_] = proximity::run(1,pred,succ);
+    auto [dv,_] {proximity::run(0, pred, succ)};
+    // }}}
 
-    // Get the key type
-    using node_t = decltype(h)::key_type;
+    // node_t {{{
+    using node_t = decltype(dv)::key_type;
+    // }}}
 
-    // Lambda to obtain a layer by index
-    auto get_layer = [&h](node_t idx)
+    // Balace the graph {{{
+    // Link and unlink graph edges
+    auto link = [&](auto&& e) -> void { g.emplace(e); };
+    auto unlink = [&](auto&& e) -> void
     {
-      return fw::apply(h
+      auto rng {g.data().equal_range(e.first)};
+      for (auto it{rng.first}; it != rng.second; ++it)
+      {
+        if( it->second == e.second )
+        {
+          g.data().erase(it);
+          break;
+        }
+      } // for: it != it.second
+    };
+    // Execute the balacing algorithm
+    balance::run(0, pred, succ, link, unlink);
+    // }}}
+
+    // Pre-processing {{{
+    auto layer = [&dv](node_t idx)
+    {
+      return fw::apply(dv
         , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
         , fw::get_map_values()
-        , fw::sort()
       );
     };
+    // Get the depth of the graph
+    auto depth {fw::apply(dv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+    // Verify edge uv exists.
+    auto adjacent = [&g](node_t u, node_t v) {  return g.adjacent(u,v); };
+    // }}}
 
-    // Lambda to verify if an edge between v → u exists
-    auto has_edge = [&g](node_t v, node_t u)
-    {
-      std::cout << std::boolalpha << "[" << v << "," << u << "] : " << g.adjacent(v,u) << std::endl;
-      return g.adjacent(v,u);
-    };
-
-    // Lambda to get the depth of the graph
-    auto depth {fw::apply(h,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-
+    // Perform test {{{
     // Matrix realization of the graph
-    auto matrices {matrix_realization::run(get_layer, has_edge, depth)};
+    auto ms {realization::run(layer, adjacent, depth)};
+    // Calculate current crossings
+    i64 prev_crossings{};
+    rg::for_each(ms,[&](auto&& m){ prev_crossings += crossings::run(m); });
+    // Start algorithm
+    auto start {std::chrono::system_clock::now()};
+    auto result{minimize::run(ms, layer, depth)};
+    auto end {std::chrono::system_clock::now()};
+    std::chrono::duration<f64> dur {end-start};
+    std::stringstream ss; ss << dur.count();
+    // Calculate new number of crossings
+    i64 new_crossings{};
+    rg::for_each(result.second,[&](auto&& m){ new_crossings += crossings::run(m); });
+    // }}}
 
-    for (auto&& m : matrices)
-    {
-      for (auto&& row : m)
-      {
-        std::cout << rv::all(row) << std::endl;
-      } // for row : m
-      std::cout << std::endl;
-    } // for [l,m] : ret
+    // Log results {{{
+    spdlog::info("{},{},{},{},{}",
+        g.vertices_count(), g.edges_count(), prev_crossings, new_crossings, ss.str());
+    // }}}
 
-    SUBCASE("Test vertices as matrices labels")
-    {
-      auto ordering{minimize_crossings::run(matrices, get_layer, depth)};
-      for (auto const& i : ordering)
-      {
-        std::cout << rv::all(i) << std::endl;
-      } // for i : ordering
+  }; // lamb: test }}}
 
-    } // SUBCASE: "Test vertices as matrices labels"
+  // Forwarding test folding lambda {{{
+  auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
+  // }}}
 
-  } // TEST_CASE: "celaeno::graph::minimize_crossings"
+  // LGSynth 91 tests {{{
+  tests(
+    cir::synth_91::alu2,
+    cir::synth_91::alu4,
+    cir::synth_91::dalu,
+    cir::synth_91::apex6,
+    cir::synth_91::apex7,
+    cir::synth_91::b1 ,
+    cir::synth_91::c8 ,
+    cir::synth_91::cc,
+    cir::synth_91::cht,
+    cir::synth_91::cm138a,
+    cir::synth_91::cm150a,
+    cir::synth_91::cm151a,
+    cir::synth_91::cm162a,
+    cir::synth_91::cm163a,
+    cir::synth_91::cm42a,
+    cir::synth_91::cm82a,
+    cir::synth_91::cm85a,
+    cir::synth_91::cmb,
+    cir::synth_91::comp,
+    cir::synth_91::cordic,
+    cir::synth_91::cu,
+    cir::synth_91::count,
+    cir::synth_91::decod,
+    cir::synth_91::my_adder
+  ); // }}}
 
-} // namespace celaeno::graph::minimize_crossings::test
+} // TEST_CASE: "celaeno::graph::minimize_crossings"
+
+} // namespace celaeno::graph::minimize_crossings::test }}}
