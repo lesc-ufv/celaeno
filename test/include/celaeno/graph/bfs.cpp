@@ -68,7 +68,7 @@ TEST_CASE("celaeno::graph::bfs"
 )
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::bfs", "logs/celaeno/graph/bfs.csv")};
+  auto logger {spdlog::basic_logger_mt("graph::bfs", "logs/celaeno/graph/bfs.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
@@ -108,8 +108,8 @@ TEST_CASE("celaeno::graph::bfs"
     // Log results {{{
     spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
     // }}}
-  }; // lamb: test
-  // }}}
+
+  }; // lamb: test }}}
 
   // Forwarding test folding lambda {{{
   auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };

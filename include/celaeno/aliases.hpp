@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 
 // namespace celaeno::aliases {{{
 
@@ -17,6 +18,7 @@ using i64 = int64_t;
 using u8 = uint8_t;
 using u32 = uint32_t;
 using u64 = uint64_t;
+using siz = std::size_t;
 // }}}
 
 // Floating-point types {{{

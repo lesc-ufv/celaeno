@@ -69,7 +69,7 @@ concept String = requires(T t){ std::string{t}; };
 TEST_CASE("celaeno::graph::views::depth")
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::views::depth", "logs/celaeno/graph/views/depth.csv")};
+  auto logger {spdlog::basic_logger_mt("graph::views::depth", "logs/celaeno/graph/views/depth.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");

@@ -60,22 +60,24 @@ namespace kahn = celaeno::graph::kahn;
 // Concepts {{{
 template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
+
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
+
 template<typename T>
-concept Function = requires(T t) { {t(int64_t{})} -> Iterable; };
+concept Neighbors = requires(T t) { {t(int64_t{})} -> Iterable; };
 // }}}
 
 // fn: run {{{
 
-template<SignedIntegral T, Function F1, Function F2>
-auto run(T root, F1&& pred, F2&& succ) -> std::pair<std::multimap<T,T>,std::map<T,T>>
+template<SignedIntegral T, Neighbors P, Neighbors S>
+auto run(T root, P&& pred, S&& succ) -> std::pair<std::multimap<T,T>,std::map<T,T>>
 {
   // Create a depth-view
-  auto [dv,vd] {depth::run(root, std::forward<F1>(pred), std::forward<F2>(succ))};
+  auto [dv,vd] {depth::run(root, std::forward<P>(pred), std::forward<S>(succ))};
 
   // Perform Topological sorting
-  auto topo {kahn::run(std::forward<T>(root),std::forward<F1>(pred),std::forward<F2>(succ))};
+  auto topo {kahn::run(std::forward<T>(root),std::forward<P>(pred),std::forward<S>(succ))};
 
   // Reverse topo view
   topo |= ra::reverse;

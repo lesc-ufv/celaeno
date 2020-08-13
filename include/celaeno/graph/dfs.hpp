@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : dfs
@@ -33,24 +34,21 @@
 
 #include <stack>
 #include <unordered_map>
-#include <type_traits> // std::remove_reference
+#include <type_traits>
 #include <concepts>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
+// namespace celaeno::graph::dfs {{{
 namespace celaeno::graph::dfs
 {
-//
-// Aliases
-//
 
+// Aliases {{{
 namespace rg = ranges;
 namespace fw = fplus::fwd;
+// }}}
 
-
-//
-// concepts
-//
+// Concepts {{{
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
@@ -58,16 +56,15 @@ template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template<typename T>
-concept Fn = requires(T t){ {t(int64_t{})} -> Iterable; };
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 
 template<typename T>
-concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+// }}}
 
-//
-// Algorithm
-//
-template<SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)>>
-std::vector<T> run(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
+// Algorithm {{{
+template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
+std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
 {
   // Stack of vertices
   std::stack<T> stack;
@@ -99,7 +96,7 @@ std::vector<T> run(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
     // Get the adjacent vertices
     // Remove the visited ones
     auto is_visited = [&visited](auto&& v){ return visited.contains(v); };
-    auto not_visited {fw::apply(adj(vertex), fw::drop_if(is_visited))};
+    auto not_visited {fw::apply(nb(vertex), fw::drop_if(is_visited))};
 
     // Insert the unvisited vertices into the stack
     rg::for_each(not_visited, [&stack](auto&& v){ stack.push(v); });
@@ -108,7 +105,6 @@ std::vector<T> run(T&& root, F1&& adj, F2&& cb = [](auto&&){return false;})
     if( cb(vertex) ) return result;
   } // while
   return result;
-} // function: run
+} // function: run }}}
 
-
-} // namespace celaeno::graph::dfs
+} // namespace celaeno::graph::dfs }}}

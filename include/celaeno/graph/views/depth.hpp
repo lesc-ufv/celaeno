@@ -51,45 +51,48 @@ namespace kahn = celaeno::graph::kahn;
 // Concepts {{{
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
+
 template<typename T>
-concept Function = requires(T t) { {t(int64_t{})} -> Iterable; };
+concept SignedIntegral = std::signed_integral<T>;
+
+template<typename T>
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 // }}}
 
 // Algorithm {{{
-template<std::signed_integral T, Function F1, Function F2>
-std::pair<std::multimap<T,T>,std::map<T,T>>
-  run(T root, F1&& pred, F2&& succ)
+template<SignedIntegral T, Neighbors P, Neighbors S>
+std::pair<std::multimap<T,T>,std::map<T,T>> run(T root, P&& pred, S&& succ)
 {
-  // level -> nodes
-  std::multimap<T,T> ln;
+  // layer -> vertices
+  std::multimap<T,T> lv;
 
-  // node -> level
-  std::map<T,T> nl;
+  // vertex -> layer
+  std::map<T,T> vl;
 
-  // Emplace in ln and nl
-  auto emplace = [&](auto&& l, auto&& n) { ln.emplace(l,n); nl.emplace(n,l); };
+  // Emplace in lv and vl
+  auto emplace = [&](auto&& l, auto&& v) { lv.emplace(l,v); vl.emplace(v,l); };
 
   // Perform Topological sorting
-  auto topo {kahn::run(std::forward<T>(root),std::forward<F1>(pred),std::forward<F2>(succ))};
+  auto topo {kahn::run(std::forward<T>(root),std::forward<P>(pred),std::forward<S>(succ))};
 
   // lambda to get all levels of a set vertices
-  auto levels = [&](auto&& vs) { return fp::transform([&](auto&& n){ return nl.at(n); }, vs);};
+  auto levels = [&](auto&& vs) { return fp::transform([&](auto&& v){ return vl.at(v); }, vs);};
 
-  // lambda to get the predecessor ps with max level
+  // lambda to get the predecessor ps with max layer
   auto max = [&](auto&& ps) { return fw::apply(levels(ps),fw::maximum()); };
 
-  // Split by level
-  fw::apply(topo,fw::transform(([&](auto&& n)
+  // Split by layer
+  fw::apply(topo,fw::transform(([&](auto&& v)
   {
-    auto preds {pred(n)};
-    // If is in the first level (has no predecessors), emplace 0
-    if( preds.size() == 0 ) [[unlikely]] { emplace(0,n); }
-    // else, emplace max level of the predecessors + 1
-    else [[likely]] { emplace(max(preds)+1,n); }
+    auto preds {pred(v)};
+    // If is in the first layer (has no predecessors), emplace 0
+    if( preds.size() == 0 ) [[unlikely]] { emplace(0,v); }
+    // else, emplace max layer of the predecessors + 1
+    else [[likely]] { emplace(max(preds)+1,v); }
     return true;
   })));
 
-  return { ln, nl };
+  return { lv, vl };
 } // function: run
 // }}}
 

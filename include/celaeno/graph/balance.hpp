@@ -1,4 +1,4 @@
-/*vim: set expandtab ts=2 sw=2 tw=80 et :*/
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : balance
@@ -41,52 +41,57 @@
 #include <celaeno/graph/bfs.hpp>
 #include <range/v3/all.hpp>
 
+// namespace celaeno::graph::balance {{{
 namespace celaeno::graph::balance
 {
 
-//
-// Aliases
-//
-
+// Namespaces {{{
 namespace depth = celaeno::graph::views::depth;
 namespace bfs = celaeno::graph::bfs;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace fw = fplus::fwd;
+// }}}
 
-template<typename T, typename F1, typename F2, typename F3, typename F4>
-void run(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
+// Concepts {{{
+template<typename T>
+concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
+
+template<typename T>
+concept SignedIntegral = std::signed_integral<T>;
+
+template<typename T>
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
+
+template<typename T>
+concept Link = requires(T t){ {t(std::pair<int64_t,int64_t>{})} -> std::same_as<std::void_t<>>; };
+// }}}
+
+// Algorithm {{{
+template<SignedIntegral T, Neighbors P, Neighbors S, Link L, Link U>
+void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
 {
-  //
   // Get the pseudo vertex with the lowest value
-  //
   auto adj = [&pred,&succ](auto&& v) { return fplus::append(pred(v),succ(v)); };
   auto counter { fw::apply(bfs::run(root,adj), fw::sort(), fw::minimum()) };
 
-  //
-  // Build depth-map
-  //
-  auto [depth_vertex,vertex_depth] =
-    depth::run(root,std::forward<F1>(pred),std::forward<F2>(succ));
+  // vd = Vertex → Depth; dv = Depth  → Vertex
+  auto [dv,vd] = depth::run(root,std::forward<P>(pred),std::forward<S>(succ));
 
-  //
   // Get the levels indexes
-  //
-  auto levels { depth_vertex | rv::keys | rv::unique | rg::to<std::vector> };
+  auto levels { dv | rv::keys | rv::unique | rg::to<std::vector> };
 
-  //
   // Algorithm
-  //
   for (auto const& i : levels)
   {
-    auto range {depth_vertex.equal_range(i)};
+    auto range {dv.equal_range(i)};
     for( auto it{range.first}; it!=range.second; ++it )
     {
       auto const& current{it->second};
       // For each predecessor current
       for( auto p : pred(current) )
       {
-        auto distance{vertex_depth.at(current)-vertex_depth.at(p)};
+        auto distance{vd.at(current)-vd.at(p)};
         while( distance > 1 )
         {
           --counter;
@@ -140,6 +145,6 @@ void run(T root, F1&& pred, F2&& succ, F3&& link, F4&& unlink )
     } // for
   } // for: i
 
-} // function: run
+} // function: run }}}
 
-} // namespace celaeno::graph::balance
+} // namespace celaeno::graph::balance }}}

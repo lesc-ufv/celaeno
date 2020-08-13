@@ -42,54 +42,101 @@ bfs:
   stage: test
   script:
     - ./build/test/test_bfs -s
+    - ls -l
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 dfs:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_dfs -s
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 graph_balance:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_balance
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 a_star:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_a_star -s
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 matrix_realization:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_m_real -s
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 barycenter:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_barycenter -s
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 crossings:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_crossings -s
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 graph_depth_view:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_views_depth -s
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 graph_proximity_view:
   needs: ["build"]
   stage: test
   script:
     - ./build/test/test_views_proximity -s
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
+
+graph_minimize_crossings:
+  needs: ["build"]
+  stage: test
+  script:
+    - ./build/test/test_minimize_crossings
+  artifacts:
+    paths:
+      - ./logs/celaeno/
+    expire_in: 1 week
 
 pages:
   stage: doc

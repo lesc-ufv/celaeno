@@ -1,11 +1,8 @@
-// vim: set ts=2 sw=2 tw=0 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
-// @company     : Universidade Federal de Viçosa - Florestal
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : bfs
 // @created     : Wednesday Aug 14, 2019 13:59:44 -03
-// @license     : MIT
-// @description : C++ Algorithms Collection
 //
 // BSD 2-Clause License
 
@@ -42,19 +39,16 @@
 #include <concepts>
 #include <range/v3/all.hpp>
 
+// namespace celaeno::graph::bfs {{{
 namespace celaeno::graph::bfs
 {
 
-//
-// Aliases
-//
+// Namespaces {{{
 namespace rg = ranges;
 namespace ra = ranges::actions;
+// }}}
 
-
-//
-// Concepts
-//
+// Concepts {{{
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
@@ -62,16 +56,15 @@ template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template<typename T>
-concept Fn = requires(T t){ {t(int64_t{})} -> Iterable; };
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 
 template<typename T>
-concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+// }}}
 
-//
-// Algorithm
-//
-template< SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)> >
-std::vector<T> run(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
+// Algorithm {{{
+template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
+std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
 {
   // Queue of vertices
   std::queue<T> queue;
@@ -103,7 +96,7 @@ std::vector<T> run(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
     // Get the adjacent vertices
     // Remove the visited ones
     auto is_visited = [&visited](auto&& v){return visited.contains(v);};
-    auto not_visited {adj(vertex) | ra::drop_while(is_visited)};
+    auto not_visited {nb(vertex) | ra::drop_while(is_visited)};
 
     // Insert non-visited into the queue
     rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
@@ -112,6 +105,6 @@ std::vector<T> run(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
     if ( cb(vertex) ) return result;
   }
   return result;
-} // function: run
+} // function: run }}}
 
-} // namespace celaeno::graph::bfs
+} // namespace celaeno::graph::bfs }}}
