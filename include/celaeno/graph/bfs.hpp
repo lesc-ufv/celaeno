@@ -62,16 +62,16 @@ template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template<typename T>
-concept Fn = requires(T t){ {t(int64_t{})} -> Iterable; };
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 
 template<typename T>
-concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 
 //
 // Algorithm
 //
-template< SignedIntegral T, Fn F1, Fc F2 = std::function<bool(int64_t)> >
-std::vector<T> run(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
+template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
+std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
 {
   // Queue of vertices
   std::queue<T> queue;
@@ -103,7 +103,7 @@ std::vector<T> run(T root, F1&& adj, F2&& cb = [](auto&&){return false;})
     // Get the adjacent vertices
     // Remove the visited ones
     auto is_visited = [&visited](auto&& v){return visited.contains(v);};
-    auto not_visited {adj(vertex) | ra::drop_while(is_visited)};
+    auto not_visited {nb(vertex) | ra::drop_while(is_visited)};
 
     // Insert non-visited into the queue
     rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
