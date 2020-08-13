@@ -1,5 +1,3 @@
->  vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
-
 # Prerequisites
 
 To compile the sample projects, you must have pip3 installed in your linux
@@ -30,3 +28,4 @@ The last step is to set the correct version of _gcc_ with _update-alternatives_.
 ```
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 10
 ```
+<!--  vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et : -->
