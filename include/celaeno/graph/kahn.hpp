@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : kahn
@@ -37,19 +38,17 @@
 #include <celaeno/graph/bfs.hpp>
 #include <fplus/fplus.hpp>
 
+// namespace celaeno::graph::kahn {{{
 namespace celaeno::graph::kahn
 {
 
-//
-// Aliases
-//
+// Namespaces {{{
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace bfs = celaeno::graph::bfs;
+// }}}
 
-//
-// Concepts
-//
+// Concepts {{{
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
@@ -57,16 +56,15 @@ template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template<typename T>
-concept Fn = requires(T t){ {t(int64_t{})} -> Iterable; };
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 
 template<typename T>
-concept Fc = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+// }}}
 
-//
-// Algorithm
-//
-template< SignedIntegral T, Fn F1, Fn F2, Fc F3 = std::function<bool(int64_t)> >
-std::vector<T> run(T&& root, F1&& pred, F2&& succ, F3&& cb = [](auto&&){return false;})
+// Algorithm {{{
+template<SignedIntegral T, Neighbors N1, Neighbors N2, Callback C = std::function<bool(int64_t)>>
+std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return false;})
 {
   auto adj = [&pred,&succ](auto&& v){ return fp::append(pred(v),succ(v)); };
 
@@ -108,6 +106,6 @@ std::vector<T> run(T&& root, F1&& pred, F2&& succ, F3&& cb = [](auto&&){return f
     }
   } // while: ! initial.empty()
   return result;
-} // function: run
+} // function: run }}}
 
-} // namespace celaeno::graph::kahn
+} // namespace celaeno::graph::kahn }}}
