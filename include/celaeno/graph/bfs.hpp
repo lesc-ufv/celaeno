@@ -1,4 +1,4 @@
-// vim: set ts=2 sw=2 tw=0 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @company     : Universidade Federal de Viçosa - Florestal
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
@@ -45,16 +45,13 @@
 namespace celaeno::graph::bfs
 {
 
-//
-// Aliases
-//
+// Namespaces {{{
 namespace rg = ranges;
 namespace ra = ranges::actions;
+// }}}
 
 
-//
-// Concepts
-//
+// Concepts {{{
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
@@ -66,10 +63,9 @@ concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 
 template<typename T>
 concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+// }}}
 
-//
-// Algorithm
-//
+// Algorithm {{{
 template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
 {
@@ -112,6 +108,6 @@ std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
     if ( cb(vertex) ) return result;
   }
   return result;
-} // function: run
+} // function: run }}}
 
 } // namespace celaeno::graph::bfs
