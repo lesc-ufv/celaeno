@@ -1,11 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
-// @company     : Universidade Federal de Viçosa - Florestal
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : bfs
 // @created     : Wednesday Aug 14, 2019 13:59:44 -03
-// @license     : MIT
-// @description : C++ Algorithms Collection
 //
 // BSD 2-Clause License
 
