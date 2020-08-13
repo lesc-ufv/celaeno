@@ -44,7 +44,7 @@ bfs:
     - ./build/test/test_bfs -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 dfs:
@@ -54,7 +54,7 @@ dfs:
     - ./build/test/test_dfs -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 graph_balance:
@@ -64,7 +64,7 @@ graph_balance:
     - ./build/test/test_balance
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 a_star:
@@ -74,7 +74,7 @@ a_star:
     - ./build/test/test_a_star -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 matrix_realization:
@@ -84,7 +84,7 @@ matrix_realization:
     - ./build/test/test_m_real -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 barycenter:
@@ -94,7 +94,7 @@ barycenter:
     - ./build/test/test_barycenter -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 crossings:
@@ -104,7 +104,7 @@ crossings:
     - ./build/test/test_crossings -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 graph_depth_view:
@@ -114,7 +114,7 @@ graph_depth_view:
     - ./build/test/test_views_depth -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 graph_proximity_view:
@@ -124,7 +124,7 @@ graph_proximity_view:
     - ./build/test/test_views_proximity -s
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 graph_minimize_crossings:
@@ -134,7 +134,7 @@ graph_minimize_crossings:
     - ./build/test/test_minimize_crossings
   artifacts:
     paths:
-      - ./logs
+      - ./logs/
     expire_in: 1 week
 
 pages:
