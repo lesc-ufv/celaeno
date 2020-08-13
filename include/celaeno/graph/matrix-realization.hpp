@@ -1,4 +1,4 @@
-/* vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :*/
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : incidence-matrix
@@ -33,74 +33,58 @@
 
 #pragma once
 
-#include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
 #include <vector>
 #include <concepts>
 #include <iterator>
+#include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
+#include <celaeno/aliases.hpp>
 
+// namespace celaeno::graph::matrix_realization {{{
 namespace celaeno::graph::matrix_realization
 {
-//
-// Aliases
-//
 
+// Namespaces {{{
 namespace fp = fplus;
-using float64_t = double;
+// }}}
 
-//
-// Concepts
-//
-// returns iterable
-// integer as param
-// has .size()
+
+// Concepts {{{
 template<typename T>
-concept Iterable =
-  requires(T t)
-  {
+concept Integral = std::integral<T>;
 
-    { t.begin()  };
-    { t.end()    };
-    { t.cbegin() };
-    { t.cend()   };
-
-  };
+template<typename T>
+concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
 template<typename T>
 concept Layer =
-  requires(T t)
-  {
-    { t(int64_t{})        } -> Iterable;
-    { t(int64_t{})        } -> Iterable;
-    { t(int64_t{}).size() } -> std::integral;
-  };
+requires(T t)
+{
+  { t(i64{})        } -> Iterable;
+  { t(i64{})        } -> Iterable;
+  { t(i64{}).size() } -> Integral;
+};
 
 template<typename T>
-concept HasEdge =
-  requires(T t)
-  {
-    { t(int64_t{},int64_t{}) } -> std::same_as<bool>;
-  };
+concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
+// }}}
 
-//
-// Algorithm
-//
-
-template<Layer L, HasEdge E>
-auto run(L&& get_layer, E&& has_edge, uint64_t height)
+// Algorithm {{{
+template<Layer L, Adjacent A>
+auto run(L&& get_layer, A&& adjacent, u64 height)
 {
-  using Matrix = std::vector<std::vector<int32_t>>;
+  using Matrix = std::vector<std::vector<i32>>;
 
   // Result
   std::vector<Matrix> result;
 
-  for (uint64_t i{0}; i < height-1; ++i)
+  for (u64 i{0}; i < height-1; ++i)
   {
     // Get two layers
     auto [l1,l2] = std::make_pair(get_layer(i),get_layer(i+1));
 
     // Create the incidence matrix
-    Matrix m( l1.size(), std::vector<int32_t>(l2.size(), 0) );
+    Matrix m( l1.size(), std::vector<i32>(l2.size(), 0) );
 
     // Enumerate layers
     auto [l1e,l2e] { std::make_pair(fp::enumerate(l1),fp::enumerate(l2)) };
@@ -113,7 +97,7 @@ auto run(L&& get_layer, E&& has_edge, uint64_t height)
     {
       for (auto&& u : l2e)
       {
-        if( has_edge(v.second,u.second) )
+        if( adjacent(v.second,u.second) )
         {
           m.at(v.first).at(u.first) = 1;
         }
@@ -125,6 +109,6 @@ auto run(L&& get_layer, E&& has_edge, uint64_t height)
   } // for: i
 
   return result;
-} // function: run
+} // function: run }}}
 
-} // namespace celaeno::graph::matrix_realization
+} // namespace celaeno::graph::matrix_realization }}}
