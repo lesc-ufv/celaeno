@@ -39,9 +39,9 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/aliases.hpp>
 
-// namespace celaeno::graph::crossings {{{
+// namespace celaeno::graph::operations::count::crossings {{{
 
-namespace celaeno::graph::crossings
+namespace celaeno::graph::operations::count::crossings
 {
 
 // Namespaces {{{
@@ -98,4 +98,4 @@ i64 run(MS&&... ms)
 
 // }}}
 
-} // namespace celaeno::graph::crossings }}}
+} // namespace celaeno::graph::operations::count::crossings }}}

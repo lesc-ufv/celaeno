@@ -12,20 +12,20 @@
 // Graph Library
 #include <taygete/graph/graph.hpp>
 // Tested algorithm
-#include <celaeno/graph/matrix-realization.hpp>
+#include <celaeno/graph/representations/incidence.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
-// namespace: celaeno::graph::matrix_realization::test {{{
+// namespace: celaeno::graph::representations::incidence::test {{{
 
-namespace celaeno::graph::matrix_realization::test
+namespace celaeno::graph::representations::incidence::test
 {
 
 // Namespaces {{{
 namespace graph = taygete::graph;
-namespace matrix_realization = celaeno::graph::matrix_realization;
+namespace incidence = celaeno::graph::representations::incidence;
 namespace fw = fplus::fwd;
 // }}}
 
@@ -47,9 +47,9 @@ void compare(C1&& c1, C2&& c2)
 
 // }}}
 
-// Test case celaeno::graph::matrix_realization {{{
+// Test case celaeno::graph::representations::incidence {{{
 
-TEST_CASE("celaeno::graph::matrix_realization"
+TEST_CASE("celaeno::graph::representations::incidence"
   * doctest::description("Matrix Realization Test")
   * doctest::timeout(100.0f))
 {
@@ -131,7 +131,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
     auto height {fw::apply(h, fw::get_map_keys(), fw::unique(), fw::size_of_cont())};
 
     // Execute the algorithm
-    auto matrices {matrix_realization::run(get_layer, has_edge, height)};
+    auto matrices {incidence::run(get_layer, has_edge, height)};
 
     // Test against expected result
     REQUIRE(matrices.size() == 3);
@@ -188,7 +188,7 @@ TEST_CASE("celaeno::graph::matrix_realization"
     // Lambda to get the height of the graph
     auto height{fw::apply(h, fw::get_map_keys(), fw::unique(),fw::size_of_cont())};
 
-    auto matrices {matrix_realization::run(get_layer, has_edge, height)};
+    auto matrices {incidence::run(get_layer, has_edge, height)};
 
     // TESTS
     REQUIRE(matrices.size() == 2);
@@ -197,6 +197,6 @@ TEST_CASE("celaeno::graph::matrix_realization"
 
   } // SUBCASE: "Odd number of layers" }}}
 
-} // TEST_CASE: celaeno::graph::matrix_realization }}}
+} // TEST_CASE: celaeno::graph::representations::incidence }}}
 
-} // namespace celaeno::graph::matrix_realization::test }}}
+} // namespace celaeno::graph::representations::incidence::test }}}

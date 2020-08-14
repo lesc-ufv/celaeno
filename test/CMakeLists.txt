@@ -61,14 +61,27 @@ function(add_test target)
 endfunction(add_test)
 
 # Tests
-add_test(test_a_star "include/celaeno/graph/a-star.cpp")
-add_test(test_balance "include/celaeno/graph/balance.cpp")
-add_test(test_barycenter "include/celaeno/graph/barycenter.cpp")
+
+## Search
 add_test(test_bfs "include/celaeno/graph/bfs.cpp")
-add_test(test_crossings "include/celaeno/graph/crossings.cpp")
 add_test(test_dfs "include/celaeno/graph/dfs.cpp")
 add_test(test_kahn "include/celaeno/graph/kahn.cpp")
-add_test(test_m_real "include/celaeno/graph/matrix-realization.cpp")
-add_test(test_minimize_crossings "include/celaeno/graph/minimize/crossings.cpp")
+
+## Views
 add_test(test_views_depth "include/celaeno/graph/views/depth.cpp")
 add_test(test_views_proximity "include/celaeno/graph/views/proximity.cpp")
+
+## Structural Change
+
+## Operations
+### Query
+add_test(test_count_crossings "include/celaeno/graph/operations/count/crossings.cpp")
+add_test(test_barycenter "include/celaeno/graph/barycenter.cpp")
+### Modifiers
+add_test(test_balance "include/celaeno/graph/balance.cpp")
+add_test(test_minimize_crossings "include/celaeno/graph/operations/minimize/crossings.cpp")
+
+## Representations
+add_test(test_m_real "include/celaeno/graph/representations/incidence.cpp")
+
+#add_test(test_a_star "include/celaeno/graph/a-star.cpp")

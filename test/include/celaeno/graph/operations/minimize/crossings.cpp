@@ -41,13 +41,13 @@
 #include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/synth-91.hpp>
 #include <celaeno/graph/balance.hpp>
-#include <celaeno/graph/minimize/crossings.hpp>
-#include <celaeno/graph/crossings.hpp>
-#include <celaeno/graph/matrix-realization.hpp>
+#include <celaeno/graph/operations/minimize/crossings.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
+#include <celaeno/graph/representations/incidence.hpp>
 #include <celaeno/graph/views/proximity.hpp>
 
-// namespace celaeno::graph::minimize::crossings::test {{{
-namespace celaeno::graph::minimize::crossings::test
+// namespace celaeno::graph::operations::minimize::crossings::test {{{
+namespace celaeno::graph::operations::minimize::crossings::test
 {
 
 // namespaces {{{
@@ -57,10 +57,10 @@ namespace rv = ranges::views;
 namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
-namespace crossings = celaeno::graph::crossings;
+namespace count_crossings = celaeno::graph::operations::count::crossings;
 namespace proximity = celaeno::graph::views::proximity;
-namespace realization = celaeno::graph::matrix_realization;
-namespace minimize = celaeno::graph::minimize::crossings;
+namespace incidence = celaeno::graph::representations::incidence;
+namespace minimize = celaeno::graph::operations::minimize::crossings;
 // }}}
 
 // Concepts {{{
@@ -68,13 +68,14 @@ template<typename T>
 concept String = requires(T t){ std::string{t}; };
 // }}}
 
-TEST_CASE("celaeno::graph::minimize::crossings"
+TEST_CASE("celaeno::graph::operations::minimize::crossings"
   * doctest::description("Graph crossing minimization test")
 )
 {
 
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::minimize::crossings", "logs/celaeno/graph/minimize-crossings.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::operations::minimize::crossings"
+    , "logs/celaeno/graph/operations/minimize/crossings.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,prev_crossings,new_crossings,runtime");
@@ -134,11 +135,11 @@ TEST_CASE("celaeno::graph::minimize::crossings"
     // }}}
 
     // Perform test {{{
-    // Matrix realization of the graph
-    auto ms {realization::run(layer, adjacent, depth)};
+    // Incidence matrices of the graph
+    auto ms {incidence::run(layer, adjacent, depth)};
     // Calculate current crossings
     i64 prev_crossings{};
-    rg::for_each(ms,[&](auto&& m){ prev_crossings += crossings::run(m); });
+    rg::for_each(ms,[&](auto&& m){ prev_crossings += count_crossings::run(m); });
     // Start algorithm
     auto start {std::chrono::system_clock::now()};
     auto result{minimize::run(ms, layer, depth)};
@@ -147,7 +148,7 @@ TEST_CASE("celaeno::graph::minimize::crossings"
     std::stringstream ss; ss << dur.count();
     // Calculate new number of crossings
     i64 new_crossings{};
-    rg::for_each(result.second,[&](auto&& m){ new_crossings += crossings::run(m); });
+    rg::for_each(result.second,[&](auto&& m){ new_crossings += count_crossings::run(m); });
     // }}}
 
     // Log results {{{
@@ -189,6 +190,6 @@ TEST_CASE("celaeno::graph::minimize::crossings"
     cir::synth_91::my_adder
   ); // }}}
 
-} // TEST_CASE: "celaeno::graph::minimize::crossings"
+} // TEST_CASE: "celaeno::graph::operations::minimize::crossings"
 
-} // namespace celaeno::graph::minimize::crossings::test }}}
+} // namespace celaeno::graph::operations::minimize::crossings::test }}}

@@ -36,14 +36,14 @@
 #include <range/v3/all.hpp>
 #include <taygete/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
-#include <celaeno/graph/crossings.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/views/proximity.hpp>
-#include <celaeno/graph/matrix-realization.hpp>
+#include <celaeno/graph/representations/incidence.hpp>
 
 
-// namespace celaeno::graph::crossings::test {{{
+// namespace celaeno::graph::operations::count::crossings::test {{{
 
-namespace celaeno::graph::crossings::test
+namespace celaeno::graph::operations::count::crossings::test
 {
 
 // namespaces {{{
@@ -51,13 +51,13 @@ namespace rv = ranges::views;
 namespace fw = fplus::fwd;
 namespace graph = taygete::graph;
 namespace proximity = celaeno::graph::views::proximity;
-namespace crossings = celaeno::graph::crossings;
-namespace realization = celaeno::graph::matrix_realization;
+namespace crossings = celaeno::graph::operations::count::crossings;
+namespace incidence = celaeno::graph::representations::incidence;
 // }}}
 
 // Tests case celaeno::graph::crossings {{{
 
-TEST_CASE("celaeno::graph::crossings")
+TEST_CASE("celaeno::graph::operations::count::crossings")
 {
   // Subcase Two-layered Bipartite graph {{{
   SUBCASE("Two-layered Bipartite graph")
@@ -308,10 +308,10 @@ TEST_CASE("celaeno::graph::crossings")
       );
     };
 
-    // Matrix realization
+    // Incidence matrices
     auto adjacent = [&g](auto&& u, auto&& v) -> bool { return g.adjacent(u,v); };
     auto depth {fw::apply(l,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-    auto ms {matrix_realization::run(layer, adjacent, depth)};
+    auto ms {incidence::run(layer, adjacent, depth)};
 
     // Calculate cost
     i64 cost{};
@@ -325,6 +325,6 @@ TEST_CASE("celaeno::graph::crossings")
 
   // }}}
 
-} // TEST_CASE: "celaeno::graph::crossings" }}}
+} // TEST_CASE: "celaeno::graph::operations::count::crossings" }}}
 
-} // namespace celaeno::graph::crossings::test }}}
+} // namespace celaeno::graph::operations::count::crossings::test }}}
