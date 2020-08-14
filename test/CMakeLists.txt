@@ -78,7 +78,7 @@ add_test(test_views_proximity "include/celaeno/graph/views/proximity.cpp")
 add_test(test_count_crossings "include/celaeno/graph/operations/count/crossings.cpp")
 add_test(test_barycenter "include/celaeno/graph/barycenter.cpp")
 ### Modifiers
-add_test(test_balance "include/celaeno/graph/balance.cpp")
+add_test(test_balance "include/celaeno/graph/operations/balance/paths.cpp")
 add_test(test_minimize_crossings "include/celaeno/graph/operations/minimize/crossings.cpp")
 
 ## Representations

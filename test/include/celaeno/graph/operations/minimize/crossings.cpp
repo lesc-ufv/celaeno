@@ -40,7 +40,7 @@
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/synth-91.hpp>
-#include <celaeno/graph/balance.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
@@ -57,6 +57,7 @@ namespace rv = ranges::views;
 namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
+namespace balance = celaeno::graph::operations::balance::paths;
 namespace count_crossings = celaeno::graph::operations::count::crossings;
 namespace proximity = celaeno::graph::views::proximity;
 namespace incidence = celaeno::graph::representations::incidence;

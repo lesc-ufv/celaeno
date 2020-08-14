@@ -1,7 +1,7 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : balance
+// @file        : paths
 // @created     : Wednesday Apr 01, 2020 21:24:23 -03
 //
 // BSD 2-Clause License
@@ -38,16 +38,16 @@
 #include <concepts>
 #include <chrono>
 #include <range/v3/all.hpp>
-#include <celaeno/graph/balance.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/synth-91.hpp>
 
-// namespace celaeno::graph::balance::test {{{
+// namespace celaeno::graph::operations::balance::paths::test {{{
 
-namespace celaeno::graph::balance::test
+namespace celaeno::graph::operations::balance::paths::test
 {
 
 // namespaces {{{
@@ -55,7 +55,7 @@ namespace celaeno::graph::balance::test
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace cir = maia::circuits;
-namespace balance = celaeno::graph::balance;
+namespace balance = celaeno::graph::operations::balance::paths;
 namespace depth = celaeno::graph::views::depth;
 namespace rg = ranges;
 namespace rv = ranges::views;
@@ -72,13 +72,14 @@ concept String = requires(T t){ std::string{t}; };
 
 // Test Cases {{{
 
-TEST_CASE("celaeno::graph::balance"
+TEST_CASE("celaeno::graph::operations::balance::paths"
   * doctest::description("Balance test")
   * doctest::timeout(1000.0f)
 )
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::balance", "logs/celaeno/graph/balance.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::operations::balance::paths"
+      , "logs/celaeno/graph/operations/balance/paths.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
@@ -177,6 +178,6 @@ TEST_CASE("celaeno::graph::balance"
   );
   // }}}
 
-} // TEST_CASE: celaeno::graph::balance }}}
+} // TEST_CASE: celaeno::graph::operations::balance::paths }}}
 
-} // namespace celaeno::graph::balance::test }}}
+} // namespace celaeno::graph::operations::balance::paths::test }}}
