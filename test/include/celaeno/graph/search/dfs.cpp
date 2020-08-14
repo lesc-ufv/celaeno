@@ -36,22 +36,22 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <celaeno/aliases.hpp>
-#include <celaeno/graph/dfs.hpp>
+#include <celaeno/graph/search/dfs.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
 #include <fplus/fplus.hpp>
 
-// namespace: celaeno::graph::dfs::test {{{
+// namespace: celaeno::graph::search::dfs::test {{{
 
-namespace celaeno::graph::dfs::test
+namespace celaeno::graph::search::dfs::test
 {
 
 // Aliases {{{
 namespace reader = taygete::graph::reader::verilog;
 namespace graph = taygete::graph;
-namespace dfs = celaeno::graph::dfs;
+namespace dfs = celaeno::graph::search::dfs;
 namespace cir = maia::circuits;
 namespace fw = fplus::fwd;
 // }}}
@@ -61,15 +61,16 @@ template<typename T>
 concept String = requires(T t){ std::string{t}; };
 // }}}
 
-// test_case: celaeno::graph::dfs {{{
+// test_case: celaeno::graph::search::dfs {{{
 
-TEST_CASE("celaeno::graph::dfs"
+TEST_CASE("celaeno::graph::search::dfs"
   * doctest::description("Depth-First Search test")
   * doctest::timeout(10.0f)
 )
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::dfs", "logs/celaeno/graph/dfs.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::search::dfs"
+      , "logs/celaeno/graph/search/dfs.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
@@ -145,9 +146,9 @@ TEST_CASE("celaeno::graph::dfs"
   );
   // }}}
 
-} // TEST_CASE: celaeno::graph::dfs }}}
+} // TEST_CASE: celaeno::graph::search::dfs }}}
 
 
-} // namespace celaeno::graph::dfs::test
+} // namespace celaeno::graph::search::dfs::test
 
 // }}}

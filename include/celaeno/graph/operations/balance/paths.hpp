@@ -38,7 +38,7 @@
 #include <utility>  // std::forward
 #include <fplus/fplus.hpp>
 #include <celaeno/graph/views/depth.hpp>
-#include <celaeno/graph/bfs.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 #include <range/v3/all.hpp>
 
 // namespace celaeno::graph::operations::balance::paths {{{
@@ -47,7 +47,7 @@ namespace celaeno::graph::operations::balance::paths
 
 // Namespaces {{{
 namespace depth = celaeno::graph::views::depth;
-namespace bfs = celaeno::graph::bfs;
+namespace bfs = celaeno::graph::search::bfs;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace fw = fplus::fwd;

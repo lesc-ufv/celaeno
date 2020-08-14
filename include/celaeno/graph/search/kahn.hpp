@@ -35,17 +35,17 @@
 #include <vector>
 #include <deque>
 #include <unordered_map>
-#include <celaeno/graph/bfs.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 #include <fplus/fplus.hpp>
 
-// namespace celaeno::graph::kahn {{{
-namespace celaeno::graph::kahn
+// namespace celaeno::graph::search::kahn {{{
+namespace celaeno::graph::search::kahn
 {
 
 // Namespaces {{{
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-namespace bfs = celaeno::graph::bfs;
+namespace bfs = celaeno::graph::search::bfs;
 // }}}
 
 // Concepts {{{
@@ -108,4 +108,4 @@ std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return fals
   return result;
 } // function: run }}}
 
-} // namespace celaeno::graph::kahn }}}
+} // namespace celaeno::graph::search::kahn }}}

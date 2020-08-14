@@ -38,7 +38,7 @@
 #include <type_traits>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
-#include <celaeno/graph/kahn.hpp>
+#include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <cmath>
 
@@ -54,7 +54,7 @@ namespace rv = ranges::views;
 namespace ra = ranges::actions;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-namespace kahn = celaeno::graph::kahn;
+namespace kahn = celaeno::graph::search::kahn;
 // }}}
 
 // Concepts {{{

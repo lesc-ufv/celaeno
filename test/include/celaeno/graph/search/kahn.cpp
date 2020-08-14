@@ -35,7 +35,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <fplus/fplus.hpp>
-#include <celaeno/graph/kahn.hpp>
+#include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
@@ -43,9 +43,9 @@
 #include <maia/circuits/synth-91.hpp>
 
 
-// namespace celaeno::graph::kahn::test {{{
+// namespace celaeno::graph::search::kahn::test {{{
 
-namespace celaeno::graph::kahn::test
+namespace celaeno::graph::search::kahn::test
 {
 
 // namespaces {{{
@@ -64,16 +64,17 @@ concept String = requires(T t){ std::string{t}; };
 
 // }}}
 
-// Test Case celaeno::graph::kahn {{{
+// Test Case celaeno::graph::search::kahn {{{
 
-TEST_CASE("celaeno::graph::kahn"
+TEST_CASE("celaeno::graph::search::kahn"
   * doctest::description("Kahn's algorithm test")
   * doctest::timeout(10.0f)
 )
 {
 
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::kahn", "logs/celaeno/graph/kahn.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::search::kahn",
+      "logs/celaeno/graph/search/kahn.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
@@ -100,7 +101,7 @@ TEST_CASE("celaeno::graph::kahn"
 
     // Execution {{{
     auto start {std::chrono::system_clock::now()};
-    auto result {celaeno::graph::kahn::run(0,pred,succ)};
+    auto result {celaeno::graph::search::kahn::run(0,pred,succ)};
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
@@ -155,6 +156,6 @@ TEST_CASE("celaeno::graph::kahn"
   // }}}
 
 
-} // TEST_CASE: celaeno::graph::kahn }}}
+} // TEST_CASE: celaeno::graph::search::kahn }}}
 
-} // namespace celaeno::graph::kahn::test }}}
+} // namespace celaeno::graph::search::kahn::test }}}

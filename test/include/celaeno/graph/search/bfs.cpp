@@ -34,7 +34,7 @@
 #include <doctest/doctest.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <celaeno/graph/bfs.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
@@ -43,13 +43,13 @@
 #include <maia/circuits/synth-91.hpp>
 #include <string_view>
 
-// namespace celaeno::graph::bfs::test {{{
+// namespace celaeno::graph::search::bfs::test {{{
 
-namespace celaeno::graph::bfs::test
+namespace celaeno::graph::search::bfs::test
 {
 
 // Namespaces {{{
-namespace bfs = celaeno::graph::bfs;
+namespace bfs = celaeno::graph::search::bfs;
 namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
@@ -61,14 +61,15 @@ template<typename T>
 concept String = requires(T t){ std::string{t}; };
 // }}}
 
-// Test Case: celaeno::graph::bfs {{{
-TEST_CASE("celaeno::graph::bfs"
+// Test Case: celaeno::graph::search::bfs {{{
+TEST_CASE("celaeno::graph::search::bfs"
   * doctest::description("Breadth-First Search test")
   * doctest::timeout(10.0f)
 )
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::bfs", "logs/celaeno/graph/bfs.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::search::bfs"
+      , "logs/celaeno/graph/search/bfs.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
@@ -143,6 +144,6 @@ TEST_CASE("celaeno::graph::bfs"
   );
   // }}}
 
-} // TEST_CASE: celaeno::graph::bfs }}}
+} // TEST_CASE: celaeno::graph::search::bfs }}}
 
 } // namespace celaeno::graph::bfs::test }}}
