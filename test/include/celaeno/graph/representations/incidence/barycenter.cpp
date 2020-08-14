@@ -8,19 +8,19 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <celaeno/graph/barycenter.hpp>
+#include <celaeno/graph/representations/incidence/barycenter.hpp>
 #include <sstream>
 #include <iomanip>
 #include <fplus/fplus.hpp>
 
-// namespace celaeno::graph::barycenter::test {{{
+// namespace celaeno::graph::operations::incidence::barycenter::test {{{
 
-namespace celaeno::graph::barycenter::test
+namespace celaeno::graph::operations::incidence::barycenter::test
 {
 
 // namespaces {{{
 
-namespace barycenter = celaeno::graph::barycenter;
+namespace barycenter = celaeno::graph::operations::incidence::barycenter;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 
@@ -57,9 +57,9 @@ auto compare(V&& v)
 
 // }}}
 
-// Test case: celaeno::graph::barycenter {{{
+// Test case: celaeno::graph::operations::incidence::barycenter {{{
 
-TEST_CASE("celaeno::graph::barycenter")
+TEST_CASE("celaeno::graph::operations::incidence::barycenter")
 {
   std::array<std::array<int32_t,5>,4> m0
   {{
@@ -123,6 +123,6 @@ TEST_CASE("celaeno::graph::barycenter")
   // compare(m1.at(0),r1.at(0));
   // compare(m1,c1,fn_col);
 
-} // TEST_CASE: "celaeno::graph::barycenter" }}}
+} // TEST_CASE: "celaeno::graph::operations::incidence::barycenter" }}}
 
-} // namespace celaeno::graph::barycenter::test }}}
+} // namespace celaeno::graph::operations::incidence::barycenter::test }}}

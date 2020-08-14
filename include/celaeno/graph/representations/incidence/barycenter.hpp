@@ -10,7 +10,7 @@
 #include <concepts>
 #include <type_traits>
 
-namespace celaeno::graph::barycenter
+namespace celaeno::graph::operations::incidence::barycenter
 {
 
 //
@@ -84,4 +84,4 @@ auto run(V&& v)
   return (b != 0)? static_cast<double>(a)/b : 0;
 } // function: run
 
-} // namespace celaeno::graph::barycenter
+} // namespace celaeno::graph::operations::incidence::barycenter

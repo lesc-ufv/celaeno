@@ -39,7 +39,7 @@
 #include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/barycenter.hpp>
+#include <celaeno/graph/representations/incidence/barycenter.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 
 // namespace celaeno::graph::operations::minimize::crossings {{{
@@ -52,7 +52,7 @@ namespace cp = celaeno::concepts;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
-namespace barycenter = celaeno::graph::barycenter;
+namespace barycenter = celaeno::graph::operations::incidence::barycenter;
 namespace count_crossings = celaeno::graph::operations::count::crossings;
 template<typename T> using ref = std::reference_wrapper<T>;
 
