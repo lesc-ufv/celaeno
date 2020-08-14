@@ -41,13 +41,13 @@
 #include <taygete/graph/reader/verilog.hpp>
 #include <maia/circuits/synth-91.hpp>
 #include <celaeno/graph/balance.hpp>
-#include <celaeno/graph/minimize-crossings.hpp>
+#include <celaeno/graph/minimize/crossings.hpp>
 #include <celaeno/graph/crossings.hpp>
 #include <celaeno/graph/matrix-realization.hpp>
 #include <celaeno/graph/views/proximity.hpp>
 
-// namespace celaeno::graph::minimize_crossings::test {{{
-namespace celaeno::graph::minimize_crossings::test
+// namespace celaeno::graph::minimize::crossings::test {{{
+namespace celaeno::graph::minimize::crossings::test
 {
 
 // namespaces {{{
@@ -60,7 +60,7 @@ namespace reader = taygete::graph::reader::verilog;
 namespace crossings = celaeno::graph::crossings;
 namespace proximity = celaeno::graph::views::proximity;
 namespace realization = celaeno::graph::matrix_realization;
-namespace minimize = celaeno::graph::minimize_crossings;
+namespace minimize = celaeno::graph::minimize::crossings;
 // }}}
 
 // Concepts {{{
@@ -68,13 +68,13 @@ template<typename T>
 concept String = requires(T t){ std::string{t}; };
 // }}}
 
-TEST_CASE("celaeno::graph::minimize_crossings"
+TEST_CASE("celaeno::graph::minimize::crossings"
   * doctest::description("Graph crossing minimization test")
 )
 {
 
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::minimize_crossings", "logs/celaeno/graph/minimize-crossings.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::minimize::crossings", "logs/celaeno/graph/minimize-crossings.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,prev_crossings,new_crossings,runtime");
@@ -189,6 +189,6 @@ TEST_CASE("celaeno::graph::minimize_crossings"
     cir::synth_91::my_adder
   ); // }}}
 
-} // TEST_CASE: "celaeno::graph::minimize_crossings"
+} // TEST_CASE: "celaeno::graph::minimize::crossings"
 
-} // namespace celaeno::graph::minimize_crossings::test }}}
+} // namespace celaeno::graph::minimize::crossings::test }}}

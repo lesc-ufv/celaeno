@@ -1,5 +1,4 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
-
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : minimize-crossings
@@ -43,8 +42,8 @@
 #include <celaeno/graph/barycenter.hpp>
 #include <celaeno/graph/crossings.hpp>
 
-// namespace celaeno::graph::minimize_crossings {{{
-namespace celaeno::graph::minimize_crossings
+// namespace celaeno::graph::minimize::crossings {{{
+namespace celaeno::graph::minimize::crossings
 {
 
 // namespaces {{{
@@ -350,4 +349,4 @@ auto run(MS&& mr, L&& layer, size_t depth)
 
 // }}}
 
-} // namespace celaeno::graph::minimize_crossings }}}
+} // namespace celaeno::graph::minimize::crossings }}}
