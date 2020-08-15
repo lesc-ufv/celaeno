@@ -1,8 +1,7 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
-
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : minimize-crossings
+// @file        : crossings
 // @created     : quarta jun 24, 2020 11:56:13 -03
 //
 // BSD 2-Clause License
@@ -40,11 +39,11 @@
 #include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/barycenter.hpp>
-#include <celaeno/graph/crossings.hpp>
+#include <celaeno/graph/representations/incidence/barycenter.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
 
-// namespace celaeno::graph::minimize_crossings {{{
-namespace celaeno::graph::minimize_crossings
+// namespace celaeno::graph::operations::minimize::crossings {{{
+namespace celaeno::graph::operations::minimize::crossings
 {
 
 // namespaces {{{
@@ -53,8 +52,8 @@ namespace cp = celaeno::concepts;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
-namespace barycenter = celaeno::graph::barycenter;
-namespace crossings = celaeno::graph::crossings;
+namespace barycenter = celaeno::graph::operations::incidence::barycenter;
+namespace count_crossings = celaeno::graph::operations::count::crossings;
 template<typename T> using ref = std::reference_wrapper<T>;
 
 // }}}
@@ -182,7 +181,7 @@ auto run(MS&& mr, L&& layer, size_t depth)
     i64 cost{};
     for (auto& [l,m] : ret)
     {
-      cost += crossings::run(m);
+      cost += count_crossings::run(m);
     } // for [l,m] : ret
     return cost;
   };
@@ -237,15 +236,15 @@ auto run(MS&& mr, L&& layer, size_t depth)
 
           // -- SUBCASE5: Assign new values sorted by barycenter
           if (
-            crossings::run(prev.second) <= crossings::run(pm) &&
-            crossings::run(curr.second) <= crossings::run(cm)
+            count_crossings::run(prev.second) <= count_crossings::run(pm) &&
+            count_crossings::run(curr.second) <= count_crossings::run(cm)
           )
           {
             pc = prev.first;
             cr = curr.first;
             pm = prev.second;
             cm = curr.second;
-          } // if crossings::run(prev.second) <= crossings::run(pm)
+          } // if count_crossings::run(prev.second) <= count_crossings::run(pm)
 
           pm = swap_rows_and_cols(pm);
 
@@ -263,11 +262,11 @@ auto run(MS&& mr, L&& layer, size_t depth)
           auto bs {fw::apply(cm,fw::transform([&](auto&& v){return barycenter::run(v);}))};
           // Check if barycenter sorting reduces the number of crossings
           auto result {sort_by_barycenters(cc,cm,bs)};
-          if (crossings::run(result.second) <= crossings::run(cm))
+          if (count_crossings::run(result.second) <= count_crossings::run(cm))
           {
             cc = result.first;
             cm = result.second;
-          } // if crossings::run(result.second) <= crossings::run(cm)
+          } // if count_crossings::run(result.second) <= count_crossings::run(cm)
           // Swap back
           cm = swap_rows_and_cols(cm);
         } // if it == (ret.end()-1)
@@ -350,4 +349,4 @@ auto run(MS&& mr, L&& layer, size_t depth)
 
 // }}}
 
-} // namespace celaeno::graph::minimize_crossings }}}
+} // namespace celaeno::graph::operations::minimize::crossings }}}

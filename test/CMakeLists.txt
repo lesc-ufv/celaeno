@@ -61,14 +61,26 @@ function(add_test target)
 endfunction(add_test)
 
 # Tests
-add_test(test_a_star "include/celaeno/graph/a-star.cpp")
-add_test(test_balance "include/celaeno/graph/balance.cpp")
-add_test(test_barycenter "include/celaeno/graph/barycenter.cpp")
-add_test(test_bfs "include/celaeno/graph/bfs.cpp")
-add_test(test_crossings "include/celaeno/graph/crossings.cpp")
-add_test(test_dfs "include/celaeno/graph/dfs.cpp")
-add_test(test_kahn "include/celaeno/graph/kahn.cpp")
-add_test(test_m_real "include/celaeno/graph/matrix-realization.cpp")
-add_test(test_minimize_crossings "include/celaeno/graph/minimize-crossings.cpp")
-add_test(test_views_depth "include/celaeno/graph/views/depth.cpp")
-add_test(test_views_proximity "include/celaeno/graph/views/proximity.cpp")
+
+## Search
+add_test(g_search_bfs "include/celaeno/graph/search/bfs.cpp")
+add_test(g_search_dfs "include/celaeno/graph/search/dfs.cpp")
+add_test(g_search_kahn "include/celaeno/graph/search/kahn.cpp")
+
+## Views
+add_test(g_views_depth "include/celaeno/graph/views/depth.cpp")
+add_test(g_views_proximity "include/celaeno/graph/views/proximity.cpp")
+
+## Operations
+### Query
+add_test(g_operations_count_crossings "include/celaeno/graph/operations/count/crossings.cpp")
+add_test(g_operations_incidence_barycenter
+    "include/celaeno/graph/representations/incidence/barycenter.cpp")
+### Modifiers
+add_test(g_operations_balance_paths "include/celaeno/graph/operations/balance/paths.cpp")
+add_test(g_operations_minimize_crossings "include/celaeno/graph/operations/minimize/crossings.cpp")
+
+## Representations
+add_test(g_representations_incidence "include/celaeno/graph/representations/incidence.cpp")
+
+#add_test(test_a_star "include/celaeno/graph/a-star.cpp")

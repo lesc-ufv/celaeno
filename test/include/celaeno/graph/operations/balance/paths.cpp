@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : kahn
-// @created     : Wednesday Apr 08, 2020 13:22:58 -03
+// @file        : paths
+// @created     : Wednesday Apr 01, 2020 21:24:23 -03
 //
 // BSD 2-Clause License
 
@@ -34,26 +34,32 @@
 #include <doctest/doctest.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <fplus/fplus.hpp>
-#include <celaeno/graph/kahn.hpp>
+#include <cstdlib>
+#include <concepts>
+#include <chrono>
+#include <range/v3/all.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
+#include <celaeno/graph/views/depth.hpp>
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
-#include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
 
+// namespace celaeno::graph::operations::balance::paths::test {{{
 
-// namespace celaeno::graph::kahn::test {{{
-
-namespace celaeno::graph::kahn::test
+namespace celaeno::graph::operations::balance::paths::test
 {
 
 // namespaces {{{
 
-namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
-namespace fw = fplus::fwd;
+namespace cir = maia::circuits;
+namespace balance = celaeno::graph::operations::balance::paths;
+namespace depth = celaeno::graph::views::depth;
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace ra = ranges::actions;
 
 // }}}
 
@@ -64,16 +70,16 @@ concept String = requires(T t){ std::string{t}; };
 
 // }}}
 
-// Test Case celaeno::graph::kahn {{{
+// Test Cases {{{
 
-TEST_CASE("celaeno::graph::kahn"
-  * doctest::description("Kahn's algorithm test")
-  * doctest::timeout(10.0f)
+TEST_CASE("celaeno::graph::operations::balance::paths"
+  * doctest::description("Balance test")
+  * doctest::timeout(1000.0f)
 )
 {
-
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::kahn", "logs/celaeno/graph/kahn.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::operations::balance::paths"
+      , "logs/celaeno/graph/operations/balance/paths.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
@@ -83,42 +89,61 @@ TEST_CASE("celaeno::graph::kahn"
   // test lambda {{{
   auto test = [&]<String S>(S&& str)
   {
-    // Read Graph {{{
+    // Read graph {{{
     graph::Graph<int64_t> g;
     auto emplace = [&g](auto&& pair){ g.emplace(pair); };
     reader::Reader{str,emplace};
     // }}}
 
-    // Check if graph was populated {{{
-    REQUIRE(g.vertices_count() > 0);
-    // }}}
-
     // Helpers {{{
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
+    auto link = [&g](auto&& pair){ g.emplace(pair); };
+    auto unlink = [&g](auto&& pair){ g.erase(pair); };
     // }}}
 
-    // Execution {{{
+    // Test Balance {{{
     auto start {std::chrono::system_clock::now()};
-    auto result {celaeno::graph::kahn::run(0,pred,succ)};
+    balance::run(0,pred,succ,link,unlink);
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
     // }}}
 
-    // Check if no nodes are missing {{{
-    auto adj = [&g](auto&& v){ return g.neighbors(v); };
-    auto bfs {bfs::run(0,adj)};
-    REQUIRE(g.vertices_count() == result.size());
-    // }}}
+    // More tests {{{
+    // * Given a depth-view, each vertex must have a distance of one
+    // * to its successor or predecessor
+    auto dview {depth::run(0,pred,succ)};
+    auto const& level_vert {dview.first};
+    auto const& vert_level {dview.second};
 
-    // Check if no nodes are duplicates {{{
-    REQUIRE(fw::apply(result,fw::unique()).size() == result.size());
+    // Get the levels
+    auto levels { level_vert | rv::keys | rv::unique };
+
+      // Get the vertices on level l
+    for(auto const& l : levels)
+    {
+      auto rng{level_vert.equal_range(l)};
+      // For each vertex on level l
+      for(auto it{rng.first}; it!=rng.second; ++it)
+      {
+        // Current vertex
+        auto const& curr {it->second};
+        // The adjacent vertices
+        auto adj {g.neighbors(curr)};
+        // Verify if distance is one to each
+        auto is_dist_one = [&vert_level,&curr](auto&& a) -> void
+          { REQUIRE(std::abs(vert_level.at(a) - vert_level.at(curr)) == 1); };
+        // Execute tests
+        rg::for_each(adj, is_dist_one);
+      } // for it{rng.first}; it!=rng.second
+    } // for auto const& l : levels
     // }}}
 
     // Log results {{{
     spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
     // }}}
+
   }; // lamb: test }}}
 
   // Forwarding test folding lambda {{{
@@ -126,8 +151,7 @@ TEST_CASE("celaeno::graph::kahn"
   // }}}
 
   // LGSynth 91 tests {{{
-  tests(
-    cir::synth_91::alu2,
+  tests(cir::synth_91::alu2,
     cir::synth_91::alu4,
     cir::synth_91::dalu,
     cir::synth_91::apex6,
@@ -154,7 +178,6 @@ TEST_CASE("celaeno::graph::kahn"
   );
   // }}}
 
+} // TEST_CASE: celaeno::graph::operations::balance::paths }}}
 
-} // TEST_CASE: celaeno::graph::kahn }}}
-
-} // namespace celaeno::graph::kahn::test }}}
+} // namespace celaeno::graph::operations::balance::paths::test }}}

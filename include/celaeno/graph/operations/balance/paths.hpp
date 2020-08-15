@@ -1,7 +1,7 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : balance
+// @file        : paths
 // @created     : Sunday Mar 01, 2020 21:20:48 -03
 //
 // BSD 2-Clause License
@@ -38,16 +38,16 @@
 #include <utility>  // std::forward
 #include <fplus/fplus.hpp>
 #include <celaeno/graph/views/depth.hpp>
-#include <celaeno/graph/bfs.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 #include <range/v3/all.hpp>
 
-// namespace celaeno::graph::balance {{{
-namespace celaeno::graph::balance
+// namespace celaeno::graph::operations::balance::paths {{{
+namespace celaeno::graph::operations::balance::paths
 {
 
 // Namespaces {{{
 namespace depth = celaeno::graph::views::depth;
-namespace bfs = celaeno::graph::bfs;
+namespace bfs = celaeno::graph::search::bfs;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace fw = fplus::fwd;
@@ -147,4 +147,4 @@ void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
 
 } // function: run }}}
 
-} // namespace celaeno::graph::balance }}}
+} // namespace celaeno::graph::operations::balance::paths }}}

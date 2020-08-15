@@ -1,0 +1,10 @@
+#  vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+
+version: '3.3'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: ./docker/Dockertests
+    image: celaeno-tests

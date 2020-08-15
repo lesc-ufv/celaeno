@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : bfs
-// @created     : Monday Apr 06, 2020 09:06:59 -03
+// @file        : kahn
+// @created     : Wednesday Apr 08, 2020 13:22:58 -03
 //
 // BSD 2-Clause License
 
@@ -34,41 +34,47 @@
 #include <doctest/doctest.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <celaeno/graph/bfs.hpp>
+#include <fplus/fplus.hpp>
+#include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
-#include <fplus/fplus.hpp>
 #include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
-#include <string_view>
 
-// namespace celaeno::graph::bfs::test {{{
 
-namespace celaeno::graph::bfs::test
+// namespace celaeno::graph::search::kahn::test {{{
+
+namespace celaeno::graph::search::kahn::test
 {
 
-// Namespaces {{{
-namespace bfs = celaeno::graph::bfs;
+// namespaces {{{
+
 namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace fw = fplus::fwd;
+
 // }}}
 
 // Concepts {{{
+
 template<typename T>
 concept String = requires(T t){ std::string{t}; };
+
 // }}}
 
-// Test Case: celaeno::graph::bfs {{{
-TEST_CASE("celaeno::graph::bfs"
-  * doctest::description("Breadth-First Search test")
+// Test Case celaeno::graph::search::kahn {{{
+
+TEST_CASE("celaeno::graph::search::kahn"
+  * doctest::description("Kahn's algorithm test")
   * doctest::timeout(10.0f)
 )
 {
+
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::bfs", "logs/celaeno/graph/bfs.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::search::kahn",
+      "logs/celaeno/graph/search/kahn.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
   spdlog::info("date,time,vertices,edges,runtime");
@@ -78,37 +84,42 @@ TEST_CASE("celaeno::graph::bfs"
   // test lambda {{{
   auto test = [&]<String S>(S&& str)
   {
-    //  Read graph {{{
-    graph::Graph<i64> g;
-    auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
+    // Read Graph {{{
+    graph::Graph<int64_t> g;
+    auto emplace = [&g](auto&& pair){ g.emplace(pair); };
     reader::Reader{str,emplace};
     // }}}
 
-    // Test if vertices_count > 0 {{{
+    // Check if graph was populated {{{
     REQUIRE(g.vertices_count() > 0);
     // }}}
 
-    // Test bfs {{{
-    auto adj = [&g](auto&& v){ return g.neighbors(v); };
+    // Helpers {{{
+    auto pred = [&g](auto&& v){ return g.predecessors(v); };
+    auto succ = [&g](auto&& v){ return g.successors(v); };
+    // }}}
+
+    // Execution {{{
     auto start {std::chrono::system_clock::now()};
-    auto bfs {bfs::run(0,adj)};
+    auto result {celaeno::graph::search::kahn::run(0,pred,succ)};
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
     // }}}
 
-    // Test vertices count with bfs size {{{
-    REQUIRE(g.vertices_count() == bfs.size());
+    // Check if no nodes are missing {{{
+    auto adj = [&g](auto&& v){ return g.neighbors(v); };
+    auto bfs {bfs::run(0,adj)};
+    REQUIRE(g.vertices_count() == result.size());
     // }}}
 
-    // Test bfs vector size  {{{
-    REQUIRE(fw::apply(bfs,fw::unique()).size() == bfs.size());
+    // Check if no nodes are duplicates {{{
+    REQUIRE(fw::apply(result,fw::unique()).size() == result.size());
     // }}}
 
     // Log results {{{
     spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
     // }}}
-
   }; // lamb: test }}}
 
   // Forwarding test folding lambda {{{
@@ -116,7 +127,8 @@ TEST_CASE("celaeno::graph::bfs"
   // }}}
 
   // LGSynth 91 tests {{{
-  tests(cir::synth_91::alu2,
+  tests(
+    cir::synth_91::alu2,
     cir::synth_91::alu4,
     cir::synth_91::dalu,
     cir::synth_91::apex6,
@@ -143,6 +155,7 @@ TEST_CASE("celaeno::graph::bfs"
   );
   // }}}
 
-} // TEST_CASE: celaeno::graph::bfs }}}
 
-} // namespace celaeno::graph::bfs::test }}}
+} // TEST_CASE: celaeno::graph::search::kahn }}}
+
+} // namespace celaeno::graph::search::kahn::test }}}

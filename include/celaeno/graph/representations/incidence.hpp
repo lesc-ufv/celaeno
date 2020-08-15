@@ -40,14 +40,13 @@
 #include <fplus/fplus.hpp>
 #include <celaeno/aliases.hpp>
 
-// namespace celaeno::graph::matrix_realization {{{
-namespace celaeno::graph::matrix_realization
+// namespace celaeno::graph::representations::incidence {{{
+namespace celaeno::graph::representations::incidence
 {
 
 // Namespaces {{{
 namespace fp = fplus;
 // }}}
-
 
 // Concepts {{{
 template<typename T>
@@ -111,4 +110,4 @@ auto run(L&& get_layer, A&& adjacent, u64 height)
   return result;
 } // function: run }}}
 
-} // namespace celaeno::graph::matrix_realization }}}
+} // namespace celaeno::graph::representations::incidence }}}

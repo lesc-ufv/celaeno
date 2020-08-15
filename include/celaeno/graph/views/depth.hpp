@@ -35,7 +35,7 @@
 
 #include <map>
 #include <fplus/fplus.hpp>
-#include <celaeno/graph/kahn.hpp>
+#include <celaeno/graph/search/kahn.hpp>
 #include <type_traits>
 
 // namespace celaeno::graph::views::depth {{{
@@ -45,7 +45,7 @@ namespace celaeno::graph::views::depth
 // Namespaces {{{
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-namespace kahn = celaeno::graph::kahn;
+namespace kahn = celaeno::graph::search::kahn;
 // }}}
 
 // Concepts {{{

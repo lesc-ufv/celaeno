@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : dfs
-// @created     : Wednesday Mar 18, 2020 14:52:57 -03
+// @file        : bfs
+// @created     : Wednesday Aug 14, 2019 13:59:44 -03
 //
 // BSD 2-Clause License
 
@@ -32,20 +32,20 @@
 
 #pragma once
 
-#include <stack>
-#include <unordered_map>
-#include <type_traits>
+#include <vector>
+#include <queue>
+#include <set>
+#include <tuple>
 #include <concepts>
-#include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
-// namespace celaeno::graph::dfs {{{
-namespace celaeno::graph::dfs
+// namespace celaeno::graph::search::bfs {{{
+namespace celaeno::graph::search::bfs
 {
 
-// Aliases {{{
+// Namespaces {{{
 namespace rg = ranges;
-namespace fw = fplus::fwd;
+namespace ra = ranges::actions;
 // }}}
 
 // Concepts {{{
@@ -66,45 +66,45 @@ concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
 {
-  // Stack of vertices
-  std::stack<T> stack;
+  // Queue of vertices
+  std::queue<T> queue;
 
-  // Map of visited vertices
-  std::unordered_map<T,bool> visited;
+  // Visited vertices
+  std::set<T> visited; // Using std::set for log(n) query
 
-  // Result that contains all visited vertices
+  // Result that contains all the visited vertices
   // until callback returns true
   std::vector<T> result;
 
-  // Push root vertex into the stack
-  stack.push(root);
+  // Push initial vertex into the queue
+  queue.push(root);
 
-  while ( ! stack.empty() )
+  while( ! queue.empty() )
   {
-    // Get the vertex at the top of the stack
-    auto vertex {stack.top()}; stack.pop();
+    // Get next vertex
+    auto vertex {queue.front()}; queue.pop();
 
-    // Check if it has been visited
-    if ( visited.contains(vertex) ) continue;
+    // Skip visited vertices
+    if( visited.contains(vertex) ) continue;
 
     // Insert the vertex in the result
     result.push_back(vertex);
 
-    // Mark the vertex as visited
-    visited.emplace(vertex,true);
+    // Mark as visited
+    visited.insert(vertex);
 
     // Get the adjacent vertices
     // Remove the visited ones
-    auto is_visited = [&visited](auto&& v){ return visited.contains(v); };
-    auto not_visited {fw::apply(nb(vertex), fw::drop_if(is_visited))};
+    auto is_visited = [&visited](auto&& v){return visited.contains(v);};
+    auto not_visited {nb(vertex) | ra::drop_while(is_visited)};
 
-    // Insert the unvisited vertices into the stack
-    rg::for_each(not_visited, [&stack](auto&& v){ stack.push(v); });
+    // Insert non-visited into the queue
+    rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
 
     // Execute callback on current vertex
-    if( cb(vertex) ) return result;
-  } // while
+    if ( cb(vertex) ) return result;
+  }
   return result;
 } // function: run }}}
 
-} // namespace celaeno::graph::dfs }}}
+} // namespace celaeno::graph::search::bfs }}}

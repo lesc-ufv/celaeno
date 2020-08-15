@@ -1,4 +1,4 @@
-image: "archlinux"
+image: formigoni/alpine-gcc-10:latest
 
 stages:
   - build
@@ -6,138 +6,106 @@ stages:
   - doc
 
 before_script:
-  - pacman --noconfirm -Syu
-  - pacman --noconfirm -S make cmake clang git python-pip
-  - pip install conan
+  - apk add make cmake clang git py3-pip
+  - pip3 install -I conan
 
-build:
+build_tests:
   stage: build
-  rules:
-    - when: manual
-      allow_failure: false
   script:
-    - mkdir build && cd build
     - conan profile new default --detect
     - conan profile update settings.compiler.libcxx=libstdc++11 default
     - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
     - conan remote add spdlog https://api.bintray.com/conan/ruanformigoni/spdlog
     - conan remote add fmt https://api.bintray.com/conan/ruanformigoni/fmt
     - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
-    - conan install
-      -s compiler=gcc
-      -s compiler.version=10
-      -s compiler.libcxx=libstdc++11
-      --build=missing .. && cd ..
+    - mkdir build && cd build
+    - conan install .. --build missing && cd ..
     - cmake -H. -Bbuild
-      -D CMAKE_BUILD_TYPE=Debug
-      -D CMAKE_CXX_COMPILER=g++
     - cmake --build build
+  rules:
+    - when: manual
+      allow_failure: false
   artifacts:
     paths:
       - ./build/test/
     expire_in: 1 week
 
-bfs:
-  needs: ["build"]
+.test:
   stage: test
-  script:
-    - ./build/test/test_bfs -s
-    - ls -l
+  needs: ["build"]
+
+.artifacts:
   artifacts:
     paths:
       - ./logs/celaeno/
     expire_in: 1 week
+
+# Search
+bfs:
+  extends: .test
+  script:
+    - ./build/test/g_search_bfs
+  extends: .artifacts
 
 dfs:
-  needs: ["build"]
-  stage: test
+  extends: .test
   script:
-    - ./build/test/test_dfs -s
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_search_dfs
+  extends: .artifacts
 
-graph_balance:
-  needs: ["build"]
-  stage: test
+khan:
+  extends: .test
   script:
-    - ./build/test/test_balance
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_search_kahn
+  extends: .artifacts
 
-a_star:
-  needs: ["build"]
-  stage: test
+# Views
+topo:
+  extends: .test
   script:
-    - ./build/test/test_a_star -s
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_views_depth
+  extends: .artifacts
 
-matrix_realization:
-  needs: ["build"]
-  stage: test
+prox:
+  extends: .test
   script:
-    - ./build/test/test_m_real -s
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_views_proximity
+  extends: .artifacts
 
-barycenter:
-  needs: ["build"]
-  stage: test
+# Operations
+## Query
+count_crossings:
+  extends: .test
   script:
-    - ./build/test/test_barycenter -s
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_operations_count_crossings
+  extends: .artifacts
 
-crossings:
-  needs: ["build"]
-  stage: test
+incidence_barycenter:
+  extends: .test
   script:
-    - ./build/test/test_crossings -s
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
-
-graph_depth_view:
-  needs: ["build"]
-  stage: test
+    - ./build/test/g_operations_incidence_barycenter
+  extends: .artifacts
+## Modifiers
+balance_paths:
+  extends: .test
   script:
-    - ./build/test/test_views_depth -s
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_operations_balance_paths
+  extends: .artifacts
 
-graph_proximity_view:
-  needs: ["build"]
-  stage: test
+minimize_crossings:
+  extends: .test
   script:
-    - ./build/test/test_views_proximity -s
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_operations_minimize_crossings
+  extends: .artifacts
 
-graph_minimize_crossings:
-  needs: ["build"]
-  stage: test
+# Representations
+incidence_barycenter:
+  extends: .test
   script:
-    - ./build/test/test_minimize_crossings
-  artifacts:
-    paths:
-      - ./logs/celaeno/
-    expire_in: 1 week
+    - ./build/test/g_operations_incidence_barycenter
+  extends: .artifacts
 
+# Pages
 pages:
   stage: doc
   before_script:
@@ -151,5 +119,3 @@ pages:
   artifacts:
     paths:
       - public
-  only:
-    - master

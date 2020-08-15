@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : minimize-crossings
-// @created     : quarta jun 24, 2020 11:56:38 -03
+// @file        : bfs
+// @created     : Monday Apr 06, 2020 09:06:59 -03
 //
 // BSD 2-Clause License
 
@@ -31,36 +31,29 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <chrono>
+#include <doctest/doctest.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <doctest/doctest.h>
-#include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
+#include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/aliases.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
+#include <fplus/fplus.hpp>
+#include <maia/circuits/iscas.hpp>
 #include <maia/circuits/synth-91.hpp>
-#include <celaeno/graph/balance.hpp>
-#include <celaeno/graph/minimize-crossings.hpp>
-#include <celaeno/graph/crossings.hpp>
-#include <celaeno/graph/matrix-realization.hpp>
-#include <celaeno/graph/views/proximity.hpp>
+#include <string_view>
 
-// namespace celaeno::graph::minimize_crossings::test {{{
-namespace celaeno::graph::minimize_crossings::test
+// namespace celaeno::graph::search::bfs::test {{{
+
+namespace celaeno::graph::search::bfs::test
 {
 
-// namespaces {{{
-namespace fw = fplus::fwd;
-namespace rg = ranges;
-namespace rv = ranges::views;
+// Namespaces {{{
+namespace bfs = celaeno::graph::search::bfs;
 namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
-namespace crossings = celaeno::graph::crossings;
-namespace proximity = celaeno::graph::views::proximity;
-namespace realization = celaeno::graph::matrix_realization;
-namespace minimize = celaeno::graph::minimize_crossings;
+namespace fw = fplus::fwd;
 // }}}
 
 // Concepts {{{
@@ -68,20 +61,22 @@ template<typename T>
 concept String = requires(T t){ std::string{t}; };
 // }}}
 
-TEST_CASE("celaeno::graph::minimize_crossings"
-  * doctest::description("Graph crossing minimization test")
+// Test Case: celaeno::graph::search::bfs {{{
+TEST_CASE("celaeno::graph::search::bfs"
+  * doctest::description("Breadth-First Search test")
+  * doctest::timeout(10.0f)
 )
 {
-
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::minimize_crossings", "logs/celaeno/graph/minimize-crossings.csv", true)};
+  auto logger {spdlog::basic_logger_mt("graph::search::bfs"
+      , "logs/celaeno/graph/search/bfs.csv", true)};
   spdlog::set_default_logger(logger);
   spdlog::set_pattern("%v");
-  spdlog::info("date,time,vertices,edges,prev_crossings,new_crossings,runtime");
+  spdlog::info("date,time,vertices,edges,runtime");
   spdlog::set_pattern("%d/%m/%Y,%T,%v");
   // }}}
 
-  // test_lambda {{{
+  // test lambda {{{
   auto test = [&]<String S>(S&& str)
   {
     //  Read graph {{{
@@ -90,69 +85,29 @@ TEST_CASE("celaeno::graph::minimize_crossings"
     reader::Reader{str,emplace};
     // }}}
 
-    // Create a proximity view {{{
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [dv,_] {proximity::run(0, pred, succ)};
+    // Test if vertices_count > 0 {{{
+    REQUIRE(g.vertices_count() > 0);
     // }}}
 
-    // node_t {{{
-    using node_t = decltype(dv)::key_type;
-    // }}}
-
-    // Balace the graph {{{
-    // Link and unlink graph edges
-    auto link = [&](auto&& e) -> void { g.emplace(e); };
-    auto unlink = [&](auto&& e) -> void
-    {
-      auto rng {g.data().equal_range(e.first)};
-      for (auto it{rng.first}; it != rng.second; ++it)
-      {
-        if( it->second == e.second )
-        {
-          g.data().erase(it);
-          break;
-        }
-      } // for: it != it.second
-    };
-    // Execute the balacing algorithm
-    balance::run(0, pred, succ, link, unlink);
-    // }}}
-
-    // Pre-processing {{{
-    auto layer = [&dv](node_t idx)
-    {
-      return fw::apply(dv
-        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-        , fw::get_map_values()
-      );
-    };
-    // Get the depth of the graph
-    auto depth {fw::apply(dv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-    // Verify edge uv exists.
-    auto adjacent = [&g](node_t u, node_t v) {  return g.adjacent(u,v); };
-    // }}}
-
-    // Perform test {{{
-    // Matrix realization of the graph
-    auto ms {realization::run(layer, adjacent, depth)};
-    // Calculate current crossings
-    i64 prev_crossings{};
-    rg::for_each(ms,[&](auto&& m){ prev_crossings += crossings::run(m); });
-    // Start algorithm
+    // Test bfs {{{
+    auto adj = [&g](auto&& v){ return g.neighbors(v); };
     auto start {std::chrono::system_clock::now()};
-    auto result{minimize::run(ms, layer, depth)};
+    auto bfs {bfs::run(0,adj)};
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
-    // Calculate new number of crossings
-    i64 new_crossings{};
-    rg::for_each(result.second,[&](auto&& m){ new_crossings += crossings::run(m); });
+    // }}}
+
+    // Test vertices count with bfs size {{{
+    REQUIRE(g.vertices_count() == bfs.size());
+    // }}}
+
+    // Test bfs vector size  {{{
+    REQUIRE(fw::apply(bfs,fw::unique()).size() == bfs.size());
     // }}}
 
     // Log results {{{
-    spdlog::info("{},{},{},{},{}",
-        g.vertices_count(), g.edges_count(), prev_crossings, new_crossings, ss.str());
+    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
     // }}}
 
   }; // lamb: test }}}
@@ -162,14 +117,13 @@ TEST_CASE("celaeno::graph::minimize_crossings"
   // }}}
 
   // LGSynth 91 tests {{{
-  tests(
-    cir::synth_91::alu2,
+  tests(cir::synth_91::alu2,
     cir::synth_91::alu4,
     cir::synth_91::dalu,
     cir::synth_91::apex6,
     cir::synth_91::apex7,
-    cir::synth_91::b1 ,
-    cir::synth_91::c8 ,
+    cir::synth_91::b1,
+    cir::synth_91::c8,
     cir::synth_91::cc,
     cir::synth_91::cht,
     cir::synth_91::cm138a,
@@ -187,8 +141,9 @@ TEST_CASE("celaeno::graph::minimize_crossings"
     cir::synth_91::count,
     cir::synth_91::decod,
     cir::synth_91::my_adder
-  ); // }}}
+  );
+  // }}}
 
-} // TEST_CASE: "celaeno::graph::minimize_crossings"
+} // TEST_CASE: celaeno::graph::search::bfs }}}
 
-} // namespace celaeno::graph::minimize_crossings::test }}}
+} // namespace celaeno::graph::bfs::test }}}
