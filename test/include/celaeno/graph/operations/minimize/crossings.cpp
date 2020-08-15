@@ -92,65 +92,48 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     reader::Reader{str,emplace};
     // }}}
 
-    // Create a proximity view {{{
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [dv,_] {proximity::run(0, pred, succ)};
+    // Helpers {{{
+    auto p = [&g](auto&& v){ return g.predecessors(v); };
+    auto s = [&g](auto&& v){ return g.successors(v); };
+    auto l = [&](auto&& e) -> void { g.emplace(e); };
+    auto u = [&](auto&& e) -> void { g.erase(e); };
     // }}}
 
-    // node_t {{{
-    using node_t = decltype(dv)::key_type;
-    // }}}
+    // Check if two vertices are adjacent
+    auto adj = [&](auto&& a, auto&& b) { return ! fw::apply(p(a),fw::append(s(b))).empty(); };
 
-    // Balace the graph {{{
-    // Link and unlink graph edges
-    auto link = [&](auto&& e) -> void { g.emplace(e); };
-    auto unlink = [&](auto&& e) -> void
+    // Create a proximity view of the graph
+    auto [pv,_] {proximity::run(0, p, s)};
+
+    // Number of layers of the graph
+    auto layers {fw::apply(pv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+
+    // Get a graph layer by index
+    auto layer = [&pv](i64 idx)
     {
-      auto rng {g.data().equal_range(e.first)};
-      for (auto it{rng.first}; it != rng.second; ++it)
-      {
-        if( it->second == e.second )
-        {
-          g.data().erase(it);
-          break;
-        }
-      } // for: it != it.second
-    };
-    // Execute the balacing algorithm
-    balance::run(0, pred, succ, link, unlink);
-    // }}}
-
-    // Pre-processing {{{
-    auto layer = [&dv](node_t idx)
-    {
-      return fw::apply(dv
+      return fw::apply(pv
         , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
         , fw::get_map_values()
       );
     };
-    // Get the number of layers of the graph
-    auto layers {fw::apply(dv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-    // Verify edge uv exists.
-    auto adjacent = [&g](node_t u, node_t v) {  return g.adjacent(u,v); };
-    // }}}
+
+    // Incidence matrices of the graph
+    auto ms {incidence::run(layer, adj, layers)};
 
     // Perform test {{{
-    // Incidence matrices of the graph
-    auto ms {incidence::run(layer, adjacent, layers)};
     // Calculate current crossings
     i64 prev_crossings{};
     rg::for_each(ms,[&](auto&& m){ prev_crossings += count_crossings::run(m); });
     // Start algorithm
     auto start {std::chrono::system_clock::now()};
-    auto result{minimize::run(ms, layer, layers)};
+    auto result{minimize::run(0,p,s,l,u)};
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
     // Calculate new number of crossings {{{
     i64 new_crossings{};
-    auto new_layers = [&result](node_t idx) { return result.at(idx); };
-    ms = incidence::run(new_layers, adjacent, layers);
+    auto new_layers = [&result](i64 idx) { return result.at(idx); };
+    ms = incidence::run(new_layers, adj, layers);
     rg::for_each(ms,[&](auto&& m){ new_crossings += count_crossings::run(m); });
     // }}}
 
