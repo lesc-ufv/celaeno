@@ -38,26 +38,24 @@
 #include <concepts>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::search::dfs {{{
 namespace celaeno::graph::search::dfs
 {
 
-// Aliases {{{
+// Namespaces {{{
 namespace rg = ranges;
 namespace fw = fplus::fwd;
 // }}}
 
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
+// }}}
+
 // Concepts {{{
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept SignedIntegral = std::signed_integral<T>;
-
-template<typename T>
-concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
-
 template<typename T>
 concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // }}}

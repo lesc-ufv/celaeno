@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : crossings
-// @created     : segunda jun 22, 2020 18:46:09 -03
+// @file        : main.cpp
+// @created     : terça jul 28, 2020 07:49:14 -03
 //
 // BSD 2-Clause License
 
@@ -30,72 +30,38 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include <concepts>
-#include <utility>
-#include <exception>
 #include <iostream>
-#include <celaeno/concepts.hpp>
+#include <cstdlib>
+#include <fmt/ranges.h>
+#include <taygete/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/graph/operations/count/crossings/pipeline.hpp>
 
-// namespace celaeno::graph::operations::count::crossings {{{
 
-namespace celaeno::graph::operations::count::crossings
-{
-
-// Namespaces {{{
-using namespace celaeno::concepts;
+// namespaces {{{
+namespace graph = taygete::graph;
+namespace count = celaeno::graph::operations::count::crossings::pipeline;
 // }}}
 
-// Algorithm {{{
-
-// Impl {{{
-template<Matrix M>
-decltype(auto) impl(M&& m)
+int main()
 {
-  // Count the number of crossings
-  i64 crossings{};
-
-  // Check if matrix is empty
-  if( m.empty() ) { return crossings; }
-
-  // Number of rows
-  auto p{m.size()};
-
-  // Number of columns
-  auto q{m.at(0).size()};
-
-  try
+  // Graph {{{
+  graph::Graph<i64> g
   {
-    for (siz j{0}; j < p-1; j++)
-    {
-      for (siz k{j+1}; k < p; k++)
-      {
-        for (siz a{0}; a < q-1; a++)
-        {
-          for (siz b{a+1}; b < q; b++)
-          {
-            crossings += m.at(j).at(b) * m.at(k).at(a);
-          } // for: b
-        } // for: a
-      } // for: k
-    } // for: j
-  } // try
-  catch (std::exception const& e)
-  {
-    std::cerr << "Degenerate incidence matrix" << std::endl;
-  } // catch
-  return crossings;
-} // function: impl }}}
+    {1,5},{2,4},{3,4},{6,9},
+    {4,7},{5,7},{5,8},{5,9},
+    {7,12},{8,10},{8,11},
+  };
+  // }}}
 
-// Variadic parameters {{{
-template<typename... MS>
-i64 run(MS&&... ms)
-{
-  return (impl(std::forward<MS>(ms)) + ...);
-} // function: run }}}
+  // Obtain predecessor and successor nodes {{{
+  auto p = [&g](auto&& v){ return g.predecessors(v); };
+  auto s = [&g](auto&& v){ return g.successors(v); };
+  // }}}
 
-// }}}
+  // Print to stdout {{{
+  fmt::print("{}\n",count::run(1,p,s));
+  // }}}
 
-} // namespace celaeno::graph::operations::count::crossings }}}
+  return EXIT_SUCCESS;
+} // main

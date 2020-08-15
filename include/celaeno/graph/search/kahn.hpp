@@ -35,8 +35,10 @@
 #include <vector>
 #include <deque>
 #include <unordered_map>
-#include <celaeno/graph/search/bfs.hpp>
 #include <fplus/fplus.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 
 // namespace celaeno::graph::search::kahn {{{
 namespace celaeno::graph::search::kahn
@@ -48,16 +50,12 @@ namespace fw = fplus::fwd;
 namespace bfs = celaeno::graph::search::bfs;
 // }}}
 
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
+// }}}
+
 // Concepts {{{
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept SignedIntegral = std::signed_integral<T>;
-
-template<typename T>
-concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
-
 template<typename T>
 concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // }}}

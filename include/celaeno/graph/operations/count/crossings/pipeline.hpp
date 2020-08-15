@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : bfs
-// @created     : Wednesday Aug 14, 2019 13:59:44 -03
+// @file        : pipeline
+// @created     : sábado ago 15, 2020 16:30:36 -03
 //
 // BSD 2-Clause License
 
@@ -32,22 +32,22 @@
 
 #pragma once
 
-#include <vector>
-#include <queue>
-#include <set>
-#include <tuple>
-#include <concepts>
-#include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
+#include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
+#include <celaeno/graph/views/proximity.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
+#include <celaeno/graph/representations/incidence.hpp>
 
-// namespace celaeno::graph::search::bfs {{{
-namespace celaeno::graph::search::bfs
+// namespace celaeno::graph::operations::count::crossings::pipeline {{{
+namespace celaeno::graph::operations::count::crossings::pipeline
 {
 
-// Namespaces {{{
-namespace rg = ranges;
-namespace ra = ranges::actions;
+// namespaces {{{
+namespace fw = fplus::fwd;
+namespace proximity = celaeno::graph::views::proximity;
+namespace incidence = celaeno::graph::representations::incidence;
 // }}}
 
 // Using namespaces {{{
@@ -55,54 +55,36 @@ using namespace celaeno::concepts;
 using namespace celaeno::graph::concepts;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
-// }}}
-
-// Algorithm {{{
-template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
-std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
+// function: run {{{
+template<SignedIntegral T, Neighbors N1, Neighbors N2>
+auto run(T t, N1&& p, N2&& s)
 {
-  // Queue of vertices
-  std::queue<T> queue;
-
-  // Visited vertices
-  std::set<T> visited; // Using std::set for log(n) query
-
-  // Result that contains all the visited vertices
-  // until callback returns true
-  std::vector<T> result;
-
-  // Push initial vertex into the queue
-  queue.push(root);
-
-  while( ! queue.empty() )
+  // Create the proximity view
+  auto [lv,_] = proximity::run(1,p,s);
+  // Check if vertices ab are adjacent
+  auto adj = [&](auto&& a, auto&& b) { return ! fw::apply(p(a),fw::append(s(b))).empty(); };
+  // Calculate the number of layers of the graph
+  auto layers {fw::apply(lv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+  // Get a layer from the proximity view
+  auto layer = [&lv](i64 idx)
   {
-    // Get next vertex
-    auto vertex {queue.front()}; queue.pop();
+    return fw::apply(lv
+      , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
+      , fw::get_map_values()
+      , fw::sort()
+    );
+  };
+  // Create the incidence matrix
+  auto ms {incidence::run(layer, adj, layers)};
 
-    // Skip visited vertices
-    if( visited.contains(vertex) ) continue;
+  // Calculate cost
+  i64 cost{};
+  for (decltype(ms.size()) i{}; i < ms.size(); ++i)
+  {
+    cost += crossings::run(ms.at(i));
+  } // for: i < l.size()
 
-    // Insert the vertex in the result
-    result.push_back(vertex);
-
-    // Mark as visited
-    visited.insert(vertex);
-
-    // Get the adjacent vertices
-    // Remove the visited ones
-    auto is_visited = [&visited](auto&& v){return visited.contains(v);};
-    auto not_visited {nb(vertex) | ra::drop_while(is_visited)};
-
-    // Insert non-visited into the queue
-    rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
-
-    // Execute callback on current vertex
-    if ( cb(vertex) ) return result;
-  }
-  return result;
+  return cost;
 } // function: run }}}
 
-} // namespace celaeno::graph::search::bfs }}}
+} // celaeno::graph::operations::count::crossings::pipeline }}}

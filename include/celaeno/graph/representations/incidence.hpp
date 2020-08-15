@@ -39,6 +39,8 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::representations::incidence {{{
 namespace celaeno::graph::representations::incidence
@@ -48,29 +50,14 @@ namespace celaeno::graph::representations::incidence
 namespace fp = fplus;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Integral = std::integral<T>;
-
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept Layer =
-requires(T t)
-{
-  { t(i64{})        } -> Iterable;
-  { t(i64{})        } -> Iterable;
-  { t(i64{}).size() } -> Integral;
-};
-
-template<typename T>
-concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{
 template<Layer L, Adjacent A>
-auto run(L&& get_layer, A&& adjacent, u64 height)
+auto run(L&& layer, A&& adjacent, u64 height)
 {
   using Matrix = std::vector<std::vector<i32>>;
 
@@ -80,7 +67,7 @@ auto run(L&& get_layer, A&& adjacent, u64 height)
   for (u64 i{0}; i < height-1; ++i)
   {
     // Get two layers
-    auto [l1,l2] = std::make_pair(get_layer(i),get_layer(i+1));
+    auto [l1,l2] = std::make_pair(layer(i),layer(i+1));
 
     // Create the incidence matrix
     Matrix m( l1.size(), std::vector<i32>(l2.size(), 0) );

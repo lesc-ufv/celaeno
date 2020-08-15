@@ -36,10 +36,12 @@
 #include <optional> // std::optional
 #include <cstdint>  // int64_t, int32_t,...
 #include <utility>  // std::forward
+#include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/search/bfs.hpp>
-#include <range/v3/all.hpp>
 
 // namespace celaeno::graph::operations::balance::paths {{{
 namespace celaeno::graph::operations::balance::paths
@@ -53,22 +55,13 @@ namespace rv = ranges::views;
 namespace fw = fplus::fwd;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept SignedIntegral = std::signed_integral<T>;
-
-template<typename T>
-concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
-
-template<typename T>
-concept Link = requires(T t){ {t(std::pair<int64_t,int64_t>{})} -> std::same_as<std::void_t<>>; };
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors P, Neighbors S, Link L, Link U>
+template<SignedIntegral T, Neighbors P, Neighbors S, Edge L, Edge U>
 void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
 {
   // Get the pseudo vertex with the lowest value

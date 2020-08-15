@@ -1,0 +1,7 @@
+[requires]
+fmt/6.0.0@bincrafters/stable
+range-v3/0.10.0@ericniebler/stable
+celaeno/0.1@ruanformigoni/testing
+
+[generators]
+cmake_find_package

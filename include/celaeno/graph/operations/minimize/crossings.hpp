@@ -38,7 +38,7 @@
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
-#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/representations/incidence/barycenter.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 
@@ -48,7 +48,6 @@ namespace celaeno::graph::operations::minimize::crossings
 
 // namespaces {{{
 
-namespace cp = celaeno::concepts;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
@@ -58,20 +57,13 @@ template<typename T> using ref = std::reference_wrapper<T>;
 
 // }}}
 
-// Concepts {{{
-
-template<typename T>
-concept Layer =
-requires(T t)
-{
-  { t(i64{}) } -> cp::Iterable;
-};
-
+// Using namespaces {{{
+using namespace celaeno::graph::concepts;
 // }}}
 
 // Helpers {{{
 
-template<cp::Matrix M>
+template<Matrix M>
 auto swap_rows_and_cols(M&& m)
 {
   // Get a column by index
@@ -94,7 +86,7 @@ auto swap_rows_and_cols(M&& m)
 // @mr  → Matrix realization
 // @layer → lambda to obtain the nodes a graph layer
 // @depth → depth of the topologically sorted graph
-template<cp::Matrices MS, Layer L>
+template<Matrices MS, Layer L>
 auto run(MS&& mr, L&& layer, size_t depth)
 {
 
@@ -343,7 +335,7 @@ auto run(MS&& mr, L&& layer, size_t depth)
 
   } // while: true
 
-  return std::make_pair(layers,fw::apply(ret,fw::unzip()).second);
+  return layers;
 
 } // function: run
 

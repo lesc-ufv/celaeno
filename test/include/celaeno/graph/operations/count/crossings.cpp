@@ -308,10 +308,12 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       );
     };
 
-    // Incidence matrices
+    // Check if vertices uv are adjacent
     auto adjacent = [&g](auto&& u, auto&& v) -> bool { return g.adjacent(u,v); };
-    auto depth {fw::apply(l,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-    auto ms {incidence::run(layer, adjacent, depth)};
+    // Calculate the number of layers of the graph
+    auto layers {fw::apply(l,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+    // Create the incidence matrix
+    auto ms {incidence::run(layer, adjacent, layers)};
 
     // Calculate cost
     i64 cost{};
