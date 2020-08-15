@@ -70,7 +70,7 @@ concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
 
 // Algorithm {{{
 template<Layer L, Adjacent A>
-auto run(L&& get_layer, A&& adjacent, u64 height)
+auto run(L&& layer, A&& adjacent, u64 height)
 {
   using Matrix = std::vector<std::vector<i32>>;
 
@@ -80,7 +80,7 @@ auto run(L&& get_layer, A&& adjacent, u64 height)
   for (u64 i{0}; i < height-1; ++i)
   {
     // Get two layers
-    auto [l1,l2] = std::make_pair(get_layer(i),get_layer(i+1));
+    auto [l1,l2] = std::make_pair(layer(i),layer(i+1));
 
     // Create the incidence matrix
     Matrix m( l1.size(), std::vector<i32>(l2.size(), 0) );
