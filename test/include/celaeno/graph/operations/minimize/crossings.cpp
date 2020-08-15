@@ -129,27 +129,29 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
         , fw::get_map_values()
       );
     };
-    // Get the depth of the graph
-    auto depth {fw::apply(dv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+    // Get the number of layers of the graph
+    auto layers {fw::apply(dv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
     // Verify edge uv exists.
     auto adjacent = [&g](node_t u, node_t v) {  return g.adjacent(u,v); };
     // }}}
 
     // Perform test {{{
     // Incidence matrices of the graph
-    auto ms {incidence::run(layer, adjacent, depth)};
+    auto ms {incidence::run(layer, adjacent, layers)};
     // Calculate current crossings
     i64 prev_crossings{};
     rg::for_each(ms,[&](auto&& m){ prev_crossings += count_crossings::run(m); });
     // Start algorithm
     auto start {std::chrono::system_clock::now()};
-    auto result{minimize::run(ms, layer, depth)};
+    auto result{minimize::run(ms, layer, layers)};
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
-    // Calculate new number of crossings
+    // Calculate new number of crossings {{{
     i64 new_crossings{};
-    rg::for_each(result.second,[&](auto&& m){ new_crossings += count_crossings::run(m); });
+    auto new_layers = [&result](node_t idx) { return result.at(idx); };
+    ms = incidence::run(new_layers, adjacent, layers);
+    rg::for_each(ms,[&](auto&& m){ new_crossings += count_crossings::run(m); });
     // }}}
 
     // Log results {{{

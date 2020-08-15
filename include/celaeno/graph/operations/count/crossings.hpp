@@ -45,13 +45,13 @@ namespace celaeno::graph::operations::count::crossings
 {
 
 // Namespaces {{{
-namespace cp = celaeno::concepts;
+using namespace celaeno::concepts;
 // }}}
 
 // Algorithm {{{
 
 // Impl {{{
-template<cp::Matrix M>
+template<Matrix M>
 decltype(auto) impl(M&& m)
 {
   // Count the number of crossings

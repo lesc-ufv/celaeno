@@ -33,14 +33,16 @@
 
 #pragma once
 
+#include <cmath>
 #include <concepts>
 #include <utility>
 #include <type_traits>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/graph/views/depth.hpp>
-#include <cmath>
 
 // namespace celaeno::graph::views::proximity {{{
 
@@ -49,23 +51,14 @@ namespace celaeno::graph::views::proximity
 
 // Namespaces {{{
 namespace depth = celaeno::graph::views::depth;
-namespace rg = ranges;
-namespace rv = ranges::views;
 namespace ra = ranges::actions;
-namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace kahn = celaeno::graph::search::kahn;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept SignedIntegral = std::signed_integral<T>;
-
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept Neighbors = requires(T t) { {t(int64_t{})} -> Iterable; };
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
 // }}}
 
 // fn: run {{{

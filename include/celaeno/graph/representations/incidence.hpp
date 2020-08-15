@@ -39,6 +39,8 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::representations::incidence {{{
 namespace celaeno::graph::representations::incidence
@@ -48,24 +50,9 @@ namespace celaeno::graph::representations::incidence
 namespace fp = fplus;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Integral = std::integral<T>;
-
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept Layer =
-requires(T t)
-{
-  { t(i64{})        } -> Iterable;
-  { t(i64{})        } -> Iterable;
-  { t(i64{}).size() } -> Integral;
-};
-
-template<typename T>
-concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{

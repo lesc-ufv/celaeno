@@ -37,6 +37,8 @@
 #include <fplus/fplus.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 #include <type_traits>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::views::depth {{{
 namespace celaeno::graph::views::depth
@@ -48,15 +50,9 @@ namespace fw = fplus::fwd;
 namespace kahn = celaeno::graph::search::kahn;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept SignedIntegral = std::signed_integral<T>;
-
-template<typename T>
-concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{

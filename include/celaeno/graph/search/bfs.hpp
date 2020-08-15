@@ -38,6 +38,8 @@
 #include <tuple>
 #include <concepts>
 #include <range/v3/all.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::search::bfs {{{
 namespace celaeno::graph::search::bfs
@@ -48,16 +50,12 @@ namespace rg = ranges;
 namespace ra = ranges::actions;
 // }}}
 
+// Using namespaces {{{
+using namespace celaeno::concepts;
+using namespace celaeno::graph::concepts;
+// }}}
+
 // Concepts {{{
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
-
-template<typename T>
-concept SignedIntegral = std::signed_integral<T>;
-
-template<typename T>
-concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
-
 template<typename T>
 concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // }}}
