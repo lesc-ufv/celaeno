@@ -122,7 +122,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
 
     // Perform test {{{
     // Calculate current crossings
-    i64 prev_crossings{count_crossings::run(p,s)};
+    i64 prev_crossings{count_crossings::run(0,p,s)};
     // Start algorithm
     auto start {std::chrono::system_clock::now()};
     auto result{minimize::run(0,p,s,l,u)};

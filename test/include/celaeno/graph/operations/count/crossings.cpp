@@ -293,7 +293,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
     auto succ = [&g](auto&& v){ return g.successors(v); };
 
     // Calculate cost
-    i64 cost {count_crossings::run(pred,succ)};
+    i64 cost {count_crossings::run(1,pred,succ)};
 
     // Check if the cost is as expected
     REQUIRE(cost == 5);
