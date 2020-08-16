@@ -119,3 +119,6 @@ pages:
   artifacts:
     paths:
       - public
+  rules:
+    - when: manual
+      allow_failure: false
