@@ -37,7 +37,7 @@
 #include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/views/proximity.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
-#include <celaeno/graph/operations/minimize/crossings/crossings.hpp>
+#include <celaeno/graph/operations/minimize/crossings/impl.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
 
@@ -50,7 +50,7 @@ namespace fw = fplus::fwd;
 namespace proximity = celaeno::graph::views::proximity;
 namespace balance = celaeno::graph::operations::balance::paths;
 namespace incidence = celaeno::graph::representations::incidence;
-namespace minimize = celaeno::graph::operations::minimize::crossings;
+namespace minimize = celaeno::graph::operations::minimize::crossings::impl;
 // }}}
 
 // Using namespaces {{{

@@ -122,8 +122,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
 
     // Perform test {{{
     // Calculate current crossings
-    i64 prev_crossings{};
-    rg::for_each(ms,[&](auto&& m){ prev_crossings += count_crossings::run(m); });
+    i64 prev_crossings{count_crossings::run(p,s)};
     // Start algorithm
     auto start {std::chrono::system_clock::now()};
     auto result{minimize::run(0,p,s,l,u)};
@@ -131,15 +130,16 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
     // Calculate new number of crossings {{{
-    i64 new_crossings{};
     auto new_layers = [&result](i64 idx) { return result.at(idx); };
     ms = incidence::run(new_layers, adj, layers);
+    i64 new_crossings{};
     rg::for_each(ms,[&](auto&& m){ new_crossings += count_crossings::run(m); });
+    // i64 new_crossings{count_crossings::run(ms)};
     // }}}
 
     // Log results {{{
     spdlog::info("{},{},{},{},{}",
-        g.vertices_count(), g.edges_count(), prev_crossings, new_crossings, ss.str());
+      g.vertices_count(), g.edges_count(), prev_crossings, new_crossings, ss.str());
     // }}}
 
   }; // lamb: test }}}

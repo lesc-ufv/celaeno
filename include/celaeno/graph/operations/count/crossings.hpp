@@ -2,7 +2,7 @@
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : crossings
-// @created     : segunda jun 22, 2020 18:46:09 -03
+// @created     : sábado ago 15, 2020 16:30:36 -03
 //
 // BSD 2-Clause License
 
@@ -32,70 +32,66 @@
 
 #pragma once
 
-#include <concepts>
-#include <utility>
-#include <exception>
-#include <iostream>
-#include <celaeno/concepts.hpp>
+#include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/graph/concepts.hpp>
+#include <celaeno/graph/views/proximity.hpp>
+#include <celaeno/graph/representations/incidence.hpp>
+#include <celaeno/graph/operations/count/crossings/impl.hpp>
 
 // namespace celaeno::graph::operations::count::crossings {{{
-
 namespace celaeno::graph::operations::count::crossings
 {
 
-// Namespaces {{{
-using namespace celaeno::concepts;
+// namespaces {{{
+namespace rg = ranges;
+namespace fw = fplus::fwd;
+namespace proximity = celaeno::graph::views::proximity;
+namespace incidence = celaeno::graph::representations::incidence;
+namespace crossings = celaeno::graph::operations::count::crossings::impl;
 // }}}
 
-// Algorithm {{{
+// Using namespaces {{{
+using namespace celaeno::graph::concepts;
+// }}}
 
-// Impl {{{
-template<Matrix M>
-decltype(auto) impl(M&& m)
+// function: run {{{
+template<Neighbors N1, Neighbors N2>
+auto run(N1&& p, N2&& s)
 {
-  // Count the number of crossings
-  i64 crossings{};
-
-  // Check if matrix is empty
-  if( m.empty() ) { return crossings; }
-
-  // Number of rows
-  auto p{m.size()};
-
-  // Number of columns
-  auto q{m.at(0).size()};
-
-  try
+  // Create the proximity view
+  auto [lv,_] = proximity::run(1,p,s);
+  // Check if vertices ab are adjacent
+  auto adj = [&](auto&& a, auto&& b) { return ! fw::apply(p(a),fw::append(s(b))).empty(); };
+  // Calculate the number of layers of the graph
+  auto layers {fw::apply(lv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+  // Get a layer from the proximity view
+  auto layer = [&lv](i64 idx)
   {
-    for (siz j{0}; j < p-1; j++)
-    {
-      for (siz k{j+1}; k < p; k++)
-      {
-        for (siz a{0}; a < q-1; a++)
-        {
-          for (siz b{a+1}; b < q; b++)
-          {
-            crossings += m.at(j).at(b) * m.at(k).at(a);
-          } // for: b
-        } // for: a
-      } // for: k
-    } // for: j
-  } // try
-  catch (std::exception const& e)
-  {
-    std::cerr << "Degenerate incidence matrix" << std::endl;
-  } // catch
-  return crossings;
-} // function: impl }}}
+    return fw::apply(lv
+      , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
+      , fw::get_map_values()
+      , fw::sort()
+    );
+  };
+  // Create the incidence matrix
+  auto ms {incidence::run(layer, adj, layers)};
 
-// Variadic parameters {{{
-template<typename... MS>
-i64 run(MS&&... ms)
-{
-  return (impl(std::forward<MS>(ms)) + ...);
+  i64 count{};
+
+  rg::for_each(ms,[&](auto&& m){ count += crossings::run(m); });
+
+  // Calculate cost
+  return count;
 } // function: run }}}
 
-// }}}
+// Usage with fold expressions {{{
+template<typename... MS>
+decltype(auto) run(MS&&... ms)
+{
+  // Calculate cost
+  return (crossings::run(std::forward<MS>(ms)) + ...);
+} // function: run }}}
 
-} // namespace celaeno::graph::operations::count::crossings }}}
+} // celaeno::graph::operations::count::crossings }}}
