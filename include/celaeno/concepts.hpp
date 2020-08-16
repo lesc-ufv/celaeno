@@ -33,6 +33,8 @@
 #pragma once
 
 #include <concepts>
+#include <type_traits>
+#include <iterator>
 #include <celaeno/aliases.hpp>
 
 // namespace celaeno::concepts {{{
@@ -46,14 +48,7 @@ template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template<typename T>
-concept Iterable =
-  requires(T t)
-  {
-    {t.begin()};
-    {t.end()};
-    {t.cbegin()};
-    {t.cend()};
-  };
+concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
 template<typename T>
 concept Arithmetic =
