@@ -37,8 +37,7 @@
 #include <taygete/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
-#include <celaeno/graph/views/proximity.hpp>
-#include <celaeno/graph/representations/incidence.hpp>
+#include <celaeno/graph/operations/count/crossings/impl.hpp>
 
 
 // namespace celaeno::graph::operations::count::crossings::test {{{
@@ -50,9 +49,7 @@ namespace celaeno::graph::operations::count::crossings::test
 namespace rv = ranges::views;
 namespace fw = fplus::fwd;
 namespace graph = taygete::graph;
-namespace proximity = celaeno::graph::views::proximity;
-namespace crossings = celaeno::graph::operations::count::crossings;
-namespace incidence = celaeno::graph::representations::incidence;
+namespace count_crossings = celaeno::graph::operations::count::crossings;
 // }}}
 
 // Tests case celaeno::graph::crossings {{{
@@ -111,12 +108,12 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
     }};
 
 
-    auto c0 {crossings::run(m0)};
-    auto c1 {crossings::run(m1)};
-    auto c2 {crossings::run(m2)};
-    auto c3 {crossings::run(m3)};
-    auto c4 {crossings::run(m4)};
-    auto c5 {crossings::run(m5)};
+    auto c0 {count_crossings::run(m0)};
+    auto c1 {count_crossings::run(m1)};
+    auto c2 {count_crossings::run(m2)};
+    auto c3 {count_crossings::run(m3)};
+    auto c4 {count_crossings::run(m4)};
+    auto c5 {count_crossings::run(m5)};
 
     REQUIRE(c0 == 14);
     REQUIRE(c1 == 10);
@@ -149,7 +146,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {0,0,0},
     }};
 
-    REQUIRE(crossings::run(g01,g02,g03) == 5);
+    REQUIRE(count_crossings::run(g01,g02,g03) == 5);
 
     std::array<std::array<i8,3>,3> g11
     {{
@@ -170,7 +167,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {0,0,0},
     }};
 
-    REQUIRE(crossings::run(g11,g12,g13) == 5);
+    REQUIRE(count_crossings::run(g11,g12,g13) == 5);
 
     std::array<std::array<i8,3>,3> g21
     {{
@@ -191,7 +188,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {1,1,0},
     }};
 
-    REQUIRE(crossings::run(g21,g22,g23) == 3);
+    REQUIRE(count_crossings::run(g21,g22,g23) == 3);
 
     std::array<std::array<i8,3>,3> g31
     {{
@@ -212,7 +209,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {0,1,1},
     }};
 
-    REQUIRE(crossings::run(g31,g32,g33) == 1);
+    REQUIRE(count_crossings::run(g31,g32,g33) == 1);
 
     std::array<std::array<i8,3>,3> g41
     {{
@@ -233,7 +230,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {0,1,1},
     }};
 
-    REQUIRE(crossings::run(g41,g42,g43) == 3);
+    REQUIRE(count_crossings::run(g41,g42,g43) == 3);
 
     std::array<std::array<i8,3>,3> g51
     {{
@@ -254,7 +251,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {0,1,1},
     }};
 
-    REQUIRE(crossings::run(g51,g52,g53) == 1);
+    REQUIRE(count_crossings::run(g51,g52,g53) == 1);
 
     std::array<std::array<i8,3>,3> g61
     {{
@@ -275,7 +272,7 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {0,1,1},
     }};
 
-    REQUIRE(crossings::run(g61,g62,g63) == 0);
+    REQUIRE(count_crossings::run(g61,g62,g63) == 0);
   } // SUBCASE: h-layered graph }}}
 
   // Taygete graphs {{{
@@ -291,37 +288,14 @@ TEST_CASE("celaeno::graph::operations::count::crossings")
       {7,12},{8,10},{8,11},
     }};
 
+    // Lambdas to the predecessors and successors vertices
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [l,_] = proximity::run(1,pred,succ);
-
-    // Get the key type
-    using node_t = decltype(l)::key_type;
-
-    auto layer = [&l](node_t idx)
-    {
-      return fw::apply(
-        l
-        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-        , fw::get_map_values()
-        , fw::sort()
-      );
-    };
-
-    // Check if vertices uv are adjacent
-    auto adjacent = [&g](auto&& u, auto&& v) -> bool { return g.adjacent(u,v); };
-    // Calculate the number of layers of the graph
-    auto layers {fw::apply(l,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-    // Create the incidence matrix
-    auto ms {incidence::run(layer, adjacent, layers)};
 
     // Calculate cost
-    i64 cost{};
-    for (decltype(ms.size()) i{}; i < ms.size(); ++i)
-    {
-      cost += crossings::run(ms.at(i));
-    } // for: i < l.size()
+    i64 cost {count_crossings::run(pred,succ)};
 
+    // Check if the cost is as expected
     REQUIRE(cost == 5);
   } // SUBCASE: "Taygete Graphs"
 

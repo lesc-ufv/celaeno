@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : main.cpp
-// @created     : terça jul 28, 2020 07:49:14 -03
+// @file        : concepts
+// @created     : sábado ago 15, 2020 15:12:43 -03
 //
 // BSD 2-Clause License
 
@@ -30,47 +30,36 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <iostream>
-#include <cstdlib>
-#include <fmt/ranges.h>
-#include <taygete/graph/graph.hpp>
-#include <celaeno/aliases.hpp>
-#include <celaeno/graph/operations/minimize/crossings.hpp>
+#pragma once
 
+#include <utility>
+#include <concepts>
+#include <celaeno/concepts.hpp>
 
-// namespaces {{{
-namespace graph = taygete::graph;
-namespace minimize = celaeno::graph::operations::minimize::crossings;
+// namespace celaeno::graph::concepts {{{
+namespace celaeno::graph::concepts
+{
+
+// Using namespaces {{{
+
+using namespace celaeno::concepts;
+
 // }}}
 
-int main()
-{
-  // Graph {{{
-  graph::Graph<i64> g
-  {
-    {1,5},{2,4},{3,4},{6,9},
-    {4,7},{5,7},{5,8},{5,9},
-    {7,12},{8,10},{8,11},
-  };
-  // }}}
+// Concepts {{{
 
-  // Obtain predecessor and successor nodes {{{
-  auto p = [&g](auto&& v){ return g.predecessors(v); };
-  auto s = [&g](auto&& v){ return g.successors(v); };
-  // }}}
+template<typename T>
+concept Edge = requires(T t){ {t(std::pair<int64_t,int64_t>{})} -> std::same_as<std::void_t<>>; };
 
-  // Link or unlink nodes on graph {{{
-  auto l = [&g](auto&& v){ return g.emplace(v); };
-  auto u = [&g](auto&& v){ return g.erase(v); };
-  // }}}
+template<typename T>
+concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
 
-  auto layers {minimize::run(1,p,s,l,u)};
+template<typename T>
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 
-  // Print ordering
-  for (auto&& l : layers)
-  {
-    fmt::print("{}\n",l);
-  } // for l : layers
+template<typename T>
+concept Layer = requires(T t) { { t(i64{}) } -> Iterable; };
 
-  return EXIT_SUCCESS;
-} // main
+// }}}
+
+} // namespace celaeno::graph::concepts }}}
