@@ -35,12 +35,12 @@
 #include <fmt/ranges.h>
 #include <taygete/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
-#include <celaeno/graph/operations/count/crossings/pipeline.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
 
 
 // namespaces {{{
 namespace graph = taygete::graph;
-namespace count = celaeno::graph::operations::count::crossings::pipeline;
+namespace count = celaeno::graph::operations::count::crossings;
 // }}}
 
 int main()
