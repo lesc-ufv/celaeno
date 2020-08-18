@@ -64,13 +64,15 @@ int main()
   auto u = [&g](auto&& v){ return g.erase(v); };
   // }}}
 
+  // Run crossings minimization {{{
   auto layers {minimize::run(1,p,s,l,u)};
+  // }}}
 
-  // Print ordering
+  // Print ordering {{{
   for (auto&& l : layers)
   {
     fmt::print("{}\n",l);
-  } // for l : layers
+  } // for l : layers }}}
 
   return EXIT_SUCCESS;
 } // main
