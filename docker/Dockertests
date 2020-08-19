@@ -37,10 +37,9 @@ RUN ./build/test/g_views_depth
 RUN ./build/test/g_views_proximity
 ## Operations
 ### Query
-RUN ./build/test/g_operations_count_crossings
-RUN ./build/test/g_operations_incidence_barycenter
-### Modifiers
 RUN ./build/test/g_operations_balance_paths
+RUN ./build/test/g_operations_count_crossings
 RUN ./build/test/g_operations_minimize_crossings
 ### Representations
+RUN ./build/test/g_operations_incidence_barycenter
 RUN ./build/test/g_representations_incidence
