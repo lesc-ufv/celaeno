@@ -1,10 +1,8 @@
 # Summary
 
-# Installation
+[Celaeno](./index.md)
 
 ---
-
-- [Prerequisites](./prerequisites.md)
 
 # Graph Algorithms
 
