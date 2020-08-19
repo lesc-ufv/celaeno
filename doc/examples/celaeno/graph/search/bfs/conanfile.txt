@@ -1,0 +1,7 @@
+[requires]
+fmt/6.0.0@bincrafters/stable
+functionalplus/v0.2.9-p0@dobiasd/stable
+celaeno/0.1@ruanformigoni/testing
+
+[generators]
+cmake_find_package
