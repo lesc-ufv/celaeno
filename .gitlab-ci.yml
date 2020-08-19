@@ -8,16 +8,16 @@ stages:
 before_script:
   - apk add make cmake clang git py3-pip
   - pip3 install -I conan
+  - conan profile new default --detect
+  - conan profile update settings.compiler.libcxx=libstdc++11 default
+  - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
+  - conan remote add spdlog https://api.bintray.com/conan/ruanformigoni/spdlog
+  - conan remote add fmt https://api.bintray.com/conan/ruanformigoni/fmt
+  - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
 
 build_tests:
   stage: build
   script:
-    - conan profile new default --detect
-    - conan profile update settings.compiler.libcxx=libstdc++11 default
-    - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
-    - conan remote add spdlog https://api.bintray.com/conan/ruanformigoni/spdlog
-    - conan remote add fmt https://api.bintray.com/conan/ruanformigoni/fmt
-    - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
     - mkdir build && cd build
     - conan install .. --build missing && cd ..
     - cmake -H. -Bbuild
@@ -28,86 +28,85 @@ build_tests:
   artifacts:
     paths:
       - ./build/test/
-    expire_in: 1 week
+    expire_in: 1 day
 
-.test:
+build_examples:
+  stage: build
+  variables:
+    BUILD_SCRIPT: /builds/formigoni/celaeno/doc/examples/build.sh
+  script:
+    # Search
+    ## bfs
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/search/bfs/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > bfs.txt
+    ## dfs
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/search/dfs/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > dfs.txt
+    ## kahn
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/search/kahn/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > kahn.txt
+    # Views
+    ## Topological
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/views/depth/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > topological.txt
+    ## Proximity
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/views/proximity/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > proximity.txt
+    # Operations
+    ## Count crossings
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/operations/count/crossings/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > count-crossings.txt
+    ## Minimize crossings
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/operations/count/crossings/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > minimize-crossings.txt
+    ## Balance paths
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/operations/balance/paths/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > balance-paths.txt
+    # Representations
+    ## Incidence matrix
+    - cd /builds/formigoni/celaeno/doc/examples/celaeno/graph/representations/incidence/
+    - eval "$BUILD_SCRIPT"
+    - ./build/main > incidence.txt
+  artifacts:
+    paths:
+      - doc/examples/celaeno/graph/
+    expire_in: 1 day
+  rules:
+    - when: manual
+      allow_failure: true
+
+test:
   stage: test
-  needs: ["build"]
-
-.artifacts:
+  needs: ["build_tests"]
+  timeout: 6h
+  script:
+    - ./build/test/g_search_bfs
+    - ./build/test/g_search_dfs
+    - ./build/test/g_search_kahn
+    - ./build/test/g_views_depth
+    - ./build/test/g_views_proximity
+    - ./build/test/g_operations_count_crossings
+    - ./build/test/g_operations_incidence_barycenter
+    - ./build/test/g_operations_balance_paths
+    - ./build/test/g_operations_minimize_crossings
+    - ./build/test/g_operations_incidence_barycenter
   artifacts:
     paths:
       - ./logs/celaeno/
     expire_in: 1 week
 
-# Search
-bfs:
-  extends: .test
-  script:
-    - ./build/test/g_search_bfs
-  extends: .artifacts
-
-dfs:
-  extends: .test
-  script:
-    - ./build/test/g_search_dfs
-  extends: .artifacts
-
-khan:
-  extends: .test
-  script:
-    - ./build/test/g_search_kahn
-  extends: .artifacts
-
-# Views
-topo:
-  extends: .test
-  script:
-    - ./build/test/g_views_depth
-  extends: .artifacts
-
-prox:
-  extends: .test
-  script:
-    - ./build/test/g_views_proximity
-  extends: .artifacts
-
-# Operations
-## Query
-count_crossings:
-  extends: .test
-  script:
-    - ./build/test/g_operations_count_crossings
-  extends: .artifacts
-
-incidence_barycenter:
-  extends: .test
-  script:
-    - ./build/test/g_operations_incidence_barycenter
-  extends: .artifacts
-## Modifiers
-balance_paths:
-  extends: .test
-  script:
-    - ./build/test/g_operations_balance_paths
-  extends: .artifacts
-
-minimize_crossings:
-  extends: .test
-  script:
-    - ./build/test/g_operations_minimize_crossings
-  extends: .artifacts
-
-# Representations
-incidence_barycenter:
-  extends: .test
-  script:
-    - ./build/test/g_operations_incidence_barycenter
-  extends: .artifacts
-
 # Pages
 pages:
   stage: doc
+  needs: []
   before_script:
     - ''
   image: "rustlang/rust:nightly"
