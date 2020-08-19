@@ -9,14 +9,18 @@
 #include <doctest/doctest.h>
 #include <array>
 
-// Graph Library
+// Helper libraries
+#include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
+
+// Tyagete
 #include <taygete/graph/graph.hpp>
-// Tested algorithm
+
+// Celaeno
+#include <celaeno/aliases.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
-#include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
 
 // namespace: celaeno::graph::representations::incidence::test {{{
 
@@ -26,7 +30,6 @@ namespace celaeno::graph::representations::incidence::test
 // Namespaces {{{
 namespace graph = taygete::graph;
 namespace incidence = celaeno::graph::representations::incidence;
-namespace fw = fplus::fwd;
 // }}}
 
 // Helpers {{{
@@ -55,13 +58,13 @@ TEST_CASE("celaeno::graph::representations::incidence"
 {
   // Used graph available at:
   // https://gitlab.com/formigoni/celaeno/-/blob/development/doc/celaeno/graph/matrix-realization-test.png
-  std::array<std::array<bool,4>,2> m1
+  std::array<std::array<i8,4>,2> m1
   {{
     {1,1,1,1},
     {1,0,0,1},
   }};
 
-  std::array<std::array<bool,4>,4> m2
+  std::array<std::array<i8,4>,4> m2
   {{
     {1,0,0,0},
     {0,1,1,1},
@@ -69,7 +72,7 @@ TEST_CASE("celaeno::graph::representations::incidence"
     {0,0,0,0},
   }};
 
-  std::array<std::array<bool,3>,4> m3
+  std::array<std::array<i8,3>,4> m3
   {{
     {1,0,0},
     {0,0,0},
@@ -80,7 +83,7 @@ TEST_CASE("celaeno::graph::representations::incidence"
   // Subcase: Even number of layers {{{
   SUBCASE("Even number of layers")
   {
-    graph::Graph<int32_t> g;
+    graph::Graph<i32> g;
     g.emplace(
       // Layer 1 → 2
       std::make_pair(1,3),
@@ -105,33 +108,11 @@ TEST_CASE("celaeno::graph::representations::incidence"
   );
 
 
-    // Create hierarchical graph
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
-
-    // Get the key type
-    using node_t = decltype(h)::key_type;
-
-    // Lambda to obtain a layer by index
-    auto get_layer = [&h](node_t idx)
-    {
-      return fw::apply(
-        h
-        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-        , fw::get_map_values()
-        , fw::sort()
-      );
-    };
-
-    // Lambda to verify if an edge between v → u exists
-    auto has_edge = [&g](node_t v, node_t u){ return g.adjacent(v,u); };
-
-    // Lambda to get the height of the graph
-    auto height {fw::apply(h, fw::get_map_keys(), fw::unique(), fw::size_of_cont())};
-
-    // Execute the algorithm
-    auto matrices {incidence::run(get_layer, has_edge, height)};
+    // Helpers
+    auto pred = [&g](auto&& u){ return g.predecessors(u); };
+    auto succ = [&g](auto&& u){ return g.successors(u); };
+    // Create matrix realization
+    auto matrices {incidence::run(1,pred,succ)};
 
     // Test against expected result
     REQUIRE(matrices.size() == 3);
@@ -145,7 +126,7 @@ TEST_CASE("celaeno::graph::representations::incidence"
 
   SUBCASE("Odd number of layers")
   {
-    graph::Graph<int64_t> g;
+    graph::Graph<i64> g;
     g.emplace(
       // Layer 1 → 2
       std::make_pair(1,3),
@@ -163,32 +144,11 @@ TEST_CASE("celaeno::graph::representations::incidence"
       std::make_pair(4,10)
     );
 
-    // Create hierarchical graph
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [h,_] = celaeno::graph::views::depth::run(1,pred,succ);
-
-    // Get the key type
-    using node_t = decltype(h)::key_type;
-
-    // Lambda to obtain a layer by index
-    auto get_layer = [&h](node_t idx)
-    {
-      return fw::apply(
-        h
-        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-        , fw::get_map_values()
-        , fw::sort()
-      );
-    };
-
-    // Lambda to verify if an edge between v → u exists
-    auto has_edge = [&g](node_t v, node_t u){ return g.adjacent(v,u); };
-
-    // Lambda to get the height of the graph
-    auto height{fw::apply(h, fw::get_map_keys(), fw::unique(),fw::size_of_cont())};
-
-    auto matrices {incidence::run(get_layer, has_edge, height)};
+    // Helpers
+    auto pred = [&g](auto&& u){ return g.predecessors(u); };
+    auto succ = [&g](auto&& u){ return g.successors(u); };
+    // Create matrix realization
+    auto matrices {incidence::run(1, pred, succ)};
 
     // TESTS
     REQUIRE(matrices.size() == 2);

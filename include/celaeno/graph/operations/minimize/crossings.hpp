@@ -60,30 +60,28 @@ using namespace celaeno::graph::concepts;
 
 // run {{{
 template<SignedIntegral T, Neighbors N1, Neighbors N2, Edge E1, Edge E2>
-decltype(auto) run(T t, N1&& p, N2&& s, E1&& u, E2&& l)
+decltype(auto) run(T root, N1&& p, N2&& s, E1&& u, E2&& l)
 {
-  auto [dv,_] {proximity::run(t, std::forward<N1>(p), std::forward<N2>(s))};
+  auto [lv,_] {proximity::run(root, std::forward<N1>(p), std::forward<N2>(s))};
 
-  balance::run(t,
+  balance::run(root,
       std::forward<N1>(p), std::forward<N2>(s),
       std::forward<E1>(u), std::forward<E2>(l)
   );
 
-  auto adj = [&](auto&& a, auto&& b) { return ! fw::apply(p(a),fw::append(s(b))).empty(); };
-
-  auto layer = [&dv](i64 idx)
+  auto layer = [&lv](i64 idx)
   {
-    return fw::apply(dv
+    return fw::apply(lv
       , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
       , fw::get_map_values()
     );
   };
 
   // Number of layers of the graph
-  auto layers {fw::apply(dv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
+  auto layers {fw::apply(lv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
 
   // Incidence matrices of the graph
-  auto&& ms {incidence::run(layer, adj, layers)};
+  auto&& ms {incidence::run(root, p, s)};
 
   // Minimize crossings
   return minimize::run(std::move(ms),layer,layers);

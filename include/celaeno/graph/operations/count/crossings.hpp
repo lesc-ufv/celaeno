@@ -33,10 +33,8 @@
 #pragma once
 
 #include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/graph/concepts.hpp>
-#include <celaeno/graph/views/proximity.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
 #include <celaeno/graph/operations/count/crossings/impl.hpp>
 
@@ -47,9 +45,6 @@ namespace celaeno::graph::operations::count::crossings
 // namespaces {{{
 namespace rg = ranges;
 namespace rv = ranges::views;
-namespace fp = fplus;
-namespace fw = fplus::fwd;
-namespace proximity = celaeno::graph::views::proximity;
 namespace incidence = celaeno::graph::representations::incidence;
 namespace crossings = celaeno::graph::operations::count::crossings::impl;
 // }}}
@@ -62,24 +57,8 @@ using namespace celaeno::graph::concepts;
 template<SignedIntegral T, Neighbors N1, Neighbors N2>
 auto run(T root, N1&& p, N2&& s)
 {
-  // Create the proximity view
-  auto [lv,_] = proximity::run(root,p,s);
-
-  // Check if vertices ab are adjacent
-  auto adj = [&](auto&& a, auto&& b) { return rg::contains(s(a),b); };
-
-  // Calculate the number of layers of the graph
-  auto layers {fw::apply(lv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-
-  // Get a layer from the proximity view
-  auto layer = [&lv](i64 idx)
-  {
-    auto r{lv.equal_range(idx)};
-    return fp::get_map_values(std::multimap(r.first,r.second));
-  };
-
   // Create the incidence matrix
-  auto ms {incidence::run(layer, adj, layers)};
+  auto ms {incidence::run(root, p, s)};
 
   // Return cost
   return rg::accumulate(rv::all(ms),0,[&](auto&& c, auto&& n){ return c + crossings::run(n); });

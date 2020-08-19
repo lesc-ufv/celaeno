@@ -16,6 +16,7 @@ RUN conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
 
 # Configure project
 ADD ./ /celaeno/
+RUN rm -rf /celaeno/build
 WORKDIR /celaeno/build
 
 # Install dependencies

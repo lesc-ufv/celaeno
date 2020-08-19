@@ -108,17 +108,8 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     // Number of layers of the graph
     auto layers {fw::apply(pv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
 
-    // Get a graph layer by index
-    auto layer = [&pv](i64 idx)
-    {
-      return fw::apply(pv
-        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-        , fw::get_map_values()
-      );
-    };
-
     // Incidence matrices of the graph
-    auto ms {incidence::run(layer, adj, layers)};
+    auto ms {incidence::run(0, p, s)};
 
     // Perform test {{{
     // Calculate current crossings
@@ -131,7 +122,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     std::stringstream ss; ss << dur.count();
     // Calculate new number of crossings {{{
     auto new_layers = [&result](i64 idx) { return result.at(idx); };
-    ms = incidence::run(new_layers, adj, layers);
+    ms = incidence::impl::run(new_layers, adj, layers);
     i64 new_crossings{};
     rg::for_each(ms,[&](auto&& m){ new_crossings += count_crossings::run(m); });
     // i64 new_crossings{count_crossings::run(ms)};

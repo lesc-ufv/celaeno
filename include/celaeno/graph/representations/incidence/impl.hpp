@@ -1,7 +1,7 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : incidence
+// @file        : incidence-matrix
 // @created     : domingo jun 14, 2020 12:17:32 -03
 //
 
@@ -41,18 +41,13 @@
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
-#include <celaeno/graph/representations/incidence/impl.hpp>
-#include <celaeno/graph/views/proximity.hpp>
 
-// namespace celaeno::graph::representations::incidence {{{
-namespace celaeno::graph::representations::incidence
+// namespace celaeno::graph::representations::incidence::impl {{{
+namespace celaeno::graph::representations::incidence::impl
 {
 
 // Namespaces {{{
-namespace rg = ranges;
-namespace fw = fplus::fwd;
-namespace proximity = celaeno::graph::views::proximity;
-namespace incidence = celaeno::graph::representations::incidence::impl;
+namespace fp = fplus;
 // }}}
 
 // Using namespaces {{{
@@ -61,32 +56,45 @@ using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors N1, Neighbors N2>
-auto run(T root, N1&& pred, N2&& succ)
+template<Layer L, Adjacent A>
+auto run(L&& layer, A&& adjacent, u64 height)
 {
-    // Proximity view: @level → vertex && @vertex → level
-    auto [lv,_] = proximity::run(root,pred,succ);
+  using Matrix = std::vector<std::vector<i32>>;
 
-    // Lambda to verify if an edge between u → v exists
-    auto adjacent = [&](T u, T v){ return rg::contains(succ(u),v); };
+  // Result
+  std::vector<Matrix> result;
 
-    // Get the height of the graph
-    auto height
-      {fw::apply(lv, fw::get_map_keys(), fw::unique(), fw::size_of_cont())};
+  for (u64 i{0}; i < height-1; ++i)
+  {
+    // Get two layers
+    auto [l1,l2] = std::make_pair(layer(i),layer(i+1));
 
-    // Lambda to obtain a layer by index
-    auto layer = [&lv](T idx)
+    // Create the incidence matrix
+    Matrix m( l1.size(), std::vector<i32>(l2.size(), 0) );
+
+    // Enumerate layers
+    auto [l1e,l2e] { std::make_pair(fp::enumerate(l1),fp::enumerate(l2)) };
+
+    // For each node of layer 1
+    // check if edge exists for each edge of layer 2
+    // If edge exists, assign 1 to matrix
+    // If edge does not exist, do nothing
+    for (auto&& v : l1e)
     {
-      return fw::apply(lv
-        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-        , fw::get_map_values()
-        , fw::sort()
-      );
-    };
+      for (auto&& u : l2e)
+      {
+        if( adjacent(v.second,u.second) )
+        {
+          m.at(v.first).at(u.first) = 1;
+        }
+      } // for l2e
+    } // for l1e
 
-    // Return the incidence matrix
-    return incidence::run(layer,adjacent,height);
+    result.push_back(m);
 
+  } // for: i
+
+  return result;
 } // function: run }}}
 
-} // namespace celaeno::graph::representations::incidence }}}
+} // namespace celaeno::graph::representations::incidence::impl }}}
