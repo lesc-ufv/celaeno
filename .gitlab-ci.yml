@@ -89,7 +89,7 @@ build_examples:
   timeout: 6h
   artifacts:
     paths:
-      - ./logs/celaeno/
+      - /builds/formigoni/celaeno/logs
     expire_in: 1 day
 
 g_search_bfs:
