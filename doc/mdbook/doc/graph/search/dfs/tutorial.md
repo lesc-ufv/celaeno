@@ -34,11 +34,10 @@ int main()
   // Required behaviors {{{
   auto p = [&g](auto&& u){ return g.predecessors(u); };
   auto s = [&g](auto&& u){ return g.successors(u); };
-  auto n = [&p,&s](auto&& u){return fp::append(p(u),s(u));};
   // }}}
 
   // Run algorithm {{{
-  auto result {dfs::run(1,n)};
+  auto result {dfs::run(1,p,s)};
   // }}}
 
   // Print to after {{{
