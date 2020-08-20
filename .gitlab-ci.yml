@@ -83,25 +83,55 @@ build_examples:
     - when: manual
       allow_failure: true
 
-test:
+.test_graph:
   stage: test
   needs: ["build_tests"]
   timeout: 6h
-  script:
-    - ./build/test/g_search_bfs
-    - ./build/test/g_search_dfs
-    - ./build/test/g_search_kahn
-    - ./build/test/g_views_depth
-    - ./build/test/g_views_proximity
-    - ./build/test/g_operations_count_crossings
-    - ./build/test/g_operations_incidence_barycenter
-    - ./build/test/g_operations_balance_paths
-    - ./build/test/g_operations_minimize_crossings
-    - ./build/test/g_operations_incidence_barycenter
   artifacts:
     paths:
       - ./logs/celaeno/
-    expire_in: 1 week
+    expire_in: 1 day
+
+g_search_bfs:
+  extends: .test_graph
+  script:
+    - ./build/test/g_search_bfs
+g_search_dfs:
+  extends: .test_graph
+  script:
+    - ./build/test/g_search_dfs
+g_search_kahn:
+  extends: .test_graph
+  script:
+    - ./build/test/g_search_kahn
+g_views_topo:
+  extends: .test_graph
+  script:
+    - ./build/test/g_views_depth
+
+g_views_prox:
+  extends: .test_graph
+  script:
+    - ./build/test/g_views_proximity
+  
+g_operations_count_crossings:
+  extends: .test_graph
+  script:
+    - ./build/test/g_operations_count_crossings
+g_operations_balance_paths:
+  extends: .test_graph
+  script:
+    - ./build/test/g_operations_balance_paths
+
+g_operations_minimize_crossings:
+  extends: .test_graph
+  script:
+    - ./build/test/g_operations_minimize_crossings
+
+g_operations_incidence_barycenter:
+  extends: .test_graph
+  script:
+    - ./build/test/g_operations_incidence_barycenter
 
 # Pages
 pages:
