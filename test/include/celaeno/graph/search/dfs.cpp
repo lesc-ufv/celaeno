@@ -91,9 +91,10 @@ TEST_CASE("celaeno::graph::search::dfs"
     // }}}
 
     // Test dfs {{{
-    auto adj = [&g](auto&& v){ return g.neighbors(v); };
+    auto pred = [&g](auto&& u){ return g.predecessors(u); };
+    auto succ = [&g](auto&& u){ return g.successors(u); };
     auto start {std::chrono::system_clock::now()};
-    auto dfs {dfs::run(0,adj)};
+    auto dfs {dfs::run(0,pred,succ)};
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();

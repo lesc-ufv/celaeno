@@ -47,6 +47,7 @@ namespace celaeno::graph::search::dfs
 
 // Namespaces {{{
 namespace rg = ranges;
+namespace fp = fplus;
 namespace fw = fplus::fwd;
 // }}}
 
@@ -61,9 +62,12 @@ concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
-std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
+template<SignedIntegral T, Neighbors P, Neighbors S, Callback C = std::function<bool(int64_t)>>
+std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;})
 {
+  // Create adjacent helper
+  auto nb = [&](auto&& u){ return fp::append(pred(u),succ(u)); };
+
   // Stack of vertices
   std::stack<T> stack;
 
