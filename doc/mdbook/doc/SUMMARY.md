@@ -10,38 +10,38 @@
 
 # Search
 
-- [Breadth-First Search](./graph/bfs/bfs.md)
-  - [API](./graph/bfs/api.md)
-  - [Tutorial](./graph/bfs/tutorial.md)
+- [Breadth-First Search](./graph/search/bfs/bfs.md)
+  - [API](./graph/search/bfs/api.md)
+  - [Tutorial](./graph/search/bfs/tutorial.md)
 
-- [Depth-First Search](./graph/dfs/dfs.md)
-  - [API](./graph/dfs/api.md)
-  - [Tutorial](./graph/dfs/tutorial.md)
+- [Depth-First Search](./graph/search/dfs/dfs.md)
+  - [API](./graph/search/dfs/api.md)
+  - [Tutorial](./graph/search/dfs/tutorial.md)
 
-- [Topological Sorting](./graph/kahn/kahn.md)
-  - [API](./graph/kahn/api.md)
-  - [Tutorial](./graph/kahn/tutorial.md)
+- [Topological Sorting](./graph/search/kahn/kahn.md)
+  - [API](./graph/search/kahn/api.md)
+  - [Tutorial](./graph/search/kahn/tutorial.md)
 
 # Views
 
-- [Topological View](./graph/view/topo/topo.md)
-  - [API](./graph/view/topo/api.md)
-  - [Tutorial](./graph/view/topo/tutorial.md)
+- [Topological View](./graph/views/topo/topo.md)
+  - [API](./graph/views/topo/api.md)
+  - [Tutorial](./graph/views/topo/tutorial.md)
 
-- [Proximity View](./graph/view/prox/prox.md)
-  - [API](./graph/view/prox/api.md)
-  - [Tutorial](./graph/view/prox/tutorial.md)
+- [Proximity View](./graph/views/prox/prox.md)
+  - [API](./graph/views/prox/api.md)
+  - [Tutorial](./graph/views/prox/tutorial.md)
 
-# Structural Change
+# Operations
 
-- [Path Balancing](./graph/balance/balance.md)
-  - [API](./graph/balance/api.md)
-  - [Tutorial](./graph/balance/tutorial.md)
+- [Path Balancing](./graph/operations/balance/balance.md)
+  - [API](./graph/operations/balance/api.md)
+  - [Tutorial](./graph/operations/balance/tutorial.md)
 
 # Representations
 
-- [Incidence Matrix](./graph/incidence/incidence.md)
-  - [API](./graph/incidence/api.md)
-  - [Tutorial](./graph/incidence/tutorial.md)
+- [Incidence Matrix](./graph/representations/incidence/incidence.md)
+  - [API](./graph/representations/incidence/api.md)
+  - [Tutorial](./graph/representations/incidence/tutorial.md)
 
 <!-- - [A\* Algorithm](./a-star.md) -->
