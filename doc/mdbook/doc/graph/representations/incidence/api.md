@@ -5,25 +5,19 @@
 ## Constraints
 ```cpp
 template<typename T>
+concept SignedIntegral = std::signed_integral<T>;
+
+template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
 template<typename T>
-concept Layer =
-requires(T t)
-{
-  { t(i64{})        } -> Iterable;
-  { t(i64{})        } -> Iterable;
-  { t(i64{}).size() } -> std::integral;
-};
-
-template<typename T>
-concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
+concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
 ```
 
 ## Interface
 ```cpp
-template<Layer L, Adjacent A>
-auto run(L&& get_layer, A&& adjacent, u64 height);
+template<SignedIntegral T, Neighbors N1, Neighbors N2>
+auto run(T root, N1&& pred, N2&& succ)
 ```
 
 <!-- vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et : -->
