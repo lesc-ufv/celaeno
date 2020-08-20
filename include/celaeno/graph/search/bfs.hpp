@@ -38,6 +38,7 @@
 #include <tuple>
 #include <concepts>
 #include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
 
@@ -46,6 +47,7 @@ namespace celaeno::graph::search::bfs
 {
 
 // Namespaces {{{
+namespace fp = fplus;
 namespace rg = ranges;
 namespace ra = ranges::actions;
 // }}}
@@ -61,9 +63,12 @@ concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors N, Callback C = std::function<bool(int64_t)>>
-std::vector<T> run(T root, N&& nb, C&& cb = [](auto&&){return false;})
+template<SignedIntegral T, Neighbors P, Neighbors S, Callback C = std::function<bool(int64_t)>>
+std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;})
 {
+  // Create adjacent helper
+  auto nb = [&](auto&& u){ return fp::append(pred(u),succ(u)); };
+
   // Queue of vertices
   std::queue<T> queue;
 

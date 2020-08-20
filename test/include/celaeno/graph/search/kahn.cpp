@@ -108,8 +108,7 @@ TEST_CASE("celaeno::graph::search::kahn"
     // }}}
 
     // Check if no nodes are missing {{{
-    auto adj = [&g](auto&& v){ return g.neighbors(v); };
-    auto bfs {bfs::run(0,adj)};
+    auto bfs {bfs::run(0,pred,succ)};
     REQUIRE(g.vertices_count() == result.size());
     // }}}
 

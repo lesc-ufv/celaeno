@@ -64,8 +64,6 @@ concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 template<SignedIntegral T, Neighbors N1, Neighbors N2, Callback C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return false;})
 {
-  auto adj = [&pred,&succ](auto&& v){ return fp::append(pred(v),succ(v)); };
-
   // Topologically sorted result
   std::vector<T> result;
 
@@ -77,7 +75,7 @@ std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return fals
 
   // Populate the deque
   auto has_pred = [&pred](auto&& v){ return ! pred(v).empty(); };
-  bfs::run(root,adj,[&has_pred,&deque](auto&& v)
+  bfs::run(root,pred,succ,[&has_pred,&deque](auto&& v)
     { if( ! has_pred(v) ){ deque.push_back(v); } return false; });
 
   while (! deque.empty() )

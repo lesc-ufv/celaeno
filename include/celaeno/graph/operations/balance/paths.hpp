@@ -65,8 +65,7 @@ template<SignedIntegral T, Neighbors P, Neighbors S, Edge L, Edge U>
 void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
 {
   // Get the pseudo vertex with the lowest value
-  auto adj = [&pred,&succ](auto&& v) { return fplus::append(pred(v),succ(v)); };
-  auto counter { fw::apply(bfs::run(root,adj), fw::sort(), fw::minimum()) };
+  auto counter { fw::apply(bfs::run(root,pred,succ), fw::sort(), fw::minimum()) };
 
   // vd = Vertex → Depth; dv = Depth  → Vertex
   auto [dv,vd] = depth::run(root,std::forward<P>(pred),std::forward<S>(succ));

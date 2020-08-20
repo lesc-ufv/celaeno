@@ -90,9 +90,10 @@ TEST_CASE("celaeno::graph::search::bfs"
     // }}}
 
     // Test bfs {{{
-    auto adj = [&g](auto&& v){ return g.neighbors(v); };
+    auto pred = [&g](auto&& u){ return g.neighbors(u); };
+    auto succ = [&g](auto&& u){ return g.neighbors(u); };
     auto start {std::chrono::system_clock::now()};
-    auto bfs {bfs::run(0,adj)};
+    auto bfs {bfs::run(0,pred,succ)};
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
     std::stringstream ss; ss << dur.count();
