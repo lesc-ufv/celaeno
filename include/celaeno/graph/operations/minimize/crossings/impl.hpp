@@ -35,12 +35,17 @@
 
 #include <map>
 #include <utility>
+#include <iterator>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/representations/incidence/barycenter.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
+
+// TODO REMOVE
+#include <fmt/core.h>
+#include <fmt/ranges.h>
 
 // namespace celaeno::graph::operations::minimize::crossings::impl {{{
 namespace celaeno::graph::operations::minimize::crossings::impl
@@ -51,6 +56,8 @@ namespace celaeno::graph::operations::minimize::crossings::impl
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
+namespace rv = ranges::views;
+namespace ra = ranges::actions;
 namespace barycenter = celaeno::graph::operations::incidence::barycenter;
 namespace count_crossings = celaeno::graph::operations::count::crossings;
 template<typename T> using ref = std::reference_wrapper<T>;
@@ -64,7 +71,7 @@ using namespace celaeno::graph::concepts;
 // Helpers {{{
 
 template<Matrix M>
-auto swap_rows_and_cols(M&& m)
+auto swap_rc(M&& m)
 {
   // Get a column by index
   auto col = [&](auto i){return fp::transform([&i](auto&& v){return v.at(i);},m);};
@@ -83,26 +90,32 @@ auto swap_rows_and_cols(M&& m)
 
 // Algorithm {{{
 
+// template<Matrix M, typename Model>
+// void phase_1(M& best, Model const& model)
+// {
+//   for (auto&& [l,m] : model)
+//   {
+//     
+//   } // for [l,m] : model
+// } // function: phase_1
+
 // @mr  → Matrix realization
 // @layer → lambda to obtain the nodes a graph layer
 // @depth → depth of the topologically sorted graph
 template<Matrices MS, Layer L>
-auto run(MS&& mr, L&& layer, size_t depth)
+auto run(MS&& mr, L&& f_layer, size_t depth)
 {
 
   // Aliases {{{
 
   // Graph layer
-  using Layer = typename std::decay_t<decltype(layer(0))>;
-
-  // Graph ref
-  using LayerRef = ref<Layer>;
+  using Layer = typename std::decay_t<decltype(f_layer(0))>;
 
   // Matrix
   using Matrix = typename std::decay_t<MS>::value_type;
 
-  // Return value
-  using Ret = std::pair<std::pair<LayerRef,LayerRef>,Matrix>;
+  // Model
+  using Model = std::multimap<Layer,Matrix>;
 
   // }}}
 
@@ -111,229 +124,191 @@ auto run(MS&& mr, L&& layer, size_t depth)
   // Get all the graph layers
   std::vector<Layer> layers
   {
-    fw::apply(fp::numbers(size_t{},depth),fw::transform([&](auto i){ return layer(i); }))
+    fw::apply(fp::numbers(size_t{},depth),fw::transform([&](auto i){ return f_layer(i); }))
   };
 
-  // Make a vector of references for the layers
-  std::vector<LayerRef> layers_ref;
-  rg::for_each(layers,[&](auto& l){ layers_ref.emplace_back(ref(l)); });
+  // Create the model
+  Model model;
 
-  // Zip layers and matrices, with two overlapping layers for each matrix
-  std::vector<Ret> ret{fp::zip(fp::overlapping_pairs(layers_ref),mr)};
+  // Populate the model with layers and matrices
+  for (auto&& e : fp::zip(layers,mr)) { model.emplace(e); }
 
-  // }}}
+  // mrc = all matrices reversed, for column barycenter
+  MS mrc {fp::transform([&](auto&& m){ return swap_rc(m); },mr)};
 
-// Helpers {{{
+  // Layers for columns start at the second position
+  layers.erase(layers.begin());
 
-  // Sort by barycenter {{{
-  auto sort_by_barycenters =
-  [](auto const& l, auto const& m, auto const& bs) -> auto
+  // Populate the model with layers and matrices
+  for (auto&& e : fp::zip(layers,mrc)) { model.emplace(e); }
+
+  // Keep the best solutions
+  Model best{model};
+
+  fmt::print("Before ------------\n");
+  for (auto&& [l,m] : model)
   {
-    return std::make_pair(
-      fw::apply(l,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd()),
-      fw::apply(m,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd())
-    );
-  }; // lamb: sort_by_barycenters
-  // }}}
+    std::vector tmp(l);
+    fmt::print("------------\n");
+    for (auto&& v : m)
+    {
+      std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
+      tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
+    } // for v : m
+    fmt::print("------------\n");
+  } // for [l,m] : model
 
-  // Reorder adjacent equal barycenters {{{
-  std::set<std::pair<i64,i64>> reordered;
-  auto reorder_equal_barycenters = [&](auto const& l, auto const& m, auto const& bs) -> auto
+
+  // Conditionally update global best
+  // Sequence row,col,row,col ... col
+  for (auto&& it{model.begin()}; it != model.end(); ++it)
   {
-    typename std::decay_t<decltype(l)> new_l{l};
-    typename std::decay_t<decltype(m)> new_m{m};
-    // Check if any adjacent barycenters are equal
-    for (decltype(bs.size()) i{}; i < bs.size()-1; ++i)
+    // Get the current matrix and layer
+    auto [l,m] = std::make_pair( it->first, it->second);
+
+    // Compute barycenters
+    auto bs {fw::apply(m
+      , fw::transform([&](auto&& v){ return barycenter::run(v); })
+    )};
+
+    // Order the layer by barycenter TODO This can be done after the
+    // cost check of sm
+    auto sl{fw::apply(l,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd())};
+
+    // Order the matrix by barycenter
+    auto sm{fw::apply(m,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd())};
+
+    // Number of crossings before and after the ordering
+    auto costb{count_crossings::impl::run(m)};
+    auto costa{count_crossings::impl::run(sm)};
+
+    // Continue to compute until cost stops decreasing
+    while (true)
     {
-      if (bs.at(i) == bs.at(i+1))
+      // Break if it stopped decreasing
+      if( costa == costb ) { break; }
+      else
       {
-        // Avoid repeatedly switching the same vertices
-        if (reordered.contains({new_l.at(i),new_l.at(i+1)}))
-        {
-          continue;
-        } // if reordered.contains({new_l.at(i),new_l.at(i+1)})
-        else
-        {
-          reordered.insert({new_l.at(i+1),new_l.at(i)});
-        } // else
+        sl = fw::apply(l,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
+        sm = fw::apply(m,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
+        costa = count_crossings::impl::run(sm);
+        costb = count_crossings::impl::run(sm);
+      } // else
+    } // while: true
 
-        // Switch the nodes
-        new_l.at(i+1) = std::exchange(new_l.at(i),new_l.at(i+1));
-        // Switch the rows
-        new_m.at(i+1) = std::exchange(new_m.at(i),new_m.at(i+1));
-      } // if bs.at(i) == bs.at(i+1)
-    } // for: i < bs.size()
-    return std::make_pair(l,m);
-  }; // lamb reorder_equal_barycenters }}}
-
-  // Accumulated cost of all matrices {{{
-
-  auto f_cost = [&]() -> i64
-  {
-    i64 cost{};
-    for (auto& [l,m] : ret)
+    // IMPORTANT Update current and next matrix and layers
+    // IMPORTANT Update global and next matrix and layers
+    // If this is the first or last element
+    if ( (it == model.begin()) || (std::distance(it,model.end()) == 1) )
     {
-      cost += count_crossings::run(m);
-    } // for [l,m] : ret
-    return cost;
-  };
-
-  // }}}
-
-// }}}
-
-
-  i64 min_cost{f_cost()};
-  i64 tries{0};
-
-  while (true)
-  {
-    // Step 1: Sort by barycenter {{{
-    auto step_1 = [&]() -> void
+      auto handle{model.extract(it)};
+      handle.key() = sl;
+      handle.mapped() = sm;
+      model.insert(std::move(handle));
+    } //  (it == model.begin()) || (std::distance(it,model.end()) == 1)
+    else // TODO Create glossary to explain this
     {
-      for (auto it{ret.begin()}; it != ret.end(); ++it)
+      // Update current layer and matrix
       {
-        // -- CASE1: The first incidence matrix
-        if (it == ret.begin())
-        {
-          // Current row cr; current matrix cm
-          auto& cr {it->first.first.get()};
-          auto& cm {it->second};
-          auto bs {fw::apply(cm,fw::transform([&](auto&& v){return barycenter::run(v);}))};
-          // Check if barycenter sorting reduces the number of crossings
-          auto result {sort_by_barycenters(cr,cm,bs)};
-          cr = result.first;
-          cm = result.second;
-          continue;
-        } // if it == ret.begin()
-
-        // -- CASE2: Previous matrix exists
-        if (it != ret.begin())
-        {
-          // -- SUBCASE1: Get the prev. matrix and its column nodes
-          auto& pc {(it-1)->first.second.get()};
-          auto& pm {(it-1)->second};
-          pm = swap_rows_and_cols(pm);
-
-          // -- SUBCASE2: Get the curr. matrix and its row nodes
-          auto& cr {it->first.first.get()};
-          auto& cm {it->second};
-
-          // -- SUBCASE3: Get the barycenter ordering for either matrices
-          auto bs {fw::apply(cm,fw::transform([&](auto&& v){return barycenter::run(v);}))};
-
-          // -- SUBCASE4: Sort the columns/rows  and matrices entries by barycenter
-          auto prev {sort_by_barycenters(pc,pm,bs)};
-          auto curr {sort_by_barycenters(cr,cm,bs)};
-
-          // -- SUBCASE5: Assign new values sorted by barycenter
-          if (
-            count_crossings::run(prev.second) <= count_crossings::run(pm) &&
-            count_crossings::run(curr.second) <= count_crossings::run(cm)
-          )
-          {
-            pc = prev.first;
-            cr = curr.first;
-            pm = prev.second;
-            cm = curr.second;
-          } // if count_crossings::run(prev.second) <= count_crossings::run(pm)
-
-          pm = swap_rows_and_cols(pm);
-
-        } // if it != ret.begin()
-
-        // -- CASE3: It is the last matrix
-        if (it == (ret.end()-1))
-        {
-          // -- SUBCASE1: Reorder by column barycenters
-          auto& cc {it->first.second.get()};
-          auto& cm {it->second};
-          // Swap rows and cols to reorder
-          cm = swap_rows_and_cols(cm);
-          // Create the barycenter vector
-          auto bs {fw::apply(cm,fw::transform([&](auto&& v){return barycenter::run(v);}))};
-          // Check if barycenter sorting reduces the number of crossings
-          auto result {sort_by_barycenters(cc,cm,bs)};
-          if (count_crossings::run(result.second) <= count_crossings::run(cm))
-          {
-            cc = result.first;
-            cm = result.second;
-          } // if count_crossings::run(result.second) <= count_crossings::run(cm)
-          // Swap back
-          cm = swap_rows_and_cols(cm);
-        } // if it == (ret.end()-1)
-      } // for: it != ret.end()
-    }; // lamb: step_1 }}}
-
-    // Step 2: Reorder rows {{{
-    auto step_2 = [&]() -> void
-    {
-      for (auto it{ret.begin()}; it != ret.end(); ++it)
+        // Extract current multimap node
+        auto handle{model.extract(it)};
+        // Update matrix layers
+        handle.key() = sl;
+        // Update matrix
+        handle.mapped() = sm;
+        // Reinstate node handle
+        model.insert(std::move(handle));
+      }
+      // If current layer and next are equal (have same vertices), update
+      if (std::distance(model.begin(), it)%2 != 0)
       {
-        // Current row cr; current matrix cm
-        auto cr { it->first.first.get() };
-        auto cm { it->second };
-        auto bs {fw::apply(cm,fw::transform([&](auto&& v){return barycenter::run(v);}))};
-        // Reorder
-        auto result {reorder_equal_barycenters(cr,cm,bs)};
-        // Assign new result
-        cr = result.first;
-        cm = result.second;
-      } // for: it != ret.end()
-    }; // lamb: Step 2 }}}
-
-    // Step 3: Reorder cols {{{
-    auto step_3 = [&]() -> void
-    {
-      for (auto it{ret.begin()}; it != ret.end(); ++it)
-      {
-        auto cc { it->first.second.get() };
-        auto cm { it->second };
-        // Swap rows and cols to reorder
-        cm = swap_rows_and_cols(cm);
-        auto bs {fw::apply(cm,fw::transform([&](auto&& v){return barycenter::run(v);}))};
-        // Reorder
-        auto result {reorder_equal_barycenters(cc,cm,bs)};
-        cc = result.first;
-        cm = result.second;
-        // Swap back
-        cm = swap_rows_and_cols(cm);
-      } // for: it != ret.end()
-    }; // lamb: Step 3 }}}
-
-    // Pipeline {{{
-    // Sort rows and cols by barycenter
-    step_1();
-    // Rearrange cols with the same barycenter
-    step_3();
-    // // Sort rows and cols by barycenter
-    step_1();
-    // // Rearrange rows with the same barycenter
-    step_2();
-    // // Sort rows and cols by barycenter
-    step_1();
-    // }}}
-
-    // Stop Conditions {{{
-
-    // -- CASE1: Stop if the cost has not reduced n times
-    i64 new_cost{f_cost()};
-
-    if (new_cost < min_cost)
-    {
-      min_cost = new_cost;
-      tries = 0;
-    } // if new_cost < min_cost
-    else
-    {
-      ++tries;
+        // Get next element
+        auto handle{model.extract(std::next(it))};
+        // Update next matrix layers
+        handle.key() = sl;
+        // Sort next matrix by current layers
+        handle.mapped() = fw::apply(handle.mapped()
+          , fw::zip(bs)
+          , fw::sort()
+          , fw::unzip()
+          , fw::snd()
+        );
+        // Reinstate node handle
+        model.insert(std::move(handle));
+      } // if std::distance(model.begin(), it)%2 != 0
     } // else
 
-    if( tries >= 100 ) { break; }
+  } // for: it != model.end()
 
-    // }}}
 
-  } // while: true
+  i64 crossings{};
+  fmt::print("After ------------\n");
+  for (auto&& [l,m] : model)
+  {
+    crossings += count_crossings::run(m);
+    std::vector tmp(l);
+    fmt::print("------------\n");
+    for (auto&& v : m)
+    {
+      std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
+      tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
+    } // for v : m
+    fmt::print("------------\n");
+  } // for [l,m] : model
+
+  fmt::print("Crossings: {}\n", crossings);
+
+  //
+  // // }}}
+  // fmt::print("Before ------------\n");
+  // for (auto&& [l,m] : model)
+  // {
+  //   std::vector tmp(l);
+  //   fmt::print("------------\n");
+  //   for (auto&& v : m)
+  //   {
+  //     std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
+  //     tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
+  //   } // for v : m
+  //   fmt::print("------------\n");
+  // } // for [l,m] : model
+  //
+  // auto prev_layer{layers.at(0)};
+  // for (auto& [l,m] : model)
+  // {
+  //   fmt::print("Level: {}\n",l);
+  //
+  //   // Calculate the barycenters
+  //   auto bs {fw::apply(m
+  //     , fw::transform([&](auto&& u){ return  barycenter::run(u); })
+  //   )};
+  //
+  //   l = fw::apply(l,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
+  //   m = fw::apply(m,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
+  //
+  //   // if (prev_layer != l)
+  //   // {
+  //   //
+  //   // } // if prev_layer != l
+  //   // fmt::print("Barycenter: {}\n",bs);
+  //   // fmt::print("Sorted vts: {}\n",l_sorted);
+  //   // for (auto&& v : m)
+  //   // {
+  //   // } // for v : m
+  // } // for [l,m] : model
+  //
+  // fmt::print("After ------------\n");
+  // for (auto&& [l,m] : model)
+  // {
+  //   std::vector tmp(l);
+  //   fmt::print("------------\n");
+  //   for (auto&& v : m)
+  //   {
+  //     std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
+  //     tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
+  //   } // for v : m
+  //   fmt::print("------------\n");
+  // } // for [l,m] : model
 
   return layers;
 
