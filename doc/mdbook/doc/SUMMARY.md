@@ -34,9 +34,9 @@
 
 # Operations
 
-- [Path Balancing](./graph/operations/balance/balance.md)
-  - [API](./graph/operations/balance/api.md)
-  - [Tutorial](./graph/operations/balance/tutorial.md)
+- [Path Balancing](./graph/operations/balance/paths/balance.md)
+  - [API](./graph/operations/balance/paths/api.md)
+  - [Tutorial](./graph/operations/balance/paths/tutorial.md)
 
 # Representations
 
