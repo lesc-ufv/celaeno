@@ -38,6 +38,10 @@
   - [API](./graph/operations/balance/paths/api.md)
   - [Tutorial](./graph/operations/balance/paths/tutorial.md)
 
+- [Count Crossings](./graph/operations/count/crossings/count.md)
+  - [API](./graph/operations/count/crossings/api.md)
+  - [Tutorial](./graph/operations/count/crossings/tutorial.md)
+
 # Representations
 
 - [Incidence Matrix](./graph/representations/incidence/incidence.md)

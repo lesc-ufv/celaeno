@@ -10,14 +10,12 @@
 #include <fmt/ranges.h>
 #include <taygete/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
-#include <celaeno/graph/operations/balance/paths.hpp>
-#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
 
 
 // namespaces {{{
 namespace graph = taygete::graph;
-namespace depth = celaeno::graph::views::depth;
-namespace balance = celaeno::graph::operations::balance::paths;
+namespace count = celaeno::graph::operations::count::crossings;
 // }}}
 
 int main()
@@ -25,51 +23,20 @@ int main()
   // Graph {{{
   graph::Graph<i64> g
   {
-    {1,5},{2,4},{3,7},{6,11},
+    {1,5},{2,4},{3,4},{6,8},
     {4,7},{5,7},{5,8},{5,9},
     {7,12},{8,10},{8,11},
   };
   // }}}
 
-  // Required behaviors {{{
-  auto p = [&g](auto&& u){ return g.predecessors(u); };
-  auto s = [&g](auto&& u){ return g.successors(u); };
-  auto l = [&g](auto&& uv) -> void { g.emplace(uv); };
-  auto u = [&g](auto&& uv) -> void { g.erase(uv); };
+  // Obtain predecessor and successor nodes {{{
+  auto p = [&g](auto&& v){ return g.predecessors(v); };
+  auto s = [&g](auto&& v){ return g.successors(v); };
   // }}}
 
-  // Create a topological view to analyse graph {{{
-  auto [layers,_] = depth::run(1,p,s);
+  // Print to stdout {{{
+  fmt::print("{}\n",count::run(1,p,s));
   // }}}
-
-  // Print before {{{
-  fmt::print("Before balancing: \n");
-  i32 prev{0};
-  for (auto&& l : layers)
-  {
-    fmt::print("{} ",l.second);
-    if( l.first > prev ){ prev = l.first; fmt::print("\n"); }
-  } // for l : layers }}}
-  fmt::print("\n-------\n");
-
-
-  // Run algorithm {{{
-  balance::run(1,p,s,l,u);
-  // }}}
-
-  // Create a topological view to analyse graph {{{
-  layers = depth::run(1,p,s).first;
-  // }}}
-
-  // Print to after {{{
-  fmt::print("After balancing: \n");
-  prev = 0;
-  for (auto&& l : layers)
-  {
-    fmt::print("{} ",l.second);
-    if( l.first > prev ){ prev = l.first; fmt::print("\n"); }
-  } // for l : layers }}}
-  fmt::print("\n");
 
   return EXIT_SUCCESS;
 } // main
@@ -77,17 +44,7 @@ int main()
 
 Output:
 ```shell
-Before balancing: 
-1 3 2 6 5 
-4 8 
-9 7 10 
-11 12 
--------
-After balancing: 
-1 3 2 6 5 
-0 4 -1 8 
-9 7 -2 10 
-12 11
+5
 ```
 
 <!-- vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et : -->
