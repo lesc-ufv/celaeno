@@ -60,13 +60,13 @@ using namespace celaeno::graph::concepts;
 
 // run {{{
 template<SignedIntegral T, Neighbors N1, Neighbors N2, Edge E1, Edge E2>
-decltype(auto) run(T root, N1&& p, N2&& s, E1&& u, E2&& l)
+decltype(auto) run(T root, N1&& p, N2&& s, E1&& l, E2&& u)
 {
   auto [lv,_] {proximity::run(root, std::forward<N1>(p), std::forward<N2>(s))};
 
   balance::run(root,
-      std::forward<N1>(p), std::forward<N2>(s),
-      std::forward<E1>(u), std::forward<E2>(l)
+    std::forward<N1>(p), std::forward<N2>(s),
+    std::forward<E1>(l), std::forward<E2>(u)
   );
 
   auto layer = [&lv](i64 idx)

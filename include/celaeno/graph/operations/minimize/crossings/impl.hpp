@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : impl
@@ -90,12 +90,12 @@ auto swap_rc(M&& m)
 
 // Algorithm {{{
 
-// template<Matrix M, typename Model>
+// template<Matrix Model>
 // void phase_1(M& best, Model const& model)
 // {
 //   for (auto&& [l,m] : model)
 //   {
-//     
+//
 //   } // for [l,m] : model
 // } // function: phase_1
 
@@ -119,8 +119,6 @@ auto run(MS&& mr, L&& f_layer, size_t depth)
 
   // }}}
 
-  // Variables {{{
-
   // Get all the graph layers
   std::vector<Layer> layers
   {
@@ -142,175 +140,112 @@ auto run(MS&& mr, L&& f_layer, size_t depth)
   // Populate the model with layers and matrices
   for (auto&& e : fp::zip(layers,mrc)) { model.emplace(e); }
 
+  // No need to use layers anymore, clear to save memory
+  layers.clear();
+
   // Keep the best solutions
   Model best{model};
 
-  fmt::print("Before ------------\n");
-  for (auto&& [l,m] : model)
+  // @ itm: Iterator for the current model
+  // @ itb: Iterator for the best model
+  // @ best model is the one which holds the best incidence matrices
+  // @ itm,itb: Starts in a layer of a row, therefore, each iteration
+  // intersperse between layers of rows and columns, with this observation, it
+  // is possible to know if an iterator is of a row or col layer, with the usage
+  // of the modulus operator, e.g, ( (std::distance(model.begin(), itm)%2)!=0 ),
+  // when the condition is true, it is always a column.
+  for (auto&& itm{model.begin()}, itb{best.begin()};
+      itm != model.end();
+      ++itm, ++itb
+  )
   {
-    std::vector tmp(l);
-    fmt::print("------------\n");
-    for (auto&& v : m)
-    {
-      std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
-      tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
-    } // for v : m
-    fmt::print("------------\n");
-  } // for [l,m] : model
+    // Current and best models pairs of layers and matrices
+    auto [lm,mm] = std::make_pair( itm->first, itm->second);
+    auto [lb,mb] = std::make_pair( itb->first, itb->second);
 
-
-  // Conditionally update global best
-  // Sequence row,col,row,col ... col
-  for (auto&& it{model.begin()}; it != model.end(); ++it)
-  {
-    // Get the current matrix and layer
-    auto [l,m] = std::make_pair( it->first, it->second);
-
-    // Compute barycenters
-    auto bs {fw::apply(m
+    // Compute the current and best matrices
+    auto bsm {fw::apply(mm
       , fw::transform([&](auto&& v){ return barycenter::run(v); })
     )};
 
-    // Order the layer by barycenter TODO This can be done after the
-    // cost check of sm
-    auto sl{fw::apply(l,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd())};
+    auto bsb {fw::apply(mb
+      , fw::transform([&](auto&& v){ return barycenter::run(v); })
+    )};
 
-    // Order the matrix by barycenter
-    auto sm{fw::apply(m,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd())};
+    // Order the layers with respect to the barycenter
+    auto slm{fw::apply(lm,fw::zip(bsm),fw::sort(),fw::unzip(),fw::snd())};
+    auto slb{fw::apply(lb,fw::zip(bsb),fw::sort(),fw::unzip(),fw::snd())};
 
-    // Number of crossings before and after the ordering
-    auto costb{count_crossings::impl::run(m)};
-    auto costa{count_crossings::impl::run(sm)};
+    // Order the current and matrices with respect to barycenter
+    auto smm{fw::apply(mm,fw::zip(bsm),fw::sort(),fw::unzip(),fw::snd())};
+    auto smb{fw::apply(mb,fw::zip(bsb),fw::sort(),fw::unzip(),fw::snd())};
 
-    // Continue to compute until cost stops decreasing
-    while (true)
+    // Compute the number of crossings for the current and best sorted matrices
+    auto cost_smm{count_crossings::impl::run(smm)};
+    auto cost_smb{count_crossings::impl::run(smb)};
+
+    // Helper to update models
+    auto update_model = [](auto& m, auto&& it, auto&& sl, auto&& sm) -> void
     {
-      // Break if it stopped decreasing
-      if( costa == costb ) { break; }
-      else
-      {
-        sl = fw::apply(l,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
-        sm = fw::apply(m,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
-        costa = count_crossings::impl::run(sm);
-        costb = count_crossings::impl::run(sm);
-      } // else
-    } // while: true
+      // Extract current multimap node
+      auto handle{m.extract(it)};
+      // Update layers ordering
+      handle.key() = sl;
+      // Update matrix
+      handle.mapped() = sm;
+      // Reinstate node handle
+      m.insert(std::move(handle));
+    };
 
     // IMPORTANT Update current and next matrix and layers
     // IMPORTANT Update global and next matrix and layers
     // If this is the first or last element
-    if ( (it == model.begin()) || (std::distance(it,model.end()) == 1) )
+    if ( (itm == model.begin()) || (std::distance(itm,model.end()) == 1) )
     {
-      auto handle{model.extract(it)};
-      handle.key() = sl;
-      handle.mapped() = sm;
-      model.insert(std::move(handle));
-    } //  (it == model.begin()) || (std::distance(it,model.end()) == 1)
+      update_model(model, itm, slm, smm);
+      // Update current best
+      if (cost_smb <= cost_smm)
+      {
+        update_model(best, itb, slb, smb);
+      } // if cost_smb < cost_smm
+    } //  (itm == model.begin()) || (std::distance(itm,model.end()) == 1)
     else // TODO Create glossary to explain this
     {
-      // Update current layer and matrix
       {
-        // Extract current multimap node
-        auto handle{model.extract(it)};
-        // Update matrix layers
-        handle.key() = sl;
-        // Update matrix
-        handle.mapped() = sm;
-        // Reinstate node handle
-        model.insert(std::move(handle));
+        update_model(model, itm, slm, smm);
+        // Update current best
+        if (cost_smb <= cost_smm)
+        {
+          update_model(best, itb, slb, smb);
+        } // if cost_smb < cost_smm
       }
-      // If current layer and next are equal (have same vertices), update
-      if (std::distance(model.begin(), it)%2 != 0)
+      // If current layer and next are equal (have same vertices)
+      if ((std::distance(model.begin(), itm)%2) != 0)
       {
-        // Get next element
-        auto handle{model.extract(std::next(it))};
-        // Update next matrix layers
-        handle.key() = sl;
-        // Sort next matrix by current layers
-        handle.mapped() = fw::apply(handle.mapped()
-          , fw::zip(bs)
-          , fw::sort()
-          , fw::unzip()
-          , fw::snd()
-        );
-        // Reinstate node handle
-        model.insert(std::move(handle));
-      } // if std::distance(model.begin(), it)%2 != 0
+        auto update_next_model =
+          [](auto& _model, auto&& _it, auto&& _sl, auto&& _bs)
+        {
+          // Get the next model
+          auto next_model{std::next(_it)};
+          // Get the handle for the element
+          auto handle{_model.extract(next_model)};
+          // Update model layers
+          handle.key() = _sl;
+          // Sort model matrix by current layers
+          auto& mpd{handle.mapped()};
+          mpd = fw::apply(mpd,fw::zip(_bs),fw::sort(),fw::unzip(),fw::snd());
+          // Reinstate node handle
+          _model.insert(std::move(handle));
+        };
+        // Update current and best models
+        update_next_model(model,itm,slm,bsm);
+        update_next_model(best,itb,slb,bsb);
+      } // if std::distance(model.begin(), itm)%2 != 0
     } // else
 
-  } // for: it != model.end()
+  } // for: itm != model.end()
 
-
-  i64 crossings{};
-  fmt::print("After ------------\n");
-  for (auto&& [l,m] : model)
-  {
-    crossings += count_crossings::run(m);
-    std::vector tmp(l);
-    fmt::print("------------\n");
-    for (auto&& v : m)
-    {
-      std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
-      tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
-    } // for v : m
-    fmt::print("------------\n");
-  } // for [l,m] : model
-
-  fmt::print("Crossings: {}\n", crossings);
-
-  //
-  // // }}}
-  // fmt::print("Before ------------\n");
-  // for (auto&& [l,m] : model)
-  // {
-  //   std::vector tmp(l);
-  //   fmt::print("------------\n");
-  //   for (auto&& v : m)
-  //   {
-  //     std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
-  //     tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
-  //   } // for v : m
-  //   fmt::print("------------\n");
-  // } // for [l,m] : model
-  //
-  // auto prev_layer{layers.at(0)};
-  // for (auto& [l,m] : model)
-  // {
-  //   fmt::print("Level: {}\n",l);
-  //
-  //   // Calculate the barycenters
-  //   auto bs {fw::apply(m
-  //     , fw::transform([&](auto&& u){ return  barycenter::run(u); })
-  //   )};
-  //
-  //   l = fw::apply(l,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
-  //   m = fw::apply(m,fw::zip(bs),fw::sort(),fw::unzip(),fw::snd());
-  //
-  //   // if (prev_layer != l)
-  //   // {
-  //   //
-  //   // } // if prev_layer != l
-  //   // fmt::print("Barycenter: {}\n",bs);
-  //   // fmt::print("Sorted vts: {}\n",l_sorted);
-  //   // for (auto&& v : m)
-  //   // {
-  //   // } // for v : m
-  // } // for [l,m] : model
-  //
-  // fmt::print("After ------------\n");
-  // for (auto&& [l,m] : model)
-  // {
-  //   std::vector tmp(l);
-  //   fmt::print("------------\n");
-  //   for (auto&& v : m)
-  //   {
-  //     std::cout << tmp.front() << " : " << rv::all(v) << std::endl;
-  //     tmp |= ra::reverse; tmp.pop_back(); tmp |= ra::reverse;
-  //   } // for v : m
-  //   fmt::print("------------\n");
-  // } // for [l,m] : model
-
-  return layers;
+  return fp::get_map_keys(best);
 
 } // function: run
 

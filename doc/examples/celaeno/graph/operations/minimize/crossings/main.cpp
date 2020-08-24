@@ -48,7 +48,7 @@ int main()
   // Graph {{{
   graph::Graph<i64> g
   {
-    {1,5},{2,4},{3,4},{6,9},
+    {1,5},{2,4},{3,4},{6,8},
     {4,7},{5,7},{5,8},{5,9},
     {7,12},{8,10},{8,11},
   };
@@ -68,11 +68,11 @@ int main()
   auto layers {minimize::run(1,p,s,l,u)};
   // }}}
 
-  // Print ordering {{{
-  for (auto&& l : layers)
-  {
-    fmt::print("{}\n",l);
-  } // for l : layers }}}
+  // // Print ordering {{{
+  // for (auto&& l : layers)
+  // {
+  //   fmt::print("{}\n",l);
+  // } // for l : layers }}}
 
   return EXIT_SUCCESS;
 } // main
