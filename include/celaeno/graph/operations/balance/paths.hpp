@@ -67,6 +67,9 @@ void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
   // Get the pseudo vertex with the lowest value
   auto counter { fw::apply(bfs::run(root,pred,succ), fw::sort(), fw::minimum()) };
 
+  // If the value greater than 0, set it to 0 as its first value is a pre-decrement
+  if(counter > 0) { counter = 0; }
+
   // vd = Vertex → Depth; dv = Depth  → Vertex
   auto [dv,vd] = depth::run(root,std::forward<P>(pred),std::forward<S>(succ));
 
