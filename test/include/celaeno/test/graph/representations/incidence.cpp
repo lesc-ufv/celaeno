@@ -53,7 +53,6 @@ void compare(C1&& c1, C2&& c2)
 // Test case celaeno::graph::representations::incidence {{{
 
 TEST_CASE("celaeno::graph::representations::incidence"
-  * doctest::description("Matrix Realization Test")
   * doctest::timeout(100.0f))
 {
   // Used graph available at:
@@ -83,36 +82,22 @@ TEST_CASE("celaeno::graph::representations::incidence"
   // Subcase: Even number of layers {{{
   SUBCASE("Even number of layers")
   {
-    graph::Graph<i32> g;
-    g.emplace(
+    graph::Graph<i32> g
+    {
       // Layer 1 → 2
-      std::make_pair(1,3),
-      std::make_pair(1,4),
-      std::make_pair(1,5),
-      std::make_pair(1,6),
-      std::make_pair(2,3),
-      std::make_pair(2,6),
+      { 1,3 },{ 1,4 },{ 1,5 },{ 1,6 },{ 2,3 },{ 2,6 },
       // Layer 2 → 3
-      std::make_pair(3,7),
-      std::make_pair(5,7),
-      std::make_pair(5,10),
-      std::make_pair(4,8),
-      std::make_pair(4,9),
-      std::make_pair(4,10),
+      { 3,7 },{ 5,7 },{ 5,10 },{ 4,8 },{ 4,9 },{ 4,10 },
       // Layer 3 → 4
-      std::make_pair(7,11),
-      std::make_pair(9,11),
-      std::make_pair(9,13),
-      std::make_pair(10,11),
-      std::make_pair(10,12)
-  );
+      { 7,11 },{ 9,11 },{ 9,13 },{ 10,11 },{ 10,12 }
+    };
 
 
     // Helpers
-    auto pred = [&g](auto&& u){ return g.predecessors(u); };
-    auto succ = [&g](auto&& u){ return g.successors(u); };
+    auto p = [&g](auto&& u){ return g.predecessors(u); };
+    auto s = [&g](auto&& u){ return g.successors(u); };
     // Create matrix realization
-    auto matrices {incidence::run(1,pred,succ)};
+    auto matrices {incidence::run(1,p,s)};
 
     // Test against expected result
     REQUIRE(matrices.size() == 3);
@@ -126,29 +111,19 @@ TEST_CASE("celaeno::graph::representations::incidence"
 
   SUBCASE("Odd number of layers")
   {
-    graph::Graph<i64> g;
-    g.emplace(
+    graph::Graph<i64> g
+    {
       // Layer 1 → 2
-      std::make_pair(1,3),
-      std::make_pair(1,4),
-      std::make_pair(1,5),
-      std::make_pair(1,6),
-      std::make_pair(2,3),
-      std::make_pair(2,6),
+      { 1,3 },{ 1,4 },{ 1,5 },{ 1,6 },{ 2,3 },{ 2,6 },
       // Layer 2 → 3
-      std::make_pair(3,7),
-      std::make_pair(5,7),
-      std::make_pair(5,10),
-      std::make_pair(4,8),
-      std::make_pair(4,9),
-      std::make_pair(4,10)
-    );
+      { 3,7 },{ 5,7 },{ 5,10 },{ 4,8 },{ 4,9 },{ 4,10 }
+    };
 
     // Helpers
-    auto pred = [&g](auto&& u){ return g.predecessors(u); };
-    auto succ = [&g](auto&& u){ return g.successors(u); };
+    auto p = [&g](auto&& u){ return g.predecessors(u); };
+    auto s = [&g](auto&& u){ return g.successors(u); };
     // Create matrix realization
-    auto matrices {incidence::run(1, pred, succ)};
+    auto matrices {incidence::run(1, p, s)};
 
     // TESTS
     REQUIRE(matrices.size() == 2);
