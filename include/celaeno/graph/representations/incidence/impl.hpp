@@ -79,13 +79,13 @@ auto run(L&& layer, A&& adjacent, u64 height)
     // check if edge exists for each edge of layer 2
     // If edge exists, assign 1 to matrix
     // If edge does not exist, do nothing
-    for (auto&& v : l1e)
+    for (auto&& u : l1e)
     {
-      for (auto&& u : l2e)
+      for (auto&& v : l2e)
       {
-        if( adjacent(v.second,u.second) )
+        if( adjacent(u.second,v.second) )
         {
-          m.at(v.first).at(u.first) = 1;
+          m.at(u.first).at(v.first) = 1;
         }
       } // for l2e
     } // for l1e

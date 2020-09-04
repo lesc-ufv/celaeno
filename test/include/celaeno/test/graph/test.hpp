@@ -1,8 +1,8 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : concepts
-// @created     : sábado ago 15, 2020 15:12:43 -03
+// @file        : test
+// @created     : sexta set 04, 2020 02:30:56 -03
 //
 // BSD 2-Clause License
 
@@ -33,39 +33,50 @@
 #pragma once
 
 #include <utility>
-#include <concepts>
-#include <celaeno/concepts.hpp>
+#include <maia/circuits/synth-91.hpp>
 
-// namespace celaeno::graph::concepts {{{
-namespace celaeno::graph::concepts
+namespace celaeno::graph::test
 {
 
-// Using namespaces {{{
-
-using namespace celaeno::concepts;
-
+// namespaces {{{
+namespace circ = maia::circuits;
 // }}}
 
-// Concepts {{{
-
 template<typename T>
-concept Vertex = requires(T t){ { t(int64_t{}) } -> std::same_as<std::void_t<>>; };
-
-template<typename T>
-concept Edge = requires(T t)
+void run(T&& test)
 {
-  { t(std::pair<int64_t,int64_t>{}) } -> std::same_as<std::void_t<>>;
-};
+  // Forwarding test folding lambda {{{
+  auto tests = [&]<typename... S>(S&&... strs) { (test(strs), ...); };
+  // }}}
 
-template<typename T>
-concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
+  // LGSynth 91 tests {{{
+  tests(
+    circ::synth_91::alu2,
+    circ::synth_91::alu4,
+    circ::synth_91::dalu,
+    circ::synth_91::apex6,
+    circ::synth_91::apex7,
+    circ::synth_91::b1,
+    circ::synth_91::c8,
+    circ::synth_91::cc,
+    circ::synth_91::cht,
+    circ::synth_91::cm138a,
+    circ::synth_91::cm150a,
+    circ::synth_91::cm151a,
+    circ::synth_91::cm162a,
+    circ::synth_91::cm163a,
+    circ::synth_91::cm42a,
+    circ::synth_91::cm82a,
+    circ::synth_91::cm85a,
+    circ::synth_91::cmb,
+    circ::synth_91::comp,
+    circ::synth_91::cordic,
+    circ::synth_91::cu,
+    circ::synth_91::count,
+    circ::synth_91::decod,
+    circ::synth_91::my_adder
+  );
+} // function: run
 
-template<typename T>
-concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
-
-template<typename T>
-concept Layer = requires(T t) { { t(i64{}) } -> Iterable; };
-
-// }}}
-
-} // namespace celaeno::graph::concepts }}}
+  // }}}
+} // namespace celaeno::graph::test

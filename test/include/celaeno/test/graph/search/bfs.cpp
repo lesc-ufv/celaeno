@@ -32,52 +32,52 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <celaeno/graph/search/bfs.hpp>
-#include <celaeno/aliases.hpp>
+
+#include <fplus/fplus.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
-#include <fplus/fplus.hpp>
-#include <maia/circuits/iscas.hpp>
-#include <maia/circuits/synth-91.hpp>
-#include <string_view>
+#include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/test/test.hpp>
+#include <celaeno/test/graph/test.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 
 // namespace celaeno::graph::search::bfs::test {{{
 
 namespace celaeno::graph::search::bfs::test
 {
 
-// Namespaces {{{
-namespace bfs = celaeno::graph::search::bfs;
-namespace cir = maia::circuits;
-namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader::verilog;
-namespace fw = fplus::fwd;
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept String = requires(T t){ std::string{t}; };
+// using namespaces {{{
+using namespace celaeno::concepts;
+// }}}
+
+// Namespaces {{{
+namespace fw = fplus::fwd;
+namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
+namespace bfs = celaeno::graph::search::bfs;
 // }}}
 
 // Test Case: celaeno::graph::search::bfs {{{
 TEST_CASE("celaeno::graph::search::bfs"
-  * doctest::description("Breadth-First Search test")
   * doctest::timeout(10.0f)
 )
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::search::bfs"
-      , "logs/celaeno/graph/search/bfs.csv", true)};
-  spdlog::set_default_logger(logger);
-  spdlog::set_pattern("%v");
-  spdlog::info("date,time,vertices,edges,runtime");
-  spdlog::set_pattern("%d/%m/%Y,%T,%v");
+  celaeno::test::logger_new({
+      .name="celaeno::graph::search::bfs",
+      .path="logs/celaeno/graph/search/bfs.csv",
+      .info="date,time,vertices,edges,runtime",
+      .pattern="%d/%m/%Y,%T,%v"
+  });
   // }}}
 
   // test lambda {{{
-  auto test = [&]<String S>(S&& str)
+  auto test = [&]<String S>(S const& str)
   {
     //  Read graph {{{
     graph::Graph<i64> g;
@@ -85,66 +85,33 @@ TEST_CASE("celaeno::graph::search::bfs"
     reader::Reader{str,emplace};
     // }}}
 
-    // Test if vertices_count > 0 {{{
-    REQUIRE(g.vertices_count() > 0);
+    // vertices_count > 0 {{{
+    assertm(g.vertices_count() > 0, "Empty input graph");
     // }}}
 
     // Test bfs {{{
-    auto pred = [&g](auto&& u){ return g.neighbors(u); };
-    auto succ = [&g](auto&& u){ return g.neighbors(u); };
-    auto start {std::chrono::system_clock::now()};
-    auto bfs {bfs::run(0,pred,succ)};
-    auto end {std::chrono::system_clock::now()};
-    std::chrono::duration<f64> dur {end-start};
-    std::stringstream ss; ss << dur.count();
+    auto p = [&g](auto&& u){ return g.predecessors(u); };
+    auto s = [&g](auto&& u){ return g.successors(u); };
+    auto [result,runtime] = celaeno::test::runtime([&](){ return bfs::run(0,p,s); });
     // }}}
 
-    // Test vertices count with bfs size {{{
-    REQUIRE(g.vertices_count() == bfs.size());
-    // }}}
-
-    // Test bfs vector size  {{{
-    REQUIRE(fw::apply(bfs,fw::unique()).size() == bfs.size());
-    // }}}
+    celaeno::test::check(
+      // Check vertices count with bfs size
+      (g.vertices_count() == result.size()),
+      // Check bfs vector size
+      fw::apply(result,fw::unique()).size() == result.size()
+    );
 
     // Log results {{{
-    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
     // }}}
 
   }; // lamb: test }}}
 
-  // Forwarding test folding lambda {{{
-  auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
-  // }}}
-
-  // LGSynth 91 tests {{{
-  tests(cir::synth_91::alu2,
-    cir::synth_91::alu4,
-    cir::synth_91::dalu,
-    cir::synth_91::apex6,
-    cir::synth_91::apex7,
-    cir::synth_91::b1,
-    cir::synth_91::c8,
-    cir::synth_91::cc,
-    cir::synth_91::cht,
-    cir::synth_91::cm138a,
-    cir::synth_91::cm150a,
-    cir::synth_91::cm151a,
-    cir::synth_91::cm162a,
-    cir::synth_91::cm163a,
-    cir::synth_91::cm42a,
-    cir::synth_91::cm82a,
-    cir::synth_91::cm85a,
-    cir::synth_91::cmb,
-    cir::synth_91::comp,
-    cir::synth_91::cordic,
-    cir::synth_91::cu,
-    cir::synth_91::count,
-    cir::synth_91::decod,
-    cir::synth_91::my_adder
-  );
+  // Perform tests {{{
+  celaeno::graph::test::run(test);
   // }}}
 
 } // TEST_CASE: celaeno::graph::search::bfs }}}
 
-} // namespace celaeno::graph::bfs::test }}}
+} // namespace celaeno::graph::search::bfs::test }}}

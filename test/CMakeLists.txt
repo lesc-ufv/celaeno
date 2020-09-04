@@ -47,7 +47,7 @@ function(add_test target)
       -Wpedantic
       -O0
       -Wshadow
-      -fconcepts-diagnostics-depth=2
+      # -fconcepts-diagnostics-depth=2
       -Weffc++
     )
   target_link_libraries(${target}
@@ -58,29 +58,33 @@ function(add_test target)
       taygete::taygete
       maia::maia
   )
+  target_include_directories(${target}
+    PRIVATE
+      $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/test/include>
+  )
 endfunction(add_test)
 
 # Tests
 
 ## Search
-add_test(g_search_bfs "include/celaeno/graph/search/bfs.cpp")
-add_test(g_search_dfs "include/celaeno/graph/search/dfs.cpp")
-add_test(g_search_kahn "include/celaeno/graph/search/kahn.cpp")
+add_test(g_search_bfs "include/celaeno/test/graph/search/bfs.cpp")
+add_test(g_search_dfs "include/celaeno/test/graph/search/dfs.cpp")
+add_test(g_search_kahn "include/celaeno/test/graph/search/kahn.cpp")
 
 ## Views
-add_test(g_views_depth "include/celaeno/graph/views/depth.cpp")
-add_test(g_views_proximity "include/celaeno/graph/views/proximity.cpp")
+add_test(g_views_depth "include/celaeno/test/graph/views/depth.cpp")
+add_test(g_views_proximity "include/celaeno/test/graph/views/proximity.cpp")
 
 ## Operations
 ### Query
-add_test(g_operations_count_crossings "include/celaeno/graph/operations/count/crossings.cpp")
+add_test(g_operations_count_crossings "include/celaeno/test/graph/operations/count/crossings.cpp")
 add_test(g_operations_incidence_barycenter
-    "include/celaeno/graph/representations/incidence/barycenter.cpp")
+    "include/celaeno/test/graph/representations/incidence/barycenter.cpp")
 ### Modifiers
-add_test(g_operations_balance_paths "include/celaeno/graph/operations/balance/paths.cpp")
-add_test(g_operations_minimize_crossings "include/celaeno/graph/operations/minimize/crossings.cpp")
+add_test(g_operations_balance_paths "include/celaeno/test/graph/operations/balance/paths.cpp")
+# add_test(g_operations_minimize_crossings "include/celaeno/graph/operations/minimize/crossings.cpp")
 
 ## Representations
-add_test(g_representations_incidence "include/celaeno/graph/representations/incidence.cpp")
+add_test(g_representations_incidence "include/celaeno/test/graph/representations/incidence.cpp")
 
 #add_test(test_a_star "include/celaeno/graph/a-star.cpp")

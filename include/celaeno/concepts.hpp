@@ -35,6 +35,7 @@
 #include <concepts>
 #include <type_traits>
 #include <iterator>
+#include <string>
 #include <celaeno/aliases.hpp>
 
 // namespace celaeno::concepts {{{
@@ -48,62 +49,75 @@ template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template<typename T>
+concept Float = std::is_floating_point_v<T>;
+
+template<typename T>
+concept String =
+requires(T t)
+{
+  { std::string{t} } -> std::same_as<std::string>;
+};
+
+template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
 
 template<typename T>
+concept ForwardIterator = std::forward_iterator<T>;
+
+template<typename T>
 concept Arithmetic =
-  requires(T t)
-  {
-    { t+t } -> std::same_as<T>;
-    { t-t } -> std::same_as<T>;
-    { t*t } -> std::same_as<T>;
-    { t/t } -> std::same_as<T>;
-  };
+requires(T t)
+{
+  { t+t } -> std::same_as<T>;
+  { t-t } -> std::same_as<T>;
+  { t*t } -> std::same_as<T>;
+  { t/t } -> std::same_as<T>;
+};
 
 template<typename V>
 concept Vector =
-  Iterable<V>
+Iterable<V>
 &&
-  requires(V v)
-  {
-    {v.at(int32_t{})};
+requires(V v)
+{
+  {v.at(int32_t{})};
 
-    {Arithmetic<decltype( v.at(int32_t{}) )>};
-  };
+  {Arithmetic<decltype( v.at(int32_t{}) )>};
+};
 
 template<typename M>
 concept Matrix =
-  Iterable<M>
+Iterable<M>
 &&
-  requires(M m)
-  {
-    {m.at(i32{})};
+requires(M m)
+{
+  {m.at(i32{})};
 
-    {m.at(i32{}).at(i32{})};
+  {m.at(i32{}).at(i32{})};
 
-    {Iterable<decltype(m.at(i32{}))>};
+  {Iterable<decltype(m.at(i32{}))>};
 
-    {Arithmetic<decltype( m.at(i32{}).at(i32{}) )>};
-  };
+  {Arithmetic<decltype( m.at(i32{}).at(i32{}) )>};
+};
 
 template<typename MS>
 concept Matrices =
-  Iterable<MS>
+Iterable<MS>
 &&
-  requires(MS ms)
-  {
-    {ms.at(i32{})};
+requires(MS ms)
+{
+  {ms.at(i32{})};
 
-    {ms.at(i32{}).at(i32{})};
+  {ms.at(i32{}).at(i32{})};
 
-    {ms.at(i32{}).at(i32{}).at(i32{})};
+  {ms.at(i32{}).at(i32{}).at(i32{})};
 
-    {Iterable<decltype(ms.at(i32{}))>};
+  {Iterable<decltype(ms.at(i32{}))>};
 
-    {Arithmetic<decltype( ms.at(i32{}).at(i32{}) )>};
+  {Arithmetic<decltype( ms.at(i32{}).at(i32{}) )>};
 
-    {Arithmetic<decltype( ms.at(i32{}).at(i32{}).at(i32{}) )>};
-  };
+  {Arithmetic<decltype( ms.at(i32{}).at(i32{}).at(i32{}) )>};
+};
 
 
 } // namespace celaeno::concepts }}}
