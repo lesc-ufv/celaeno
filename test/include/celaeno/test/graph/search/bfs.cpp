@@ -79,7 +79,7 @@ TEST_CASE("celaeno::graph::search::bfs"
   // test lambda {{{
   auto test = [&]<String S>(S const& str)
   {
-    //  Read graph {{{
+    // Read graph {{{
     graph::Graph<i64> g;
     auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
     reader::Reader{str,emplace};

@@ -32,36 +32,36 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <iostream>
+
 #include <fplus/fplus.hpp>
-#include <range/v3/all.hpp>
+
+#include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/test/test.hpp>
+#include <celaeno/test/graph/test.hpp>
+#include <celaeno/graph/views/proximity.hpp>
+
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
-#include <maia/circuits/synth-91.hpp>
-#include <celaeno/aliases.hpp>
-#include <celaeno/graph/views/proximity.hpp>
-#include <maia/circuits/synth-91.hpp>
 
 // namespace celaeno::graph::view::proximity::test {{{
 
 namespace celaeno::graph::view::proximity::test
 {
-// Namespaces {{{
-namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader::verilog;
-namespace circuit = maia::circuits;
-namespace proximity = celaeno::graph::views::proximity;
-namespace cir = maia::circuits;
-namespace fp = fplus;
-namespace fw = fplus::fwd;
-namespace rv = ranges::views;
+
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept String = requires(T t){ std::string{t}; };
+// using namespaces {{{
+using namespace celaeno::concepts;
+// }}}
+
+// Namespaces {{{
+namespace fw = fplus::fwd;
+namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
+namespace proximity = celaeno::graph::views::proximity;
 // }}}
 
 TEST_CASE("celaeno::graph::view::proximity"
@@ -71,13 +71,12 @@ TEST_CASE("celaeno::graph::view::proximity"
 {
 
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::views::proximity",
-      "logs/celaeno/graph/views/proximity.csv", true)};
-  spdlog::set_default_logger(logger);
-  spdlog::set_pattern("%v");
-  spdlog::info("date,time,vertices,edges,runtime");
-  spdlog::set_pattern("%d/%m/%Y,%T,%v");
-
+  celaeno::test::logger_new({
+      .name="graph::views::proximity",
+      .path="logs/celaeno/graph/views/proximity.csv",
+      .info="date,time,vertices,edges,runtime",
+      .pattern="%d/%m/%Y,%T,%v"
+  });
   // }}}
 
   // test_lambda {{{
@@ -92,11 +91,8 @@ TEST_CASE("celaeno::graph::view::proximity"
     // Execute proximity view algorithm {{{
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto start {std::chrono::system_clock::now()};
-    auto [dv,vd] {proximity::run(0, pred, succ)};
-    auto end {std::chrono::system_clock::now()};
-    std::chrono::duration<f64> dur {end-start};
-    std::stringstream ss; ss << dur.count();
+    auto [result,runtime] = celaeno::test::runtime([&](){ return proximity::run(0, pred, succ); });
+    auto [dv,vd] = std::make_pair(result.first, result.second);
     // }}}
 
     // Perform tests {{{
@@ -118,41 +114,12 @@ TEST_CASE("celaeno::graph::view::proximity"
     // }}}
 
     // Log results {{{
-    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
     // }}}
   }; // lamb: test }}}
 
-  // Forwarding test folding lambda {{{
-  auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
-  // }}}
-
-  // LGSynth 91 tests {{{
-  tests(
-    cir::synth_91::alu2,
-    cir::synth_91::alu4,
-    cir::synth_91::dalu,
-    cir::synth_91::apex6,
-    cir::synth_91::apex7,
-    cir::synth_91::b1,
-    cir::synth_91::c8,
-    cir::synth_91::cc,
-    cir::synth_91::cht,
-    cir::synth_91::cm138a,
-    cir::synth_91::cm150a,
-    cir::synth_91::cm151a,
-    cir::synth_91::cm162a,
-    cir::synth_91::cm163a,
-    cir::synth_91::cm42a,
-    cir::synth_91::cm82a,
-    cir::synth_91::cm85a,
-    cir::synth_91::cmb,
-    cir::synth_91::comp,
-    cir::synth_91::cordic,
-    cir::synth_91::cu,
-    cir::synth_91::count,
-    cir::synth_91::decod,
-    cir::synth_91::my_adder
-  );
+  // Perform tests {{{
+  celaeno::graph::test::run(test);
   // }}}
 
 } // TEST_CASE: "celaeno::graph::view::proximity"

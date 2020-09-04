@@ -63,6 +63,18 @@ decltype(auto) runtime(F&& f_test)
   return std::make_pair(result,ss.str());
 } // function: runtime }}}
 
+// runtime void_t {{{
+template<typename F>
+decltype(auto) runtime_vt(F&& f_test)
+{
+  auto start {std::chrono::system_clock::now()};
+  f_test();
+  auto end {std::chrono::system_clock::now()};
+  std::chrono::duration<f64> dur {end-start};
+  std::stringstream ss; ss << dur.count();
+  return ss.str();
+} // function: runtime_vt }}}
+
 // logger {{{
 
 struct LoggerParams

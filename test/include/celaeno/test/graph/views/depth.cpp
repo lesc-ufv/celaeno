@@ -30,38 +30,36 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <vector>
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <chrono>
-#include <vector>
-#include <range/v3/all.hpp>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <celaeno/graph/views/depth.hpp>
+
 #include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/test/test.hpp>
+#include <celaeno/test/graph/test.hpp>
+#include <celaeno/graph/views/depth.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
-#include <maia/circuits/iscas.hpp>
-#include <maia/circuits/synth-91.hpp>
 
 
 // namespace celaeno::graph::views::depth::test {{{
 namespace celaeno::graph::views::depth::test
 {
 
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
+
+// using namespaces {{{
+using namespace celaeno::concepts;
+// }}}
+
 // Namespaces {{{
-namespace cir = maia::circuits;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace depth = celaeno::graph::views::depth;
-namespace rg = ranges;
-namespace rv = ranges::views;
-namespace ra = ranges::actions;
-// }}}
-
-// Concepts {{{
-template<typename T>
-concept String = requires(T t){ std::string{t}; };
 // }}}
 
 // test case celaeno::graph::views::depth  {{{
@@ -69,19 +67,12 @@ concept String = requires(T t){ std::string{t}; };
 TEST_CASE("celaeno::graph::views::depth")
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::views::depth", "logs/celaeno/graph/views/depth.csv", true)};
-  spdlog::set_default_logger(logger);
-  spdlog::set_pattern("%v");
-  spdlog::info("date,time,vertices,edges,runtime");
-  spdlog::set_pattern("%d/%m/%Y,%T,%v");
-  // }}}
-
-  // Expected values array {{{
-  constexpr std::array<i8,24> const ev
-  {{
-    40,42,35,15,14,4,9,4,6,4,13,9,8,3,5,7,8,18,13,9,20,3,49
-  }};
-  i64 ridx{};
+  celaeno::test::logger_new({
+      .name="graph::views::depth",
+      .path="logs/celaeno/graph/views/depth.csv",
+      .info="date,time,vertices,edges,runtime",
+      .pattern="%d/%m/%Y,%T,%v"
+  });
   // }}}
 
   // test lambda {{{
@@ -97,64 +88,22 @@ TEST_CASE("celaeno::graph::views::depth")
     // Helpers
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    // Start chrono
-    auto start {std::chrono::system_clock::now()};
-    auto dv {depth::run(0, pred, succ).first};
-    // Stop chrono
-    auto end {std::chrono::system_clock::now()};
-    std::chrono::duration<f64> dur {end-start};
-    std::stringstream ss; ss << dur.count();
+    auto [result,runtime] = celaeno::test::runtime([&](){ return depth::run(0, pred, succ).first; });
     // }}}
 
 
-    // lamb: get_depth {{{
-    auto fdepth = [&]()
-    {
-      return  fw::apply(dv,fw::get_map_keys(),fw::maximum());
-    }; // lamb: fdepth
-    // }}}
-
-    // Test Depth {{{
-    REQUIRE(fdepth() == ev.at(ridx++));
+    // Perform checks {{{
+    // TODO
     // }}}
 
     // Log results {{{
-    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
     // }}}
+
   }; // lamb: test }}}
 
-  // Forwarding test folding lambda {{{
-  auto tests = [&]<String... S>(S&&... strs) -> void { (test(std::forward<S>(strs)), ...); };
-  // }}}
-
-  // LGSynth 91 tests {{{
-
-  tests(
-    cir::synth_91::alu2   , // 40
-    cir::synth_91::alu4   , // 42
-    cir::synth_91::dalu   , // 35
-    cir::synth_91::apex6  , // 15
-    cir::synth_91::apex7  , // 14
-    cir::synth_91::b1     , // 4
-    cir::synth_91::c8     , // 9
-    cir::synth_91::cc     , // 4
-    cir::synth_91::cht    , // 6
-    cir::synth_91::cm138a , // 4
-    cir::synth_91::cm150a , // 13
-    cir::synth_91::cm162a , // 9
-    cir::synth_91::cm163a , // 8
-    cir::synth_91::cm42a  , // 3
-    cir::synth_91::cm82a  , // 5
-    cir::synth_91::cm85a  , // 7
-    cir::synth_91::cmb    , // 8
-    cir::synth_91::comp   , // 18
-    cir::synth_91::cordic , // 13
-    cir::synth_91::cu     , // 9
-    cir::synth_91::count  , // 20
-    cir::synth_91::decod  , // 3
-    cir::synth_91::my_adder // 49
-  );
-
+  // Perform tests {{{
+  celaeno::graph::test::run(test);
   // }}}
 
 } // TEST_CASE: celaeno::graph::views::depth }}}
