@@ -97,12 +97,14 @@ TEST_CASE("celaeno::graph::search::dfs"
     auto [result,runtime] = celaeno::test::runtime([&](){ return dfs::run(0,p,s); });
     // }}}
 
+    // Perform checks {{{
     celaeno::test::check(
       // Check vertices count with bfs size
       (g.vertices_count() == result.size()),
-      // Check bfs vector size
+      // Check if there are no duplicates
       fw::apply(result,fw::unique()).size() == result.size()
     );
+    // }}}
 
     // Log results {{{
     celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
