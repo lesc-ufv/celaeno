@@ -32,26 +32,32 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <cstdlib>
-#include <concepts>
-#include <chrono>
+
 #include <range/v3/all.hpp>
-#include <celaeno/graph/operations/balance/paths.hpp>
-#include <celaeno/graph/views/depth.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/test/test.hpp>
+#include <celaeno/test/graph/test.hpp>
+#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
-#include <maia/circuits/synth-91.hpp>
 
 // namespace celaeno::graph::operations::balance::paths::test {{{
 
 namespace celaeno::graph::operations::balance::paths::test
 {
 
-// namespaces {{{
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
 
+// using namespaces {{{
+using namespace celaeno::concepts;
+// }}}
+
+
+// namespaces {{{
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace cir = maia::circuits;
@@ -59,61 +65,48 @@ namespace balance = celaeno::graph::operations::balance::paths;
 namespace depth = celaeno::graph::views::depth;
 namespace rg = ranges;
 namespace rv = ranges::views;
-namespace ra = ranges::actions;
-
-// }}}
-
-// Concepts {{{
-
-template<typename T>
-concept String = requires(T t){ std::string{t}; };
-
 // }}}
 
 // Test Cases {{{
 
 TEST_CASE("celaeno::graph::operations::balance::paths"
-  * doctest::description("Balance test")
   * doctest::timeout(1000.0f)
 )
 {
   // Logger {{{
-  auto logger {spdlog::basic_logger_mt("graph::operations::balance::paths"
-      , "logs/celaeno/graph/operations/balance/paths.csv", true)};
-  spdlog::set_default_logger(logger);
-  spdlog::set_pattern("%v");
-  spdlog::info("date,time,vertices,edges,runtime");
-  spdlog::set_pattern("%d/%m/%Y,%T,%v");
+  celaeno::test::logger_new({
+      .name="celaeno::graph::operations::balance::paths",
+      .path="logs/celaeno/graph/operations/balance/paths.csv",
+      .info="date,time,vertices,edges,runtime",
+      .pattern="%d/%m/%Y,%T,%v"
+  });
   // }}}
 
   // test lambda {{{
-  auto test = [&]<String S>(S&& str)
+  auto test = [&]<String S>(S const& str)
   {
     // Read graph {{{
-    graph::Graph<int64_t> g;
-    auto emplace = [&g](auto&& pair){ g.emplace(pair); };
+    graph::Graph<i64> g;
+    auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
     reader::Reader{str,emplace};
     // }}}
 
-    // Helpers {{{
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto link = [&g](auto&& pair){ g.emplace(pair); };
-    auto unlink = [&g](auto&& pair){ g.erase(pair); };
+    // vertices_count > 0 {{{
+    assertm(g.vertices_count() > 0, "Empty input graph");
     // }}}
 
     // Test Balance {{{
-    auto start {std::chrono::system_clock::now()};
-    balance::run(0,pred,succ,link,unlink);
-    auto end {std::chrono::system_clock::now()};
-    std::chrono::duration<f64> dur {end-start};
-    std::stringstream ss; ss << dur.count();
+    auto p = [&g](auto&& v){ return g.predecessors(v); };
+    auto s = [&g](auto&& v){ return g.successors(v); };
+    auto l = [&g](auto&& e){ g.emplace(e); };
+    auto u = [&g](auto&& e){ g.erase(e); };
+    auto runtime {celaeno::test::runtime_vt([&](){ balance::run(0,p,s,l,u); })};
     // }}}
 
     // More tests {{{
     // * Given a depth-view, each vertex must have a distance of one
     // * to its successor or predecessor
-    auto dview {depth::run(0,pred,succ)};
+    auto dview {depth::run(0,p,s)};
     auto const& level_vert {dview.first};
     auto const& vert_level {dview.second};
 
@@ -121,9 +114,9 @@ TEST_CASE("celaeno::graph::operations::balance::paths"
     auto levels { level_vert | rv::keys | rv::unique };
 
       // Get the vertices on level l
-    for(auto const& l : levels)
+    for(auto const& _l : levels)
     {
-      auto rng{level_vert.equal_range(l)};
+      auto rng{level_vert.equal_range(_l)};
       // For each vertex on level l
       for(auto it{rng.first}; it!=rng.second; ++it)
       {
@@ -141,41 +134,13 @@ TEST_CASE("celaeno::graph::operations::balance::paths"
     // }}}
 
     // Log results {{{
-    spdlog::info("{},{},{}", g.vertices_count(), g.edges_count(), ss.str());
+    celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
     // }}}
 
   }; // lamb: test }}}
 
-  // Forwarding test folding lambda {{{
-  auto tests = [&]<String... S>(S&&... strs) { (test(std::forward<S>(strs)), ...); };
-  // }}}
-
-  // LGSynth 91 tests {{{
-  tests(cir::synth_91::alu2,
-    cir::synth_91::alu4,
-    cir::synth_91::dalu,
-    cir::synth_91::apex6,
-    cir::synth_91::apex7,
-    cir::synth_91::b1,
-    cir::synth_91::c8,
-    cir::synth_91::cc,
-    cir::synth_91::cht,
-    cir::synth_91::cm138a,
-    cir::synth_91::cm150a,
-    cir::synth_91::cm151a,
-    cir::synth_91::cm162a,
-    cir::synth_91::cm163a,
-    cir::synth_91::cm42a,
-    cir::synth_91::cm82a,
-    cir::synth_91::cm85a,
-    cir::synth_91::cmb,
-    cir::synth_91::comp,
-    cir::synth_91::cordic,
-    cir::synth_91::cu,
-    cir::synth_91::count,
-    cir::synth_91::decod,
-    cir::synth_91::my_adder
-  );
+  // Perform tests {{{
+  celaeno::graph::test::run(test);
   // }}}
 
 } // TEST_CASE: celaeno::graph::operations::balance::paths }}}
