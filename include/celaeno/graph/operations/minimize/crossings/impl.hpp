@@ -33,8 +33,10 @@
 
 #pragma once
 
+#include <ranges>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/heuristics/barycenter.hpp>
 
 // namespace celaeno::graph::operations::minimize::crossings::impl {{{
 namespace celaeno::graph::operations::minimize::crossings::impl
@@ -48,28 +50,41 @@ namespace celaeno::graph::operations::minimize::crossings::impl
 using namespace celaeno::concepts;
 // }}}
 
+// namespaces {{{
+namespace barycenter = celaeno::heuristics::barycenter;
+// }}}
+
 // fn: bor {{{
 template<Matrix M>
 decltype(auto) bor(M&& m)
 {
+  std::ranges::sort(m,[&](auto&& lhs, auto&& rhs)
+  {
+    return barycenter::run(lhs) < barycenter::run(rhs);
+  });
+
+  return m;
 } // function: bor }}}
 
 // fn: boc {{{
 template<Matrix M>
 decltype(auto) boc(M&& m)
 {
+  return m;
 } // function: boc }}}
 
 // fn: ror {{{
 template<Matrix M>
 decltype(auto) ror(M&& m)
 {
+  return m;
 } // function: ror }}}
 
 // fn: roc {{{
 template<Matrix M>
 decltype(auto) roc(M&& m)
 {
+  return m;
 } // function: roc }}}
 
 } // namespace celaeno::graph::operations::minimize::crossing::impl }}}
