@@ -6,12 +6,13 @@
 // @created     : sábado jun 20, 2020 18:21:24 -03
 //
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
-#include <celaeno/graph/representations/incidence/barycenter.hpp>
 #include <sstream>
 #include <iomanip>
+
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <doctest/doctest.h>
 #include <fplus/fplus.hpp>
+#include <celaeno/heuristics/barycenter.hpp>
 
 // namespace celaeno::graph::operations::incidence::barycenter::test {{{
 
@@ -20,7 +21,7 @@ namespace celaeno::graph::operations::incidence::barycenter::test
 
 // namespaces {{{
 
-namespace barycenter = celaeno::graph::operations::incidence::barycenter;
+namespace barycenter = celaeno::heuristics::barycenter;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 
