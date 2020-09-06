@@ -32,13 +32,17 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
+
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
-#include <taygete/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/test/test.hpp>
+#include <celaeno/test/graph/test.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/operations/count/crossings/impl.hpp>
-
+#include <taygete/graph/graph.hpp>
+#include <taygete/graph/reader/verilog.hpp>
 
 // namespace celaeno::graph::operations::count::crossings::test {{{
 
