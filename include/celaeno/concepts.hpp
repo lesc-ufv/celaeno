@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : concepts
@@ -49,14 +49,11 @@ template<typename T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template<typename T>
-concept Float = std::is_floating_point_v<T>;
+concept Float = std::floating_point<T>;
 
 template<typename T>
 concept String =
-requires(T t)
-{
-  { std::string{t} } -> std::same_as<std::string>;
-};
+requires(T t) { { std::string{t} } -> std::same_as<std::string>; };
 
 template<typename T>
 concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
@@ -76,48 +73,10 @@ requires(T t)
 
 template<typename V>
 concept Vector =
-Iterable<V>
-&&
-requires(V v)
-{
-  {v.at(int32_t{})};
-
-  {Arithmetic<decltype( v.at(int32_t{}) )>};
-};
+Iterable<V> && requires(V&& v){ typename std::decay_t<V>::value_type; };
 
 template<typename M>
 concept Matrix =
-Iterable<M>
-&&
-requires(M m)
-{
-  {m.at(i32{})};
-
-  {m.at(i32{}).at(i32{})};
-
-  {Iterable<decltype(m.at(i32{}))>};
-
-  {Arithmetic<decltype( m.at(i32{}).at(i32{}) )>};
-};
-
-template<typename MS>
-concept Matrices =
-Iterable<MS>
-&&
-requires(MS ms)
-{
-  {ms.at(i32{})};
-
-  {ms.at(i32{}).at(i32{})};
-
-  {ms.at(i32{}).at(i32{}).at(i32{})};
-
-  {Iterable<decltype(ms.at(i32{}))>};
-
-  {Arithmetic<decltype( ms.at(i32{}).at(i32{}) )>};
-
-  {Arithmetic<decltype( ms.at(i32{}).at(i32{}).at(i32{}) )>};
-};
-
+Vector<M> && Iterable<typename std::decay_t<M>::value_type::value_type>;
 
 } // namespace celaeno::concepts }}}
