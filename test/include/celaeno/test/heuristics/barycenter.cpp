@@ -5,125 +5,39 @@
 // @file        : barycenter
 // @created     : sábado jun 20, 2020 18:21:24 -03
 //
+// BSD 2-Clause License
 
-#include <sstream>
-#include <iomanip>
+// Copyright (c) 2020, Ruan Evangelista Formigoni
+// All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+
+// * Redistributions of source code must retain the above copyright notice, this
+//   list of conditions and the following disclaimer.
+
+// * Redistributions in binary form must reproduce the above copyright notice,
+//   this list of conditions and the following disclaimer in the documentation
+//   and/or other materials provided with the distribution.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <fplus/fplus.hpp>
 #include <celaeno/heuristics/barycenter.hpp>
 
 // namespace celaeno::graph::operations::incidence::barycenter::test {{{
 
 namespace celaeno::graph::operations::incidence::barycenter::test
 {
-
-// namespaces {{{
-
-namespace barycenter = celaeno::heuristics::barycenter;
-namespace fp = fplus;
-namespace fw = fplus::fwd;
-
-// }}}
-
-// Helpers {{{
-
-template<typename M>
-auto swap_rows_and_cols(M&& m)
-{
-  // Get a column by index
-  auto col = [&](auto i){return fp::transform([&i](auto&& v){return v.at(i);},m);};
-
-  // Get the number of columns
-  size_t sz{};
-  try{ sz = m.at(0).size(); }
-  catch(std::exception const& e) { std::cerr << "Empty matrix" << std::endl; }
-
-  // Return new container with columns as rows
-  return fw::apply(fp::numbers(size_t{},sz),fw::transform([&](auto i){return col(i);}));
-
-} // function: swap_rows_and_cols
-
-template<typename V>
-auto compare(V&& v)
-{
-  std::stringstream ss;
-  ss << std::setprecision(2);
-  ss << barycenter::run(v);
-  auto exec{std::stod(ss.str())};
-
-  return exec;
-} // function: compare
-
-// }}}
-
-// Test case: celaeno::graph::operations::incidence::barycenter {{{
-
-TEST_CASE("celaeno::graph::operations::incidence::barycenter")
-{
-  std::array<std::array<int32_t,5>,4> m0
-  {{
-    {1,1,0,0,0},
-    {1,0,0,1,1},
-    {0,1,0,1,1},
-    {1,0,1,0,1},
-  }};
-  std::array<double,4> r0 {1.5,3.3,3.7,3};
-  std::array<double,5> c0 {2.3,2,4,2.5,3};
-
-  std::array<std::array<int32_t,5>,4> m1
-  {{
-    {1,1,0,1,0},
-    {0,1,1,0,0},
-    {0,1,0,1,1},
-    {0,0,1,1,1},
-  }};
-  std::array<double,4> r1 {2.3, 2.5, 3.7, 4};
-  std::array<double,5> c1 {1, 2, 3, 2.7, 3.5};
-
-      // auto col = [&](auto i){return fp::transform([&i](auto&& v){return v.at(i);},m);};
-
-
-  // Rows
-  fw::apply(m0
-    , fw::zip(r0)
-    , fw::transform([](auto&& e){
-        CHECK( compare(e.second) == e.first );
-        return EXIT_SUCCESS;
-    })
-  );
-
-  fw::apply(m1
-    , fw::zip(r1)
-    , fw::transform([](auto&& e){
-        CHECK( compare(e.second) == e.first );
-        return EXIT_SUCCESS;
-    })
-  );
-
-  // Cols
-  fw::apply(swap_rows_and_cols(m0)
-    , fw::zip(c0)
-    , fw::transform([](auto&& e){
-        CHECK( compare(e.second) == e.first );
-        return EXIT_SUCCESS;
-    })
-  );
-
-  fw::apply(swap_rows_and_cols(m1)
-    , fw::zip(c1)
-    , fw::transform([](auto&& e){
-        CHECK( compare(e.second) == e.first );
-        return EXIT_SUCCESS;
-    })
-  );
-
-  // compare(m0.at(0),r0.at(0));
-  // compare(m0,c0,fn_col);
-  // compare(m1.at(0),r1.at(0));
-  // compare(m1,c1,fn_col);
-
-} // TEST_CASE: "celaeno::graph::operations::incidence::barycenter" }}}
-
+  // TODO IMPORTANT
 } // namespace celaeno::graph::operations::incidence::barycenter::test }}}
