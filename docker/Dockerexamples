@@ -1,0 +1,66 @@
+# vim: set expandtab syntax=dockerfile fdm=marker ts=2 sw=2 tw=100 et :
+
+FROM formigoni/alpine-gcc-10:latest
+
+# Install packages
+RUN apk add make cmake clang git py3-pip
+RUN pip3 install -I conan
+
+# Configure conan
+RUN conan profile new default --detect
+RUN conan profile update settings.compiler.libcxx=libstdc++11 default
+RUN conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
+RUN conan remote add spdlog https://api.bintray.com/conan/ruanformigoni/spdlog
+RUN conan remote add fmt https://api.bintray.com/conan/ruanformigoni/fmt
+RUN conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
+
+# Configure project
+ADD ./doc/examples/ /examples/
+
+# Build examples
+## Build script
+ENV BUILD_SCRIPT /examples/build.sh
+
+## Search
+### bfs
+WORKDIR /examples/celaeno/graph/search/bfs/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > bfs.txt
+### dfs
+WORKDIR /examples/celaeno/graph/search/dfs/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > dfs.txt
+### kahn
+WORKDIR /examples/celaeno/graph/search/kahn/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > kahn.txt
+
+## Views
+### Topological
+WORKDIR /examples/celaeno/graph/views/depth/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > topological.txt
+### Proximity
+WORKDIR /examples/celaeno/graph/views/proximity/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > proximity.txt
+
+## Operations
+### Count crossings
+WORKDIR /examples/celaeno/graph/operations/count/crossings/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > count-crossings.txt
+### Minimize crossings
+WORKDIR /examples/celaeno/graph/operations/count/crossings/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > minimize-crossings.txt
+### Balance paths
+WORKDIR /examples/celaeno/graph/operations/balance/paths/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > balance-paths.txt
+
+## Representations
+### Incidence matrix
+WORKDIR /examples/celaeno/graph/representations/incidence/
+RUN eval "$BUILD_SCRIPT"
+RUN ./build/main > incidence.txt
