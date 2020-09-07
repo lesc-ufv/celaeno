@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : minimize-crossings
@@ -32,11 +32,12 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <range/v3/all.hpp>
+
 #include <celaeno/concepts.hpp>
+#include <celaeno/test/test.hpp>
 #include <celaeno/graph/operations/minimize/crossings/impl.hpp>
+
 #include "crossings/data.hpp"
-#include "../../../test.hpp"
 
 // namespace celaeno::graph::operations::minimize::crossings::test {{{
 namespace celaeno::graph::operations::minimize::crossings::test
@@ -47,7 +48,6 @@ using namespace celaeno::concepts;
 // }}}
 
 // namespaces {{{
-namespace rv = ranges::views;
 namespace test = celaeno::test;
 namespace impl = celaeno::graph::operations::minimize::crossings::impl;
 // }}}
@@ -56,29 +56,56 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
   * doctest::description("Graph crossing minimization test")
 )
 {
-  // lamb: test bor {{{
-  auto test_bor = []<Matrix M>(M&& m, M&& solution) -> void
+
+  // lamb: zip {{{
+  auto zip = []<Iterable C1, Iterable C2>(C1 const& c1, C2 const& c2)
+    requires
+       requires(C1){ typename std::decay_t<C1>::value_type; }
+    && requires(C2){ typename std::decay_t<C2>::value_type; }
   {
-    auto _m {impl::bor(std::forward<M>(m))};
-    for (auto&& [result,expected] : rv::zip(_m,solution))
+
+    using T1 = typename C1::value_type;
+    using T2 = typename C2::value_type;
+
+    std::vector<std::pair<T1,T2>> zipped;
+
+    for (auto it1{c1.begin()}, it2{c2.begin()}; it1 != c1.end() && it2 != c2.end(); ++it1, ++it2)
     {
-      test::check(result == expected);
-    } // for row : fp::zip(_m,data::mrsb1)
+      zipped.emplace_back(*it1,*it2);
+    } // for
+
+    return zipped;
   }; // }}}
 
-  // Test barycenter ordering method {{{
-  test_bor(data::bs1,data::br1);
-  test_bor(data::bs2,data::br2);
-  test_bor(data::bs3,data::br3);
-  test_bor(data::bs4,data::br4);
-  test_bor(data::bs5,data::br5);
+  // lamb: test {{{
+  auto test = [&zip]<Matrix M>(M&& m, M&& s) -> decltype(auto)
+  {
+    return [&m,&s,&zip]<typename F>(F&& f) -> void
+    {
+      for (auto&& [result,expected] : zip(f(m),s))
+      {
+        test::check(result == expected);
+      } // for
+    };
+  }; // }}}
+
+  // Test row barycenter ordering method {{{
+  auto bor = []<Matrix M>(M&& m){ return impl::bor(std::forward<M>(m)); };
+  test(data::bs1,data::br1)(bor);
+  test(data::bs2,data::br2)(bor);
+  test(data::bs3,data::br3)(bor);
+  test(data::bs4,data::br4)(bor);
+  test(data::bs5,data::br5)(bor);
   // }}}
 
-  // lamb: test boc {{{
-  auto test_boc = []<Matrix M>(M&& m)
-  {
-    auto _m {impl::boc(std::forward<M>(m))};
-  }; // }}}
+  // Test col barycenter ordering method {{{
+  // auto boc = []<Matrix M>(M&& m){ return impl::boc(std::forward<M>(m)); };
+  // test(data::bs1,data::br1)(bor);
+  // test(data::bs2,data::br2)(bor);
+  // test(data::bs3,data::br3)(bor);
+  // test(data::bs4,data::br4)(bor);
+  // test(data::bs5,data::br5)(bor);
+  // }; // }}}
 
 } // TEST_CASE: "celaeno::graph::operations::minimize::crossings"
 
