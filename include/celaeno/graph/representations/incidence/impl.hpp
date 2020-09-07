@@ -59,7 +59,7 @@ using namespace celaeno::graph::concepts;
 template<Layer L, Adjacent A>
 auto run(L&& layer, A&& adjacent, u64 height)
 {
-  using Matrix = std::vector<std::vector<i32>>;
+  using Matrix = std::vector<std::vector<bool>>;
 
   // Result
   std::vector<Matrix> result;
@@ -70,7 +70,7 @@ auto run(L&& layer, A&& adjacent, u64 height)
     auto [l1,l2] = std::make_pair(layer(i),layer(i+1));
 
     // Create the incidence matrix
-    Matrix m( l1.size(), std::vector<i32>(l2.size(), 0) );
+    Matrix m( l1.size(), std::vector<bool>(l2.size(), 0) );
 
     // Enumerate layers
     auto [l1e,l2e] { std::make_pair(fp::enumerate(l1),fp::enumerate(l2)) };
