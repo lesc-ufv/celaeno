@@ -77,35 +77,44 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     return zipped;
   }; // }}}
 
-  // lamb: test {{{
-  auto test = [&zip]<Matrix M>(M&& m, M&& s) -> decltype(auto)
+  // subcase: barycenter reordering {{{
+  SUBCASE("Barycenter reordering")
   {
-    return [&m,&s,&zip]<typename F>(F&& f) -> void
+    // lamb: test {{{
+    auto test = [&zip]<Matrix M>(M&& m, M&& s) -> decltype(auto)
     {
-      for (auto&& [result,expected] : zip(f(m),s))
+      return [&m,&s,&zip]<typename F>(F&& f) -> void
       {
-        test::check(result == expected);
-      } // for
-    };
-  }; // }}}
+        for (auto&& [result,expected] : zip(f(m),s))
+        {
+          test::check(result == expected);
+        } // for
+      };
+    }; // }}}
 
-  // Test row barycenter ordering method {{{
-  auto bor = []<Matrix M>(M&& m){ return impl::bor(std::forward<M>(m)); };
-  test(data::bs1,data::br1)(bor);
-  test(data::bs2,data::br2)(bor);
-  test(data::bs3,data::br3)(bor);
-  test(data::bs4,data::br4)(bor);
-  test(data::bs5,data::br5)(bor);
-  // }}}
+    // Test row barycenter ordering {{{
+    auto bor = []<Matrix M>(M&& m){ return impl::bor(std::forward<M>(m)); };
+    test(data::brs1,data::brss1)(bor);
+    test(data::brs2,data::brss2)(bor);
+    test(data::brs3,data::brss3)(bor);
+    test(data::brs4,data::brss4)(bor);
+    test(data::brs5,data::brss5)(bor);
+    // }}}
 
-  // Test col barycenter ordering method {{{
-  // auto boc = []<Matrix M>(M&& m){ return impl::boc(std::forward<M>(m)); };
-  // test(data::bs1,data::br1)(bor);
-  // test(data::bs2,data::br2)(bor);
-  // test(data::bs3,data::br3)(bor);
-  // test(data::bs4,data::br4)(bor);
-  // test(data::bs5,data::br5)(bor);
-  // }; // }}}
+    // Test barycenter ordering {{{
+    auto boc = []<Matrix M>(M&& m){ return impl::boc(std::forward<M>(m)); };
+    test(data::bro1,data::brso1)(boc);
+    test(data::bro2,data::brso2)(boc);
+    test(data::brs3,data::brss3)(boc);
+    test(data::brs4,data::brss4)(boc);
+    test(data::brs5,data::brss5)(boc);
+    // }}}
+  } // SUBCASE: "Barycenter reordering" }}}
+
+  // subcase: equal row ordering {{{
+  SUBCASE("Equal row reordering")
+  {
+  } // SUBCASE: "Barycenter reordering" }}}
 
 } // TEST_CASE: "celaeno::graph::operations::minimize::crossings"
 

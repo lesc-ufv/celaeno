@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <vector>
 #include <ranges>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -58,33 +59,57 @@ namespace barycenter = celaeno::heuristics::barycenter;
 template<Matrix M>
 decltype(auto) bor(M&& m)
 {
-  std::ranges::sort(m,[&](auto&& lhs, auto&& rhs)
-  {
-    return barycenter::run(lhs) < barycenter::run(rhs);
-  });
+  // R will be used as an r-value of M
+  using R = typename std::decay_t<M>;
 
-  return m;
+  // Namespaces
+  namespace rg = std::ranges;
+
+  assertm(m.size() > 0, "Empty matrix");
+
+  auto sort = [](R&& _m) -> decltype(auto)
+  {
+    rg::sort(_m,[&](auto&& lhs, auto&& rhs)
+    {
+      return barycenter::run(lhs) < barycenter::run(rhs);
+    });
+    return _m;
+  };
+
+  return sort(std::move(m));
 } // function: bor }}}
 
 // fn: boc {{{
 template<Matrix M>
 decltype(auto) boc(M&& m)
 {
-  return m;
+  using std::vector;
+
+  // R will be used as an r-value of M
+  using R = typename std::decay_t<M>;
+
+  auto reverse = [](R&& _m) -> decltype(auto)
+  {
+    R rev{std::size_t{_m.at(0).size()},vector<bool>(std::size_t{_m.size()})};
+
+    for (std::size_t i{}; i < _m.size(); ++i)
+    {
+      for (std::size_t j{}; j < _m.at(i).size(); ++j)
+      {
+        rev.at(j).at(i) = _m.at(i).at(j);
+      } // for: j
+    } // for: i
+    return rev;
+  };
+
+  return reverse(std::move(bor(std::move(reverse(std::move(m))))));
 } // function: boc }}}
 
-// fn: ror {{{
+// fn: ro TODO {{{
 template<Matrix M>
-decltype(auto) ror(M&& m)
+decltype(auto) ro(M&& m)
 {
   return m;
-} // function: ror }}}
-
-// fn: roc {{{
-template<Matrix M>
-decltype(auto) roc(M&& m)
-{
-  return m;
-} // function: roc }}}
+} // function: ro }}}
 
 } // namespace celaeno::graph::operations::minimize::crossing::impl }}}

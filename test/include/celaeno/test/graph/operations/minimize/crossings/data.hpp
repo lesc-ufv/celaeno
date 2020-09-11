@@ -38,10 +38,10 @@
 namespace data
 {
 
-// Barycenter row ordering {{{
+// Barycenter reordering {{{
 
 // Base matrix sample 1
-std::vector<std::vector<bool>> bs1
+std::vector<std::vector<bool>> brs1
 {{
   {1,1,0,0,0}, // 1 + 2 / 2 = 1.5
   {1,0,0,1,1}, // 1 + 4 + 5 / 3 == 3.33...
@@ -50,7 +50,7 @@ std::vector<std::vector<bool>> bs1
 }};
 
 // Expected row sorted by barycenter matrix 1
-std::vector<std::vector<bool>> br1
+std::vector<std::vector<bool>> brss1
 {{
   {1,1,0,0,0}, // 1.5
   {1,0,1,0,1}, // 1 + 3 + 5 / 3 == 3
@@ -59,7 +59,7 @@ std::vector<std::vector<bool>> br1
 }};
 
 // Base matrix sample 2
-std::vector<std::vector<bool>> bs2
+std::vector<std::vector<bool>> brs2
 {{
   {0,1,1,0,0}, // 2 + 3 / 2 = 2.5
   {1,1,0,1,0}, // 1 + 2 + 4 / 3 = 2.33...
@@ -68,7 +68,7 @@ std::vector<std::vector<bool>> bs2
 }};
 
 // Expected row sorted by barycenter matrix 2
-std::vector<std::vector<bool>> br2
+std::vector<std::vector<bool>> brss2
 {{
   {1,1,0,1,0}, // 1 + 2 + 4 / 3 = 2.33...
   {0,1,1,0,0}, // 2 + 3 / 2 = 2.5
@@ -77,7 +77,7 @@ std::vector<std::vector<bool>> br2
 }};
 
 // Base matrix sample 3
-std::vector<std::vector<bool>> bs3
+std::vector<std::vector<bool>> brs3
 {{
   {0,0,0,1}, // 4 / 1 = 4
   {0,0,1,1}, // 3 + 4 / 2 = 3.5
@@ -86,7 +86,7 @@ std::vector<std::vector<bool>> bs3
 }};
 
 // Expected row sorted by barycenter matrix 3
-std::vector<std::vector<bool>> br3
+std::vector<std::vector<bool>> brss3
 {{
   {1,0,0,1}, // 1 + 4 / 2 = 2.5
   {0,1,1,1}, // 2 + 3 + 4 / 3 = 3
@@ -95,29 +95,118 @@ std::vector<std::vector<bool>> br3
 }};
 
 // Base matrix sample 4
-std::vector<std::vector<bool>> bs4
+std::vector<std::vector<bool>> brs4
 {{
   {0}, // 0
 }};
 
 // Expected row sorted by barycenter matrix 4
-std::vector<std::vector<bool>> br4
+std::vector<std::vector<bool>> brss4
 {{
   {0}, // 0
 }};
 
 // Base matrix sample 5
-std::vector<std::vector<bool>> bs5
+std::vector<std::vector<bool>> brs5
 {{
   {1,1}, // 1 + 2 / 2 = 1.5
   {1,0}, // 1
 }};
 
 // Expected row sorted by barycenter matrix 5
-std::vector<std::vector<bool>> br5
+std::vector<std::vector<bool>> brss5
 {{
   {1,0}, // 1
   {1,1}, // 1 + 2 / 2 = 1.5
+}};
+
+// }}}
+
+// Equal barycenter reordering {{{
+
+// Base matrix sample 1
+std::vector<std::vector<bool>> bro1
+{{
+  {1,1,0,0,0}, // 1 + 2 + 3 / 3 = 2
+  {1,0,1,0,1}, // 1 + 4 / 2 = 2.5
+  {1,0,0,1,1}, // 2 / 1 = 2
+  {0,1,0,1,1}, // 3 + 4 / 2 = 3.5
+               // 2 + 3 + 4 / 3 = 3.66..
+}};
+
+// Expected row sorted by barycenter matrix 1
+std::vector<std::vector<bool>> brso1
+{{
+  {1,0,1,0,0}, // 1 + 2 + 3 / 3 = 2
+  {1,1,0,1,0}, // 2 / 1 = 2
+  {1,0,0,1,1}, // 1 + 4 / 2 = 2.5
+  {0,0,1,1,1}, // 2 + 3 + 4 / 3 = 3
+               // 3 + 4 / 2 = 3.5
+}};
+
+// Base matrix sample 1
+std::vector<std::vector<bool>> bro2
+{{
+  {1,1,0,1,0}, // 1 + 3 + 4 / 3 = 2.666
+  {0,0,0,1,1}, // 1 = 1
+  {1,0,1,1,0}, // 3 + 4 / 2 = 3.5
+  {1,0,1,0,1}, // 1 + 2 + 3 / 3 = 2
+               // 2 + 4 / 2 = 3
+}};
+
+// Expected row sorted by barycenter matrix 2
+std::vector<std::vector<bool>> brso2
+{{
+  {1,1,1,0,0}, // 1 = 1
+  {0,1,0,1,0}, // 1 + 2 + 3 / 3 = 2
+  {0,1,1,0,1}, // 1 + 3 + 4 / 3 = 2.666
+  {0,0,1,1,1}, // 2 + 4 / 2 = 3
+               // 3 + 4 / 2 = 3.5
+}};
+
+// Base matrix sample 3
+std::vector<std::vector<bool>> bro3
+{{
+  {0,0,0,1}, // 3
+  {0,0,1,1}, // 4
+  {1,0,0,1}, // 2 + 4 / 2 = 3
+  {0,1,1,1}, // 1 + 2 + 3 + 4 / 4 = 2.5
+}};
+
+
+// Expected row sorted by barycenter matrix 2
+std::vector<std::vector<bool>> brso3
+{{
+  {1,0,0,0}, // 1 + 2 + 3 + 4 / 4 = 2.5
+  {1,0,1,0}, // 3
+  {1,1,0,0}, // 2 + 4 / 2 = 3
+  {1,0,1,1}, // 4
+}};
+
+// Base matrix sample 4
+std::vector<std::vector<bool>> bro4
+{{
+  {0}, // 0
+}};
+
+// Expected row sorted by barycenter matrix 4
+std::vector<std::vector<bool>> brso4
+{{
+  {0}, // 0
+}};
+
+// Base matrix sample 5
+std::vector<std::vector<bool>> bro5
+{{
+  {1,1}, // 1 + 2 / 2 = 1.5
+  {1,0}, // 1
+}};
+
+// Expected row sorted by barycenter matrix 5
+std::vector<std::vector<bool>> brso5
+{{
+  {1,1}, // 1
+  {0,1}, // 1 + 2 / 2 = 1.5
 }};
 
 // }}}
