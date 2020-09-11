@@ -66,13 +66,13 @@ decltype(auto) run(M&& m)
 
   try
   {
-    for (siz j{0}; j < p-1; j++)
+    for (std::size_t j{0}; j < p-1; j++)
     {
-      for (siz k{j+1}; k < p; k++)
+      for (std::size_t k{j+1}; k < p; k++)
       {
-        for (siz a{0}; a < q-1; a++)
+        for (std::size_t a{0}; a < q-1; a++)
         {
-          for (siz b{a+1}; b < q; b++)
+          for (std::size_t b{a+1}; b < q; b++)
           {
             crossings += m.at(j).at(b) * m.at(k).at(a);
           } // for: b
