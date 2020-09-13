@@ -30,10 +30,12 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+#include <ranges>
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
-#include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/test/test.hpp>
@@ -63,8 +65,6 @@ namespace reader = taygete::graph::reader::verilog;
 namespace cir = maia::circuits;
 namespace balance = celaeno::graph::operations::balance::paths;
 namespace depth = celaeno::graph::views::depth;
-namespace rg = ranges;
-namespace rv = ranges::views;
 // }}}
 
 // Test Cases {{{
@@ -106,31 +106,28 @@ TEST_CASE("celaeno::graph::operations::balance::paths"
     // More tests {{{
     // * Given a depth-view, each vertex must have a distance of one
     // * to its successor or predecessor
-    auto dview {depth::run(0,p,s)};
-    auto const& level_vert {dview.first};
-    auto const& vert_level {dview.second};
+    auto [lv,vl] {depth::run(0,p,s)};
 
     // Get the levels
-    auto levels { level_vert | rv::keys | rv::unique };
+    auto levels { std::views::transform(lv,[](auto&& _u){ return _u.first; }) };
 
-      // Get the vertices on level l
-    for(auto const& _l : levels)
+    // Get the vertices on level
+    for(auto&& level : levels)
     {
-      auto rng{level_vert.equal_range(_l)};
-      // For each vertex on level l
-      for(auto it{rng.first}; it!=rng.second; ++it)
+      // For each vertex on level
+      for(auto it{lv.at(level).begin()}; it!=lv.at(level).end(); ++it)
       {
-        // Current vertex
-        auto const& curr {it->second};
         // The adjacent vertices
-        auto adj {g.neighbors(curr)};
+        auto adj {g.neighbors(*it)};
         // Verify if distance is one to each
-        auto is_dist_one = [&vert_level,&curr](auto&& a) -> void
-          { REQUIRE(std::abs(vert_level.at(a) - vert_level.at(curr)) == 1); };
+        auto is_dist_one = [&](auto&& a) -> void
+        {
+          celaeno::test::check(std::abs(vl.at(a) - vl.at(*it)) == 1);
+        };
         // Execute tests
-        rg::for_each(adj, is_dist_one);
-      } // for it{rng.first}; it!=rng.second
-    } // for auto const& l : levels
+        std::ranges::for_each(adj, is_dist_one);
+      } // for
+    } // for
     // }}}
 
     // Log results {{{

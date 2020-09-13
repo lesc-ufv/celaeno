@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : paths
@@ -32,12 +32,8 @@
 
 #pragma once
 
-#include <iostream> // std::cerr and std::endl
-#include <optional> // std::optional
-#include <cstdint>  // int64_t, int32_t,...
 #include <utility>  // std::forward
-#include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
+#include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -50,9 +46,6 @@ namespace celaeno::graph::operations::balance::paths
 // Namespaces {{{
 namespace depth = celaeno::graph::views::depth;
 namespace bfs = celaeno::graph::search::bfs;
-namespace rg = ranges;
-namespace rv = ranges::views;
-namespace fw = fplus::fwd;
 // }}}
 
 // Using namespaces {{{
@@ -60,36 +53,44 @@ using namespace celaeno::concepts;
 using namespace celaeno::graph::concepts;
 // }}}
 
+// Using declarations {{{
+using std::ranges::transform;
+// }}}
+
 // Algorithm {{{
 template<SignedIntegral T, Neighbors P, Neighbors S, Edge L, Edge U>
-void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
+void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
 {
-  // Get the pseudo vertex with the lowest value
-  auto counter { fw::apply(bfs::run(root,pred,succ), fw::sort(), fw::minimum()) };
+  // Dummy vertex with lowest value
+  i64 idx{};
 
-  // If the value greater than 0, set it to 0 as its first value is a pre-decrement
-  if(counter > 0) { counter = 0; }
+  // Define function to compare values lt 0
+  auto f_lowest = [&idx](auto&& e) { if(e < idx){ idx=e; } return true; };
 
-  // vd = Vertex → Depth; dv = Depth  → Vertex
-  auto [dv,vd] = depth::run(root,std::forward<P>(pred),std::forward<S>(succ));
+  // Get the dummy vertex with the lowest value
+  bfs::run(root,f_pred,f_succ,f_lowest);
 
-  // Get the levels indexes
-  auto levels { dv | rv::keys | rv::unique | rg::to<std::vector> };
+  // vl = Vertex → Level; lv = Level  → Vertex
+  auto [lv,vl] = depth::run(root,std::forward<P>(f_pred),std::forward<S>(f_succ));
+
+  // Create the vector with levels indexes
+  std::vector<T> levels {};
+
+  // Populate level indexes
+  transform(lv, std::back_inserter(levels), [](auto&& e) { return e.first; });
 
   // Algorithm
-  for (auto const& i : levels)
+  for (auto&& current : levels)
   {
-    auto range {dv.equal_range(i)};
-    for( auto it{range.first}; it!=range.second; ++it )
+    for( auto it{lv.at(current).begin()}; it!=lv.at(current).end(); ++it )
     {
-      auto const& current{it->second};
       // For each predecessor current
-      for( auto p : pred(current) )
+      for( auto p : f_pred(*it) )
       {
-        auto distance{vd.at(current)-vd.at(p)};
+        auto distance{vl.at(*it)-vl.at(p)};
         while( distance > 1 )
         {
-          --counter;
+          --idx;
           //
           // ↓         ↓
           // A         B
@@ -101,8 +102,8 @@ void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
           // * -> * -> *
           //  \_______/
           //
-          link(std::make_pair(p,counter));
-          link(std::make_pair(counter,current));
+          f_link(std::make_pair(p,idx));
+          f_link(std::make_pair(idx,*it));
           //
           // ↓         ↓
           // A    C    B
@@ -114,7 +115,7 @@ void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
           // A    C    B
           // * -> * -> *
           //
-          unlink(std::make_pair(p,current));
+          f_unlink(std::make_pair(p,*it));
           //
           // ↓
           // A    C    B
@@ -125,7 +126,7 @@ void run(T root, P&& pred, S&& succ, L&& link, U&& unlink )
           // A    C    B
           // * -> * -> *
           //
-          p = counter;
+          p = idx;
           //
           // If the distance 'd' is still greater than one, more pseudo
           // vertices need to be inserted in-between C and B.
