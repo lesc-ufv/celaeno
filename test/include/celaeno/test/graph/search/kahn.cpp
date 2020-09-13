@@ -33,7 +33,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
-#include <fplus/fplus.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
 #include <celaeno/aliases.hpp>
@@ -56,7 +55,6 @@ using namespace celaeno::concepts;
 // }}}
 
 // namespaces {{{
-namespace fw = fplus::fwd;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace topo = celaeno::graph::search::kahn;
@@ -90,17 +88,18 @@ TEST_CASE("celaeno::graph::search::kahn"
     // }}}
 
     // Test Kahn {{{
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [result,runtime] = celaeno::test::runtime([&](){ return kahn::run(0,pred,succ); });
+    auto f_p = [&g](auto&& v){ return g.predecessors(v); };
+    auto f_s = [&g](auto&& v){ return g.successors(v); };
+    auto [result,runtime] = celaeno::test::runtime([&]{ return kahn::run(0,f_p,f_s); });
     // }}}
 
     // Perform checks {{{
+    auto f_unique = [](auto&& c){ return std::set(c.begin(),c.end()); };
     celaeno::test::check(
       // Check vertices count with bfs size
-      (g.vertices_count() == result.size()),
+      ( g.vertices_count() == result.size() ),
       // Check if there are no duplicates
-      fw::apply(result,fw::unique()).size() == result.size()
+      ( f_unique(result).size() == result.size() )
     );
     // }}}
 

@@ -33,7 +33,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
-#include <fplus/fplus.hpp>
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader/verilog.hpp>
 #include <celaeno/aliases.hpp>
@@ -56,7 +55,6 @@ using namespace celaeno::concepts;
 // }}}
 
 // Namespaces {{{
-namespace fw = fplus::fwd;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace dfs = celaeno::graph::search::dfs;
@@ -92,17 +90,18 @@ TEST_CASE("celaeno::graph::search::dfs"
     // }}}
 
     // Test dfs {{{
-    auto p = [&g](auto&& u){ return g.predecessors(u); };
-    auto s = [&g](auto&& u){ return g.successors(u); };
-    auto [result,runtime] = celaeno::test::runtime([&](){ return dfs::run(0,p,s); });
+    auto f_p = [&g](auto&& u){ return g.predecessors(u); };
+    auto f_s = [&g](auto&& u){ return g.successors(u); };
+    auto [result,runtime] = celaeno::test::runtime([&]{ return dfs::run(0,f_p,f_s); });
     // }}}
 
     // Perform checks {{{
+    auto f_unique = [](auto&& c){ return std::set(c.begin(),c.end()); };
     celaeno::test::check(
       // Check vertices count with bfs size
-      (g.vertices_count() == result.size()),
+      ( g.vertices_count() == result.size() ),
       // Check if there are no duplicates
-      fw::apply(result,fw::unique()).size() == result.size()
+      ( f_unique(result).size() == result.size() )
     );
     // }}}
 
