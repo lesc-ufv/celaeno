@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : depth
@@ -34,19 +34,16 @@
 #pragma once
 
 #include <map>
-#include <fplus/fplus.hpp>
-#include <celaeno/graph/search/kahn.hpp>
 #include <type_traits>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
+#include <celaeno/graph/search/kahn.hpp>
 
 // namespace celaeno::graph::views::depth {{{
 namespace celaeno::graph::views::depth
 {
 
 // Namespaces {{{
-namespace fp = fplus;
-namespace fw = fplus::fwd;
 namespace kahn = celaeno::graph::search::kahn;
 // }}}
 
@@ -57,40 +54,42 @@ using namespace celaeno::graph::concepts;
 
 // Algorithm {{{
 template<SignedIntegral T, Neighbors P, Neighbors S>
-std::pair<std::multimap<T,T>,std::map<T,T>> run(T root, P&& pred, S&& succ)
+auto run(T root, P&& f_pred, S&& f_succ)
+  -> std::pair<std::map<T,std::set<T>>,std::map<T,T>> 
 {
-  // layer -> vertices
-  std::multimap<T,T> lv;
-
   // vertex -> layer
   std::map<T,T> vl;
 
+  // layer -> vertices
+  std::map<T,std::set<T>> lv;
+
   // Emplace in lv and vl
-  auto emplace = [&](auto&& l, auto&& v) { lv.emplace(l,v); vl.emplace(v,l); };
+  auto emplace = [&](auto&& l, auto&& v) { vl.emplace(v,l); lv[l].emplace(v); };
 
   // Perform Topological sorting
-  auto topo {kahn::run(std::forward<T>(root),std::forward<P>(pred),std::forward<S>(succ))};
+  auto topo {kahn::run(root,std::forward<P>(f_pred),std::forward<S>(f_succ))};
 
   // lambda to get all levels of a set vertices
-  auto levels = [&](auto&& vs) { return fp::transform([&](auto&& v){ return vl.at(v); }, vs);};
+  auto levels = [&](auto&& vs)
+  {
+    return std::ranges::transform_view(vs,[&vl](auto&& u){ return vl.at(u); });
+  };
 
-  // lambda to get the predecessor ps with max layer
-  auto max = [&](auto&& ps) { return fw::apply(levels(ps),fw::maximum()); };
+  // lambda to get the predecessor with max layer
+  auto max = [&](auto&& ps) { return std::ranges::max(levels(ps)); };
 
   // Split by layer
-  fw::apply(topo,fw::transform(([&](auto&& v)
+  std::ranges::for_each(topo,[&](auto&& v)
   {
-    auto preds {pred(v)};
+    auto preds {f_pred(v)};
     // If is in the first layer (has no predecessors), emplace 0
     if( preds.size() == 0 ) [[unlikely]] { emplace(0,v); }
     // else, emplace max layer of the predecessors + 1
     else [[likely]] { emplace(max(preds)+1,v); }
-    return true;
-  })));
+  });
 
   return { lv, vl };
-} // function: run
-// }}}
+} // function: run }}}
 
 } // namespace celaeno::graph::view::depth
 
