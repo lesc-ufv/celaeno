@@ -34,6 +34,7 @@
 
 #include <utility>
 #include <concepts>
+#include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 
 // namespace celaeno::graph::concepts {{{
@@ -49,19 +50,20 @@ using namespace celaeno::concepts;
 // Concepts {{{
 
 template<typename T>
-concept Vertex = requires(T t){ { t(int64_t{}) } -> std::same_as<std::void_t<>>; };
+concept Vertex = requires(T t){ { t(i64{}) } -> std::same_as<std::void_t<>>; };
 
 template<typename T>
 concept Edge = requires(T t)
 {
-  { t(std::pair<int64_t,int64_t>{}) } -> std::same_as<std::void_t<>>;
+  { t(std::pair<i64,i64>{}) } -> std::same_as<std::void_t<>>;
 };
 
 template<typename T>
 concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
 
 template<typename T>
-concept Neighbors = requires(T t){ {t(int64_t{})} -> Iterable; };
+concept Neighbors =
+requires(T t) { { t(i64{}) } -> Iterable; };
 
 template<typename T>
 concept Layer = requires(T t) { { t(i64{}) } -> Iterable; };
