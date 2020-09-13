@@ -30,10 +30,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <ranges>
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-
-#include <fplus/fplus.hpp>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -58,7 +58,6 @@ using namespace celaeno::concepts;
 // }}}
 
 // Namespaces {{{
-namespace fw = fplus::fwd;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace proximity = celaeno::graph::views::proximity;
@@ -89,28 +88,37 @@ TEST_CASE("celaeno::graph::view::proximity"
     // }}}
 
     // Execute proximity view algorithm {{{
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [result,runtime] = celaeno::test::runtime([&](){ return proximity::run(0, pred, succ); });
-    auto [dv,vd] = std::make_pair(result.first, result.second);
+    auto f_p = [&g](auto&& v){ return g.predecessors(v); };
+    auto f_s = [&g](auto&& v){ return g.successors(v); };
+    auto [result,runtime] = celaeno::test::runtime([&]{ return proximity::run(0, f_p, f_s); });
+    auto&& vl{result.second};
     // }}}
 
     // Perform tests {{{
-    for (auto&& [v,d] : vd)
+    for (auto&& [v,l] : vl)
     {
       // If has successors get the minimum level between all of them
-      auto successors{succ(v)};
-      if( ! successors.empty() )
+      if( auto successors = f_s(v); ! successors.empty() )
       {
-        i64 minimum {fw::apply(successors
-          , fw::transform([&](auto&& s){ return vd.at(s); })
-          , fw::sort()
-          , fw::minimum()
-        )};
+
+        // Store levels
+        std::vector<decltype(l)> levels;
+
+        // Populate levels
+        std::ranges::transform(successors, std::back_inserter(levels),
+          [&vl](auto&& s){ return vl.at(s); }
+        );
+
+        // Sort to find minimum (only finds the first minimum)
+        std::ranges::sort(levels);
+
+        // Get minimum value
+        auto minimum {std::ranges::min(levels)};
+
         // Check distance of v and topologically nearest successor is one
-        CHECK( minimum-d == 1 );
+        CHECK( minimum-l == 1 );
       } // if: ! successors.empty()
-    } // for [v,d] : vd
+    } // for [v,l] : vl
     // }}}
 
     // Log results {{{
