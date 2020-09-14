@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : bfs
@@ -39,6 +39,7 @@
 #include <concepts>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
+#include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
 
@@ -48,7 +49,6 @@ namespace celaeno::graph::search::bfs
 
 // Namespaces {{{
 namespace fp = fplus;
-namespace rg = ranges;
 namespace ra = ranges::actions;
 // }}}
 
@@ -59,15 +59,15 @@ using namespace celaeno::graph::concepts;
 
 // Concepts {{{
 template<typename T>
-concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+concept Callback = requires(T t){ {t(i64{})} -> std::same_as<bool>; };
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors P, Neighbors S, Callback C = std::function<bool(int64_t)>>
-std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;})
+template<SignedIntegral T, typename P, typename S, Callback C = std::function<bool(i64)>>
+std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return false;})
 {
   // Create adjacent helper
-  auto nb = [&](auto&& u){ return fp::append(pred(u),succ(u)); };
+  auto f_nb = [&](auto&& u){ return fp::append(f_pred(u),f_succ(u)); };
 
   // Queue of vertices
   std::queue<T> queue;
@@ -98,14 +98,14 @@ std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;
 
     // Get the adjacent vertices
     // Remove the visited ones
-    auto is_visited = [&visited](auto&& v){return visited.contains(v);};
-    auto not_visited {nb(vertex) | ra::drop_while(is_visited)};
+    auto f_is_visited = [&visited](auto&& v){return visited.contains(v);};
+    auto f_not_visited {f_nb(vertex) | ra::drop_while(f_is_visited)};
 
     // Insert non-visited into the queue
-    rg::for_each(not_visited, [&queue](auto&& v){ queue.push(v); });
+    std::ranges::for_each(f_not_visited, [&queue](auto&& v){ queue.push(v); });
 
     // Execute callback on current vertex
-    if ( cb(vertex) ) return result;
+    if ( f_cb(vertex) ) return result;
   }
   return result;
 } // function: run }}}

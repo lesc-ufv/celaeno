@@ -30,15 +30,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
-#include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
-#include <celaeno/graph/views/proximity.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/minimize/crossings/impl.hpp>
-#include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
 
 // namespace celaeno::graph::operations::minimize::crossings {{{
@@ -46,8 +42,6 @@ namespace celaeno::graph::operations::minimize::crossings
 {
 
 // namespaces {{{
-namespace fw = fplus::fwd;
-namespace proximity = celaeno::graph::views::proximity;
 namespace balance = celaeno::graph::operations::balance::paths;
 namespace incidence = celaeno::graph::representations::incidence;
 namespace minimize = celaeno::graph::operations::minimize::crossings::impl;
@@ -59,32 +53,23 @@ using namespace celaeno::graph::concepts;
 // }}}
 
 // run {{{
-template<SignedIntegral T, Neighbors N1, Neighbors N2, Edge E1, Edge E2>
+template<SignedIntegral T, typename N1, typename N2, typename E1, typename E2>
 decltype(auto) run(T root, N1&& p, N2&& s, E1&& l, E2&& u)
 {
-  auto [lv,_] {proximity::run(root, std::forward<N1>(p), std::forward<N2>(s))};
-
+  //
+  // @ Sugiyama algorithm requires a k-layered bipartite graph
+  //
   balance::run(root,
     std::forward<N1>(p), std::forward<N2>(s),
     std::forward<E1>(l), std::forward<E2>(u)
   );
 
-  auto layer = [&lv](i64 idx)
-  {
-    return fw::apply(lv
-      , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-      , fw::get_map_values()
-    );
-  };
-
-  // Number of layers of the graph
-  auto layers {fw::apply(lv,fw::get_map_keys(),fw::unique(),fw::size_of_cont())};
-
-  // Incidence matrices of the graph
-  auto&& ms {incidence::run(root, p, s)};
-
-  // Minimize crossings
-  return minimize::run(std::move(ms),layer,layers);
+  //
+  // @ Minimize crossings of the matrix realization
+  //
+  return minimize::run(
+    incidence::run(root, std::forward<N1>(p), std::forward<N2>(s))
+  );
 
 } // function: run
 

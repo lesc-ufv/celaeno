@@ -64,7 +64,7 @@ using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors N1, Neighbors N2>
+template<SignedIntegral T, typename N1, typename N2>
 auto run(T root, N1&& f_pred, N2&& f_succ)
 {
     // Proximity view: @level → vertex && @vertex → level

@@ -46,7 +46,6 @@ namespace celaeno::graph::search::kahn
 
 // Namespaces {{{
 namespace fp = fplus;
-namespace fw = fplus::fwd;
 namespace bfs = celaeno::graph::search::bfs;
 // }}}
 
@@ -61,7 +60,7 @@ concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors N1, Neighbors N2, Callback C = std::function<bool(int64_t)>>
+template<SignedIntegral T, typename N1, typename N2, Callback C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return false;})
 {
   // Topologically sorted result

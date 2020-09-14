@@ -78,8 +78,7 @@ add_test(g_views_proximity "include/celaeno/test/graph/views/proximity.cpp")
 ## Operations
 ### Query
 add_test(g_operations_count_crossings "include/celaeno/test/graph/operations/count/crossings.cpp")
-add_test(g_operations_incidence_barycenter
-    "include/celaeno/test/heuristics/barycenter.cpp")
+add_test(g_operations_incidence_barycenter "include/celaeno/test/heuristics/barycenter.cpp")
 ### Modifiers
 add_test(g_operations_balance_paths "include/celaeno/test/graph/operations/balance/paths.cpp")
 add_test(g_operations_minimize_crossings "include/celaeno/test/graph/operations/minimize/crossings.cpp")

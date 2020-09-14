@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : depth
@@ -85,10 +85,9 @@ TEST_CASE("celaeno::graph::views::depth")
     // }}}
 
     // Create depth view {{{
-    // Helpers
     auto pred = [&g](auto&& v){ return g.predecessors(v); };
     auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [result,runtime] = celaeno::test::runtime([&](){ return depth::run(0, pred, succ).first; });
+    auto [result,runtime] = celaeno::test::runtime([&]{ return depth::run(0, pred, succ); });
     // }}}
 
 

@@ -62,7 +62,7 @@ concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors P, Neighbors S, Callback C = std::function<bool(int64_t)>>
+template<SignedIntegral T, typename P, typename S, Callback C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;})
 {
   // Create adjacent helper

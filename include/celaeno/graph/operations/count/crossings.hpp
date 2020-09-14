@@ -54,7 +54,7 @@ using namespace celaeno::graph::concepts;
 // }}}
 
 // function: run {{{
-template<SignedIntegral T, Neighbors N1, Neighbors N2>
+template<SignedIntegral T, typename N1, typename N2>
 auto run(T root, N1&& p, N2&& s)
 {
   // Create the incidence matrix

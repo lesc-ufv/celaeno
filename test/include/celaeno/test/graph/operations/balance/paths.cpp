@@ -100,7 +100,7 @@ TEST_CASE("celaeno::graph::operations::balance::paths"
     auto s = [&g](auto&& v){ return g.successors(v); };
     auto l = [&g](auto&& e){ g.emplace(e); };
     auto u = [&g](auto&& e){ g.erase(e); };
-    auto runtime {celaeno::test::runtime_vt([&](){ balance::run(0,p,s,l,u); })};
+    auto runtime {celaeno::test::runtime_vt([&]{ balance::run(0,p,s,l,u); })};
     // }}}
 
     // More tests {{{

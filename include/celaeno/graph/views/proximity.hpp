@@ -63,7 +63,7 @@ using std::ranges::sort;
 
 // fn: run {{{
 
-template<SignedIntegral T, Neighbors P, Neighbors S>
+template<SignedIntegral T, typename P, typename S>
 auto run(T root, P&& f_pred, S&& f_succ) -> std::pair<std::map<T,std::set<T>>,std::map<T,T>>
 {
   // Create a depth-view

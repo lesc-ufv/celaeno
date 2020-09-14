@@ -49,25 +49,6 @@ using namespace celaeno::concepts;
 
 // Concepts {{{
 
-template<typename T>
-concept Vertex = requires(T t){ { t(i64{}) } -> std::same_as<std::void_t<>>; };
-
-template<typename T>
-concept Edge = requires(T t)
-{
-  { t(std::pair<i64,i64>{}) } -> std::same_as<std::void_t<>>;
-};
-
-template<typename T>
-concept Adjacent = requires(T t) {{ t(i64{},i64{}) } -> std::same_as<bool>; };
-
-template<typename T>
-concept Neighbors =
-requires(T t) { { t(i64{}) } -> Iterable; };
-
-template<typename T>
-concept Layer = requires(T t) { { t(i64{}) } -> Iterable; };
-
 // }}}
 
 } // namespace celaeno::graph::concepts }}}

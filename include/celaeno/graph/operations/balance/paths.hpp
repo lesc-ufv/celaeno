@@ -58,7 +58,7 @@ using std::ranges::transform;
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, Neighbors P, Neighbors S, Edge L, Edge U>
+template<SignedIntegral T, typename P, typename S, typename L, typename U>
 void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
 {
   // Dummy vertex with lowest value
