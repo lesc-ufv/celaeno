@@ -36,8 +36,7 @@
 #include <vector>
 #include <concepts>
 #include <iterator>
-#include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
+#include <range/v3/all.hpp> // TODO remove
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
@@ -48,9 +47,13 @@
 namespace celaeno::graph::representations::incidence
 {
 
+
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
+
 // Namespaces {{{
 namespace rg = ranges;
-namespace fw = fplus::fwd;
 namespace proximity = celaeno::graph::views::proximity;
 namespace incidence = celaeno::graph::representations::incidence::impl;
 // }}}
@@ -62,30 +65,33 @@ using namespace celaeno::graph::concepts;
 
 // Algorithm {{{
 template<SignedIntegral T, Neighbors N1, Neighbors N2>
-auto run(T root, N1&& pred, N2&& succ)
+auto run(T root, N1&& f_pred, N2&& f_succ)
 {
     // Proximity view: @level → vertex && @vertex → level
-    auto [lv,_] = proximity::run(root,pred,succ);
+    auto [lvs,_] = proximity::run(root,f_pred,f_succ);
+
+    // Number of levels must be > 1
+    assertm(lvs.size() > 1, "Number of layers of the input graph is less 2");
 
     // Lambda to verify if an edge between u → v exists
-    auto adjacent = [&](T u, T v){ return rg::contains(succ(u),v); };
-
-    // Get the height of the graph
-    auto height
-      {fw::apply(lv, fw::get_map_keys(), fw::unique(), fw::size_of_cont())};
-
-    // Lambda to obtain a layer by index
-    auto layer = [&lv](T idx)
-    {
-      return fw::apply(lv
-        , fw::drop_if([&idx](auto&& e){ return e.first != idx; })
-        , fw::get_map_values()
-        , fw::sort()
-      );
-    };
+    auto f_adjacent = [&](T u, T v){ return rg::contains(f_succ(u),v); };
 
     // Return the incidence matrix
-    return incidence::run(layer,adjacent,height);
+    return incidence::all(
+      std::forward<decltype(lvs)>(lvs),
+      std::forward<decltype(f_adjacent)>(f_adjacent)
+    );
+
+} // function: run }}}
+
+template<typename L1, typename L2, typename A>
+auto run(L1&& l1, L2&& l2, A&& f_adjacent)
+{
+  return incidence::single(
+    std::forward<L1>(l1),
+    std::forward<L2>(l2),
+    std::forward<A>(f_adjacent)
+  );
 
 } // function: run }}}
 

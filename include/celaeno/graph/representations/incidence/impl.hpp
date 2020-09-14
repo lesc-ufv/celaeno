@@ -36,8 +36,7 @@
 #include <vector>
 #include <concepts>
 #include <iterator>
-#include <range/v3/all.hpp>
-#include <fplus/fplus.hpp>
+#include <ranges>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
@@ -46,55 +45,59 @@
 namespace celaeno::graph::representations::incidence::impl
 {
 
-// Namespaces {{{
-namespace fp = fplus;
-// }}}
-
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::graph::concepts;
 // }}}
 
-// Algorithm {{{
-template<Layer L, Adjacent A>
-auto run(L&& layer, A&& adjacent, u64 height)
-{
-  using Matrix = std::vector<std::vector<bool>>;
+// Type aliases {{{
+using Matrix = std::vector<std::vector<bool>>;
+// }}}
 
-  // Result
+// Algorithm {{{
+
+// fn: single {{{
+template<typename L1, typename L2, typename A>
+auto single(L1&& l1, L2&& l2, A&& f_adjacent)
+{
+  // Create the incidence matrix
+  Matrix m(l1.size(),std::vector<bool>(l2.size(),0));
+
+  // If edge exists, 1 else 0
+  std::ranges::for_each(l1,
+  [&,i=0](auto&& u) mutable
+  {
+    std::ranges::for_each(l2,[&,j=0](auto&& v) mutable
+    {
+      if( f_adjacent(u,v) ){ m.at(i).at(j) = 1; }
+      ++j;
+    });
+    ++i;
+  });
+
+  // A single incidence matrix
+  return m;
+
+} // function: single }}}
+
+// fn: all {{{
+template<typename L, typename A>
+auto all(L&& layers, A&& f_adjacent)
+{
+  // Result is the representation of the grpah as an incidence matrix
   std::vector<Matrix> result;
 
-  for (u64 i{0}; i < height-1; ++i)
+  // Create all incidence matrices
+  for (auto&& it{layers.cbegin()}; it != std::prev(layers.cend()); ++it)
   {
-    // Get two layers
-    auto [l1,l2] = std::make_pair(layer(i),layer(i+1));
+    result.emplace_back(single(it->second,std::next(it)->second,f_adjacent));
+  } // for: it != layers.cend()
 
-    // Create the incidence matrix
-    Matrix m( l1.size(), std::vector<bool>(l2.size(), 0) );
-
-    // Enumerate layers
-    auto [l1e,l2e] { std::make_pair(fp::enumerate(l1),fp::enumerate(l2)) };
-
-    // For each node of layer 1
-    // check if edge exists for each edge of layer 2
-    // If edge exists, assign 1 to matrix
-    // If edge does not exist, do nothing
-    for (auto&& u : l1e)
-    {
-      for (auto&& v : l2e)
-      {
-        if( adjacent(u.second,v.second) )
-        {
-          m.at(u.first).at(v.first) = 1;
-        }
-      } // for l2e
-    } // for l1e
-
-    result.push_back(m);
-
-  } // for: i
-
+  // All incidence matrices
   return result;
-} // function: run }}}
+
+} // function: all }}}
+
+// }}}
 
 } // namespace celaeno::graph::representations::incidence::impl }}}
