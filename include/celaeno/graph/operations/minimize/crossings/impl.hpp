@@ -38,6 +38,12 @@
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/heuristics/barycenter.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
+#include <celaeno/graph/representations/incidence.hpp>
+
+// TODO remove
+#include <fmt/core.h>
+#include <fmt/ranges.h>
 
 // namespace celaeno::graph::operations::minimize::crossings::impl {{{
 namespace celaeno::graph::operations::minimize::crossings::impl
@@ -53,23 +59,38 @@ using namespace celaeno::concepts;
 
 // namespaces {{{
 namespace barycenter = celaeno::heuristics::barycenter;
+namespace incidence = celaeno::graph::representations::incidence;
+namespace ccrossings = celaeno::graph::operations::count::crossings;
 // }}}
+
+// fn: reverse {{{
+template<Matrix M>
+decltype(auto) reverse(M&& m)
+{
+  using matrix_t = typename std::decay_t<M>;
+
+  matrix_t rev{std::size_t{m.at(0).size()},std::vector<bool>(std::size_t{m.size()})};
+
+  for (std::size_t i{}; i < m.size(); ++i)
+  {
+    for (std::size_t j{}; j < m.at(i).size(); ++j)
+    {
+      rev.at(j).at(i) = m.at(i).at(j);
+    } // for: j
+  } // for: i
+
+  return rev;
+} // }}}
 
 // fn: bor {{{
 template<Matrix M>
 decltype(auto) bor(M&& m)
 {
-  // R will be used as an r-value of M
-  using R = typename std::decay_t<M>;
-
-  // Namespaces
-  namespace rg = std::ranges;
-
   assertm(m.size() > 0, "Empty matrix");
 
-  auto sort = [](R&& _m) -> decltype(auto)
+  auto sort = [](std::decay_t<M>&& _m) -> decltype(auto)
   {
-    rg::sort(_m,[&](auto&& lhs, auto&& rhs)
+    std::ranges::sort(_m,[&](auto&& lhs, auto&& rhs)
     {
       return barycenter::run(lhs) < barycenter::run(rhs);
     });
@@ -83,33 +104,45 @@ decltype(auto) bor(M&& m)
 template<Matrix M>
 decltype(auto) boc(M&& m)
 {
-  using std::vector;
-
-  // R will be used as an r-value of M
-  using R = typename std::decay_t<M>;
-
-  auto reverse = [](R&& _m) -> decltype(auto)
-  {
-    R rev{std::size_t{_m.at(0).size()},vector<bool>(std::size_t{_m.size()})};
-
-    for (std::size_t i{}; i < _m.size(); ++i)
-    {
-      for (std::size_t j{}; j < _m.at(i).size(); ++j)
-      {
-        rev.at(j).at(i) = _m.at(i).at(j);
-      } // for: j
-    } // for: i
-    return rev;
-  };
-
-  return reverse(std::move(bor(std::move(reverse(std::move(m))))));
+  return reverse(std::move(bor(std::move(reverse(std::forward<M>(m))))));
 } // function: boc }}}
 
-// fn: ro TODO {{{
+// fn: ror TODO {{{
 template<Matrix M>
-decltype(auto) ro(M&& m)
+decltype(auto) ror(M&& m)
 {
   return m;
-} // function: ro }}}
+} // function: ror }}}
+
+// fn: roc TODO {{{
+template<typename M>
+decltype(auto) roc(M&& m)
+{
+  return m;
+} // function: roc }}}
+
+// fn: phase_1 {{{
+template<typename L, typename FNA>
+decltype(auto) phase_1(L&& layers, FNA&& f_adjacent)
+{
+  using E = typename std::decay_t<L>::value_type::value_type;
+
+  std::vector<std::vector<E>> result;
+
+  // Step 1 - Keep the best ordering of layers
+  std::decay_t<L> best_orderings{layers};
+
+  assertm(layers.size() >= 2, "Layer count is less than 2");
+
+  for (auto it{layers.cbegin()}; it != layers.cend(); ++it)
+  {
+    // Step 2 - Sort layer by row barycenter
+    auto adjacent = []<typename T, typename U>(T&& t, U&& u)
+    {
+      return rg::contains(succ(t),u);
+    };
+
+    auto matrix{ incidence::run( pred, succ,  ) };
+  }
 
 } // namespace celaeno::graph::operations::minimize::crossing::impl }}}

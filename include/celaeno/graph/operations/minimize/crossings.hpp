@@ -32,19 +32,23 @@
 #pragma once
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/functional.hpp>
 #include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/minimize/crossings/impl.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
+#include <celaeno/graph/views/depth.hpp>
 
 // namespace celaeno::graph::operations::minimize::crossings {{{
 namespace celaeno::graph::operations::minimize::crossings
 {
 
 // namespaces {{{
+namespace fun = celaeno::functional;
 namespace balance = celaeno::graph::operations::balance::paths;
 namespace incidence = celaeno::graph::representations::incidence;
 namespace minimize = celaeno::graph::operations::minimize::crossings::impl;
+namespace depth = celaeno::graph::views::depth;
 // }}}
 
 // Using namespaces {{{
@@ -54,22 +58,35 @@ using namespace celaeno::graph::concepts;
 
 // run {{{
 template<SignedIntegral T, typename N1, typename N2, typename E1, typename E2>
-decltype(auto) run(T root, N1&& p, N2&& s, E1&& l, E2&& u)
+decltype(auto) run(T root, N1&& f_p, N2&& f_s, E1&& f_l, E2&& f_u)
 {
   //
   // @ Sugiyama algorithm requires a k-layered bipartite graph
   //
   balance::run(root,
-    std::forward<N1>(p), std::forward<N2>(s),
-    std::forward<E1>(l), std::forward<E2>(u)
+    std::forward<N1>(f_p), std::forward<N2>(f_s),
+    std::forward<E1>(f_l), std::forward<E2>(f_u)
   );
+
+  //
+  // @ Check if two vertices are adjacent
+  //
+  auto f_adjacent = [&f_s]<typename V>(V _u, V _v) -> bool
+  {
+    auto successors{f_s(_u)};
+    return std::ranges::find(successors,_v) != std::ranges::end(successors);
+  };
+
+  //
+  // @ Create layers vector
+  //
+  auto topo_view{depth::run(root,std::forward<N1>(f_p),std::forward<N2>(f_s)).first};
+  auto layers{fun::values(topo_view)};
 
   //
   // @ Minimize crossings of the matrix realization
   //
-  return minimize::run(
-    incidence::run(root, std::forward<N1>(p), std::forward<N2>(s))
-  );
+  return minimize::phase_1(layers,f_adjacent);
 
 } // function: run
 

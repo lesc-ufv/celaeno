@@ -71,6 +71,14 @@ requires(T t)
   { t/t } -> std::same_as<T>;
 };
 
+template<typename T>
+concept Map =
+requires
+{
+  typename std::decay_t<T>::key_type;
+  typename std::decay_t<T>::mapped_type;
+};
+
 template<typename V>
 concept Vector =
 Iterable<V> && requires(V&& v){ typename std::decay_t<V>::value_type; };

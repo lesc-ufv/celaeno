@@ -33,9 +33,18 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
+#include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/functional.hpp>
 #include <celaeno/test/test.hpp>
+#include <celaeno/test/graph/test.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
+#include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/operations/minimize/crossings/impl.hpp>
+
+#include <taygete/graph/graph.hpp>
+#include <taygete/graph/reader/verilog.hpp>
 
 #include "crossings/data.hpp"
 
@@ -43,12 +52,23 @@
 namespace celaeno::graph::operations::minimize::crossings::test
 {
 
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
+
 // Using namespaces {{{
 using namespace celaeno::concepts;
 // }}}
 
 // namespaces {{{
+namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
+namespace fun = celaeno::functional;
 namespace test = celaeno::test;
+namespace balance = celaeno::graph::operations::balance::paths;
+namespace depth = celaeno::graph::views::depth;
+namespace ccrossings = celaeno::graph::operations::count::crossings;
+namespace mcrossings = celaeno::graph::operations::minimize::crossings;
 namespace impl = celaeno::graph::operations::minimize::crossings::impl;
 // }}}
 
@@ -56,36 +76,15 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
   * doctest::description("Graph crossing minimization test")
 )
 {
-
-  // lamb: zip {{{
-  auto zip = []<Iterable C1, Iterable C2>(C1 const& c1, C2 const& c2)
-    requires
-       requires(C1){ typename std::decay_t<C1>::value_type; }
-    && requires(C2){ typename std::decay_t<C2>::value_type; }
-  {
-
-    using T1 = typename C1::value_type;
-    using T2 = typename C2::value_type;
-
-    std::vector<std::pair<T1,T2>> zipped;
-
-    for (auto it1{c1.begin()}, it2{c2.begin()}; it1 != c1.end() && it2 != c2.end(); ++it1, ++it2)
-    {
-      zipped.emplace_back(*it1,*it2);
-    } // for
-
-    return zipped;
-  }; // }}}
-
   // subcase: barycenter reordering {{{
   SUBCASE("Barycenter reordering")
   {
     // lamb: test {{{
-    auto test = [&zip]<Matrix M>(M&& m, M&& s) -> decltype(auto)
+    auto test = []<Matrix M>(M&& m, M&& s) -> decltype(auto)
     {
-      return [&m,&s,&zip]<typename F>(F&& f) -> void
+      return [&m,&s]<typename F>(F&& f) -> void
       {
-        for (auto&& [result,expected] : zip(f(m),s))
+        for (auto&& [result,expected] : fun::zip(f(m),s))
         {
           test::check(result == expected);
         } // for
@@ -109,12 +108,109 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     test(data::brs4,data::brss4)(boc);
     test(data::brs5,data::brss5)(boc);
     // }}}
-  } // SUBCASE: "Barycenter reordering" }}}
+  } // subcase: "Barycenter reordering" }}}
 
-  // subcase: equal row ordering {{{
-  SUBCASE("Equal row reordering")
+  // subcase: "Phase 1" {{{
+  SUBCASE("Phase 1")
   {
-  } // SUBCASE: "Barycenter reordering" }}}
+    auto test_row = []<Matrix M>(M&& sample, M&& result)
+    {
+      celaeno::test::check(impl::phase_1(sample,true) == result);
+    };
+
+    auto test_col = []<Matrix M>(M&& sample, M&& result)
+    {
+      celaeno::test::check(impl::phase_1(sample,false) == result);
+    };
+
+    test_row(data::brs1,data::brss1);
+    test_row(data::brs2,data::brss2);
+    test_row(data::brs3,data::brss3);
+    test_row(data::brs4,data::brss4);
+    test_row(data::brs5,data::brss5);
+
+    test_col(data::bro1,data::brso1);
+    test_col(data::bro2,data::brso2);
+    test_col(data::bro3,data::brso3);
+    test_col(data::bro4,data::brso4);
+    test_col(data::bro5,data::brso5);
+  } // subcase: "Phase 1" }}}
+
+  // subcase: "Phase 2" {{{
+  SUBCASE("Phase 2")
+  {
+    // Logger {{{
+    celaeno::test::logger_new({
+        .name="celaeno::graph::operations::minimize::crossings",
+        .path="logs/celaeno/graph/operations/minimize/crossings.csv",
+        .info="date,time,vertices,edges,runtime",
+        .pattern="%d/%m/%Y,%T,%v"
+    });
+    // }}}
+
+    // test lambda {{{
+    auto test = [&]<String S>(S const& str)
+    {
+      // Read graph {{{
+      graph::Graph<i64> g;
+      auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
+      reader::Reader{str,emplace};
+      // }}}
+
+      // vertices_count > 0 {{{
+      assertm(g.vertices_count() > 0, "Empty input graph");
+      // }}}
+
+      // Test minimize crossings {{{
+      auto f_p = [&g](auto&& v){ return g.predecessors(v); };
+      auto f_s = [&g](auto&& v){ return g.successors(v); };
+      auto f_l = [&g](auto&& e){ g.emplace(e); };
+      auto f_u = [&g](auto&& e){ g.erase(e); };
+
+      auto [result,runtime]
+      {
+        celaeno::test::runtime([&]{return mcrossings::run(0,f_p,f_s,f_l,f_u);})
+      };
+      // }}}
+
+      auto dp{depth::run(0,f_p,f_s).first};
+
+      fmt::print("Layers before\n");
+      for (auto&& [l,v] : dp)
+      {
+        fmt::print("{}\n",v);
+      } // for
+
+      fmt::print("Layers after\n");
+      for (auto&& l : result)
+      {
+        fmt::print("{}\n",l);
+      } // for
+
+      CHECK( result.size() == dp.size() );
+
+      // if (result.cbegin() != result.cend())
+      // {
+      //   for (auto it{result.cbegin()}; it != std::prev(result.cend()); ++it)
+      //   {
+      //     if ( std::next(it) != result.cend() )
+      //     {
+      //       fmt::print("Crossings: {} | {}", ccrossings::single());
+      //     } // if
+      //   } // for
+      // } // if
+
+      // Log results {{{
+      celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
+      // }}}
+
+    }; // lamb: test }}}
+
+    // Perform tests {{{
+    celaeno::graph::test::run(test);
+    // }}}
+  } // SUBCASE: "Phase 2" }}}
+
 
 } // TEST_CASE: "celaeno::graph::operations::minimize::crossings"
 
