@@ -68,11 +68,11 @@ int main()
   auto layers {minimize::run(1,p,s,l,u)};
   // }}}
 
-  // // Print ordering {{{
-  // for (auto&& l : layers)
-  // {
-  //   fmt::print("{}\n",l);
-  // } // for l : layers }}}
+  // Print ordering {{{
+  for (auto&& l : layers)
+  {
+    fmt::print("{}\n",l);
+  } // for l : layers }}}
 
   return EXIT_SUCCESS;
 } // main

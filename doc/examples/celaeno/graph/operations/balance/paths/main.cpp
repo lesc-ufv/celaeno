@@ -48,12 +48,7 @@ namespace balance = celaeno::graph::operations::balance::paths;
 int main()
 {
   // Graph {{{
-  graph::Graph<i64> g
-  {
-    {1,5},{2,4},{3,7},{6,11},
-    {4,7},{5,7},{5,8},{5,9},
-    {7,12},{8,10},{8,11},
-  };
+  graph::Graph<i64> g{{0,1},{1,2},{2,3},{0,3}};
   // }}}
 
   // Required behaviors {{{
@@ -69,14 +64,13 @@ int main()
 
   // Print before {{{
   fmt::print("Before balancing: \n");
-  i32 prev{0};
-  for (auto&& l : layers)
+  std::ranges::for_each(layers,[i=0](auto&& l) mutable
   {
-    fmt::print("{} ",l.second);
-    if( l.first > prev ){ prev = l.first; fmt::print("\n"); }
-  } // for l : layers }}}
-  fmt::print("\n-------\n");
-
+    fmt::print("{}\n",l.second);
+    ++i;
+  });
+  fmt::print("\n");
+  // }}}
 
   // Run algorithm {{{
   balance::run(1,p,s,l,u);
@@ -88,13 +82,13 @@ int main()
 
   // Print to after {{{
   fmt::print("After balancing: \n");
-  prev = 0;
-  for (auto&& l : layers)
+  std::ranges::for_each(layers,[i=0](auto&& l) mutable
   {
-    fmt::print("{} ",l.second);
-    if( l.first > prev ){ prev = l.first; fmt::print("\n"); }
-  } // for l : layers }}}
+    fmt::print("{}\n",l.second);
+    ++i;
+  });
   fmt::print("\n");
+  // }}}
 
   return EXIT_SUCCESS;
 } // main
