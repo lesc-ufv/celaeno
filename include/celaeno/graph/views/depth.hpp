@@ -35,6 +35,7 @@
 
 #include <map>
 #include <type_traits>
+#include <range/v3/all.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
@@ -44,6 +45,8 @@ namespace celaeno::graph::views::depth
 {
 
 // Namespaces {{{
+namespace rg = ranges;
+namespace rv = ranges::views;
 namespace kahn = celaeno::graph::search::kahn;
 // }}}
 
@@ -55,16 +58,16 @@ using namespace celaeno::graph::concepts;
 // Algorithm {{{
 template<SignedIntegral T, typename P, typename S>
 auto run(T root, P&& f_pred, S&& f_succ)
-  -> std::pair<std::map<T,std::set<T>>,std::map<T,T>>
+  -> std::pair< std::map<T,std::vector<T>>, std::map<T,T> >
 {
   // vertex -> layer
   std::map<T,T> vl;
 
   // layer -> vertices
-  std::map<T,std::set<T>> lv;
+  std::map<T,std::vector<T>> lv;
 
   // Emplace in lv and vl
-  auto emplace = [&](auto&& l, auto&& v) { vl.emplace(v,l); lv[l].emplace(v); };
+  auto emplace = [&](auto&& l, auto&& v) { vl.emplace(v,l); lv[l].push_back(v); };
 
   // Perform Topological sorting
   auto topo {kahn::run(root,std::forward<P>(f_pred),std::forward<S>(f_succ))};
@@ -72,20 +75,20 @@ auto run(T root, P&& f_pred, S&& f_succ)
   // lambda to get all levels of a set vertices
   auto levels = [&](auto&& vs)
   {
-    return std::ranges::transform_view(vs,[&vl](auto&& u){ return vl.at(u); });
+    return rv::transform(vs,[&vl](auto&& u){ return vl.at(u); });
   };
 
   // lambda to get the predecessor with max layer
   auto max = [&](auto&& ps) { return std::ranges::max(levels(ps)); };
 
   // Split by layer
-  std::ranges::for_each(topo,[&](auto&& v)
+  rg::for_each(topo,[&](auto&& v)
   {
     auto preds {f_pred(v)};
     // If is in the first layer (has no predecessors), emplace 0
-    if( preds.size() == 0 ) [[unlikely]] { emplace(0,v); }
+    if( preds.size() == 0 ) { emplace(0,v); }
     // else, emplace max layer of the predecessors + 1
-    else [[likely]] { emplace(max(preds)+1,v); }
+    else { emplace(max(preds)+1,v); }
   });
 
   return { lv, vl };

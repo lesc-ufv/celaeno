@@ -31,11 +31,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#include <ranges>
-
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
+#include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/test/test.hpp>
@@ -60,6 +59,8 @@ using namespace celaeno::concepts;
 
 
 // namespaces {{{
+namespace rg = ranges;
+namespace rv = ranges::views;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader::verilog;
 namespace cir = maia::circuits;
@@ -109,7 +110,7 @@ TEST_CASE("celaeno::graph::operations::balance::paths"
     auto [lv,vl] {depth::run(0,p,s)};
 
     // Get the levels
-    auto levels { std::views::transform(lv,[](auto&& _u){ return _u.first; }) };
+    auto levels { rv::transform(lv,[](auto&& _u){ return _u.first; }) };
 
     // Get the vertices on level
     for(auto&& level : levels)
@@ -120,12 +121,12 @@ TEST_CASE("celaeno::graph::operations::balance::paths"
         // The adjacent vertices
         auto adj {g.neighbors(*it)};
         // Verify if distance is one to each
-        auto is_dist_one = [&](auto&& a) -> void
+        auto is_dist_one = [&,vl = std::ref(vl)](auto&& a) -> void
         {
-          celaeno::test::check(std::abs(vl.at(a) - vl.at(*it)) == 1);
+          celaeno::test::check(std::abs(vl.get().at(a) - vl.get().at(*it)) == 1);
         };
         // Execute tests
-        std::ranges::for_each(adj, is_dist_one);
+        rg::for_each(adj, is_dist_one);
       } // for
     } // for
     // }}}

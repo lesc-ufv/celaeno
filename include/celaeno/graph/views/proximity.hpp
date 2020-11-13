@@ -35,6 +35,7 @@
 
 #include <ranges>
 #include <utility>
+#include <range/v3/all.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
@@ -46,6 +47,8 @@ namespace celaeno::graph::views::proximity
 {
 
 // Namespaces {{{
+namespace rg = ranges;
+namespace rv = ranges::views;
 namespace depth = celaeno::graph::views::depth;
 namespace kahn = celaeno::graph::search::kahn;
 // }}}
@@ -56,15 +59,15 @@ using namespace celaeno::graph::concepts;
 // }}}
 
 // using declarations {{{
-using std::ranges::for_each;
-using std::ranges::transform;
-using std::ranges::sort;
+using rg::for_each;
+using rv::transform;
+using rg::sort;
 // }}}
 
 // fn: run {{{
 
 template<SignedIntegral T, typename P, typename S>
-auto run(T root, P&& f_pred, S&& f_succ) -> std::pair<std::map<T,std::set<T>>,std::map<T,T>>
+auto run(T root, P&& f_pred, S&& f_succ) -> std::pair<std::map<T,std::vector<T>>,std::map<T,T>>
 {
   // Create a depth-view
   auto [lvs,vl] {depth::run(root, std::forward<P>(f_pred), std::forward<S>(f_succ))};
@@ -93,9 +96,19 @@ auto run(T root, P&& f_pred, S&& f_succ) -> std::pair<std::map<T,std::set<T>>,st
           // Levels ordered by successors
           std::vector<T> levels;
           // Order successors in ascending order of lev(s)
-          sort(succs,[&vl](auto&& lhs, auto&& rhs) { return vl.at(lhs) < vl.at(rhs); });
+          sort(succs,
+            [vl=std::ref(vl)](auto&& lhs, auto&& rhs)
+            {
+              return vl.get().at(lhs) < vl.get().at(rhs);
+            }
+          );
           // Populate levels by sorted successors
-          transform(succs,std::back_inserter(levels),[&](auto&& s) { return vl.at(s); });
+          for_each(succs,
+            [&,vl=std::ref(vl)](auto&& s)
+            {
+              levels.emplace_back(vl.get().at(s));
+            }
+          );
           // Get the difference of lev(min(s)) and lev(p)
           auto diff { levels.at(0) - vl.at(p) };
           // If the diff is gt than one, update lev(p)
@@ -106,7 +119,7 @@ auto run(T root, P&& f_pred, S&& f_succ) -> std::pair<std::map<T,std::set<T>>,st
   } // for
 
   // Update level -> vertices
-  for_each(vl, [&lvs](auto&& e){ lvs[e.second].emplace(e.first); });
+  for_each(vl, [lvs=std::ref(lvs)](auto&& e){ lvs.get().at(e.second).emplace_back(e.first); });
 
   return { lvs, vl };
 
