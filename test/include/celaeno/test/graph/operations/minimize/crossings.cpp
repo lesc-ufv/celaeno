@@ -33,18 +33,21 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
+#include <fplus/fplus.hpp>
+#include <range/v3/all.hpp>
+
+#include <taygete/graph/graph.hpp>
+#include <taygete/graph/reader/verilog.hpp>
+
 #include <celaeno/aliases.hpp>
-#include <celaeno/concepts.hpp>
-#include <celaeno/functional.hpp>
 #include <celaeno/test/test.hpp>
 #include <celaeno/test/graph/test.hpp>
+#include <celaeno/concepts.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/operations/minimize/crossings/impl.hpp>
 
-#include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader/verilog.hpp>
 
 #include "crossings/data.hpp"
 
@@ -56,22 +59,26 @@ namespace celaeno::graph::operations::minimize::crossings::test
 #define assertm(exp, msg) assert(((void)msg, exp))
 // }}}
 
+// Namespaces {{{
+namespace rg = ranges;
+namespace fp = fplus;
+
+namespace graph = taygete::graph;
+namespace reader = taygete::graph::reader::verilog;
+
+namespace test = celaeno::test;
+namespace ccrossings = celaeno::graph::operations::count::crossings;
+namespace balance = celaeno::graph::operations::balance::paths;
+namespace incidence = celaeno::graph::representations::incidence;
+namespace mc = celaeno::graph::operations::minimize::crossings;
+namespace mci = celaeno::graph::operations::minimize::crossings::impl;
+// }}}
+
 // Using namespaces {{{
 using namespace celaeno::concepts;
 // }}}
 
-// namespaces {{{
-namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader::verilog;
-namespace fun = celaeno::functional;
-namespace test = celaeno::test;
-namespace balance = celaeno::graph::operations::balance::paths;
-namespace depth = celaeno::graph::views::depth;
-namespace ccrossings = celaeno::graph::operations::count::crossings;
-namespace mcrossings = celaeno::graph::operations::minimize::crossings;
-namespace impl = celaeno::graph::operations::minimize::crossings::impl;
-// }}}
-
+// TEST_CASE: "celaeno::graph::operations::minimize::crossings" {{{
 TEST_CASE("celaeno::graph::operations::minimize::crossings"
   * doctest::description("Graph crossing minimization test")
 )
@@ -84,15 +91,21 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     {
       return [&m,&s]<typename F>(F&& f) -> void
       {
-        for (auto&& [result,expected] : fun::zip(f(m),s))
+        for (auto&& [result,expected] : fp::zip(f(m),s))
         {
           test::check(result == expected);
         } // for
       };
     }; // }}}
 
+    // lamb: bor {{{
+    auto bor = []<Matrix M>(M&& m)
+    {
+      return impl::bor(std::forward<M>(m),std::vector<i64>(m.size(),0)).first;
+    };
+    // }}}
+
     // Test row barycenter ordering {{{
-    auto bor = []<Matrix M>(M&& m){ return impl::bor(std::forward<M>(m)); };
     test(data::brs1,data::brss1)(bor);
     test(data::brs2,data::brss2)(bor);
     test(data::brs3,data::brss3)(bor);
@@ -100,50 +113,78 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     test(data::brs5,data::brss5)(bor);
     // }}}
 
-    // Test barycenter ordering {{{
-    auto boc = []<Matrix M>(M&& m){ return impl::boc(std::forward<M>(m)); };
-    test(data::bro1,data::brso1)(boc);
-    test(data::bro2,data::brso2)(boc);
-    test(data::brs3,data::brss3)(boc);
-    test(data::brs4,data::brss4)(boc);
-    test(data::brs5,data::brss5)(boc);
+    // lamb: boc {{{
+    auto boc = []<Matrix M>(M&& m)
+    {
+      return impl::reverse(
+        impl::bor(
+          impl::reverse(std::forward<M>(m)),std::vector<i64>(m.at(0).size(),0)
+        ).first
+      );
+    };
     // }}}
+
+    // Test barycenter ordering {{{
+    // test(data::bro1,data::brso1)(boc);
+    // test(data::bro2,data::brso2)(boc);
+    // test(data::brs3,data::brss3)(boc);
+    // test(data::brs4,data::brss4)(boc);
+    // test(data::brs5,data::brss5)(boc);
+    // }}}
+
   } // subcase: "Barycenter reordering" }}}
 
-  // subcase: "Phase 1" {{{
-  SUBCASE("Phase 1")
+  // subcase: "Minimize crossings" {{{
+  SUBCASE("Minimize crossings")
   {
-    auto test_row = []<Matrix M>(M&& sample, M&& result)
+    // test lambda {{{
+    auto test = [&]()
     {
-      celaeno::test::check(impl::phase_1(sample,true) == result);
-    };
+      // Read graph {{{
+      graph::Graph<i64> g
+      {
+        {6,8},{2,4},{3,4},{1,5},
+        {4,7},{5,7},{5,8},{5,9},
+        {7,12},{8,10},{8,11},
+      };
+      // }}}
 
-    auto test_col = []<Matrix M>(M&& sample, M&& result)
-    {
-      celaeno::test::check(impl::phase_1(sample,false) == result);
-    };
+      // vertices_count > 0 {{{
+      assertm(g.vertices_count() > 0, "Empty input graph");
+      // }}}
 
-    test_row(data::brs1,data::brss1);
-    test_row(data::brs2,data::brss2);
-    test_row(data::brs3,data::brss3);
-    test_row(data::brs4,data::brss4);
-    test_row(data::brs5,data::brss5);
+      // Test minimize crossings {{{
+      auto f_p = [&g](auto&& v){ return g.predecessors(v); };
+      auto f_s = [&g](auto&& v){ return g.successors(v); };
+      auto f_l = [&g](auto&& e){ g.emplace(e); };
+      auto f_u = [&g](auto&& e){ g.erase(e); };
 
-    test_col(data::bro1,data::brso1);
-    test_col(data::bro2,data::brso2);
-    test_col(data::bro3,data::brso3);
-    test_col(data::bro4,data::brso4);
-    test_col(data::bro5,data::brso5);
-  } // subcase: "Phase 1" }}}
 
-  // subcase: "Phase 2" {{{
-  SUBCASE("Phase 2")
+      // TODO erase {{{
+
+      // Print ordered
+      mc::run(1,f_p,f_s,f_l,f_u);
+
+      // TODO erase }}}
+
+      // Test minimize crossings }}}
+
+    }; // lamb: test }}}
+
+    // Perform tests {{{
+    test();
+    // }}}
+
+  } // }}}
+
+  // subcase: "Batch tests" {{{
+  SUBCASE("Batch tests")
   {
     // Logger {{{
     celaeno::test::logger_new({
         .name="celaeno::graph::operations::minimize::crossings",
         .path="logs/celaeno/graph/operations/minimize/crossings.csv",
-        .info="date,time,vertices,edges,runtime",
+        .info="date,time,prev_crossings,current_crossings,runtime",
         .pattern="%d/%m/%Y,%T,%v"
     });
     // }}}
@@ -167,41 +208,51 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
       auto f_l = [&g](auto&& e){ g.emplace(e); };
       auto f_u = [&g](auto&& e){ g.erase(e); };
 
+      // Balance graph
+      balance::run(0,f_p,f_s,f_l,f_u);
+
+      // Save crossings count
+      auto before{ccrossings::run(0,f_p,f_s)};
+
       auto [result,runtime]
       {
-        celaeno::test::runtime([&]{return mcrossings::run(0,f_p,f_s,f_l,f_u);})
+        celaeno::test::runtime([&]{return mc::run(0,f_p,f_s,f_l,f_u);})
+      };
+
+      // Generate adjancent pairs for layer indices {{{
+      auto f_generate_layer_pairs = [](auto _layer_count) -> auto
+      {
+        std::vector<std::pair<i64,i64>> pairs;
+
+        for (std::size_t i{}; i < _layer_count-1; ++i)
+        {
+          pairs.emplace_back(i,i+1);
+        } // for: i < _layer_count
+
+        return pairs;
       };
       // }}}
 
-      auto dp{depth::run(0,f_p,f_s).first};
-
-      fmt::print("Layers before\n");
-      for (auto&& [l,v] : dp)
+      auto f_adjacent = [&]<typename V>(V _u, V _v) -> bool
       {
-        fmt::print("{}\n",v);
-      } // for
+        auto successors{f_s(_u)};
+        return rg::find(successors,_v) != rg::end(successors);
+      };
 
-      fmt::print("Layers after\n");
-      for (auto&& l : result)
+      i64 after{};
+      for (auto&& p : f_generate_layer_pairs(result.size()))
       {
-        fmt::print("{}\n",l);
+        auto incidence_matrix{incidence::run(
+          result.at(p.first),
+          result.at(p.second),
+          f_adjacent)
+        };
+        after += ccrossings::run(incidence_matrix);
       } // for
-
-      CHECK( result.size() == dp.size() );
-
-      // if (result.cbegin() != result.cend())
-      // {
-      //   for (auto it{result.cbegin()}; it != std::prev(result.cend()); ++it)
-      //   {
-      //     if ( std::next(it) != result.cend() )
-      //     {
-      //       fmt::print("Crossings: {} | {}", ccrossings::single());
-      //     } // if
-      //   } // for
-      // } // if
+      // }}}
 
       // Log results {{{
-      celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
+      celaeno::test::logger_write("{},{},{}", before, after, runtime);
       // }}}
 
     }; // lamb: test }}}
@@ -209,9 +260,9 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     // Perform tests {{{
     celaeno::graph::test::run(test);
     // }}}
-  } // SUBCASE: "Phase 2" }}}
+  } // SUBCASE: "Batch tests" }}}
 
 
-} // TEST_CASE: "celaeno::graph::operations::minimize::crossings"
+} // }}}
 
 } // namespace celaeno::graph::operations::minimize::crossings::test }}}

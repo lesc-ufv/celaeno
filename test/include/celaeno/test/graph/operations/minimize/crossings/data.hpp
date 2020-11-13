@@ -97,13 +97,13 @@ std::vector<std::vector<bool>> brss3
 // Base matrix sample 4
 std::vector<std::vector<bool>> brs4
 {{
-  {0}, // 0
+  0, // 0
 }};
 
 // Expected row sorted by barycenter matrix 4
 std::vector<std::vector<bool>> brss4
 {{
-  {0}, // 0
+  0, // 0
 }};
 
 // Base matrix sample 5
@@ -186,13 +186,13 @@ std::vector<std::vector<bool>> brso3
 // Base matrix sample 4
 std::vector<std::vector<bool>> bro4
 {{
-  {0}, // 0
+  0, // 0
 }};
 
 // Expected row sorted by barycenter matrix 4
 std::vector<std::vector<bool>> brso4
 {{
-  {0}, // 0
+  0, // 0
 }};
 
 // Base matrix sample 5
