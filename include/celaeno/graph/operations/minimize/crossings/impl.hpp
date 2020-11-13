@@ -34,16 +34,13 @@
 #pragma once
 
 #include <vector>
-#include <ranges>
+#include <fplus/fplus.hpp>
+#include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/heuristics/barycenter.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
-
-// TODO remove
-#include <fmt/core.h>
-#include <fmt/ranges.h>
 
 // namespace celaeno::graph::operations::minimize::crossings::impl {{{
 namespace celaeno::graph::operations::minimize::crossings::impl
@@ -58,6 +55,10 @@ using namespace celaeno::concepts;
 // }}}
 
 // namespaces {{{
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace fp = fplus;
+namespace depth = celaeno::graph::views::depth;
 namespace barycenter = celaeno::heuristics::barycenter;
 namespace incidence = celaeno::graph::representations::incidence;
 namespace ccrossings = celaeno::graph::operations::count::crossings;
@@ -83,29 +84,27 @@ decltype(auto) reverse(M&& m)
 } // }}}
 
 // fn: bor {{{
-template<Matrix M>
-decltype(auto) bor(M&& m)
+template<typename C, typename L>
+decltype(auto) bor(C const& c, L const& l)
 {
-  assertm(m.size() > 0, "Empty matrix");
+  assertm(c.size() > 0, "Empty matrix");
 
-  auto sort = [](std::decay_t<M>&& _m) -> decltype(auto)
+  auto sort = []<typename _C>(_C _c, L _l) -> auto
   {
-    std::ranges::sort(_m,[&](auto&& lhs, auto&& rhs)
+    auto zipped_values{fp::zip(_c,_l)};
+
+    rg::sort(zipped_values,[&](auto&& lhs, auto&& rhs)
     {
-      return barycenter::run(lhs) < barycenter::run(rhs);
+      return barycenter::run(lhs.first) < barycenter::run(rhs.first);
     });
-    return _m;
+
+    std::tie(_c,_l) = fp::unzip(zipped_values);
+
+    return std::make_pair(_c,_l);
   };
 
-  return sort(std::move(m));
+  return sort(c,l);
 } // function: bor }}}
-
-// fn: boc {{{
-template<Matrix M>
-decltype(auto) boc(M&& m)
-{
-  return reverse(std::move(bor(std::move(reverse(std::forward<M>(m))))));
-} // function: boc }}}
 
 // fn: ror TODO {{{
 template<Matrix M>
@@ -122,27 +121,99 @@ decltype(auto) roc(M&& m)
 } // function: roc }}}
 
 // fn: phase_1 {{{
-template<typename L, typename FNA>
-decltype(auto) phase_1(L&& layers, FNA&& f_adjacent)
+template<SignedIntegral S, typename F1, typename F2>
+decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ)
 {
-  using E = typename std::decay_t<L>::value_type::value_type;
-
-  std::vector<std::vector<E>> result;
-
-  // Step 1 - Keep the best ordering of layers
-  std::decay_t<L> best_orderings{layers};
-
-  assertm(layers.size() >= 2, "Layer count is less than 2");
-
-  for (auto it{layers.cbegin()}; it != layers.cend(); ++it)
+  // Generate adjancent pairs for layer indices {{{
+  //
+  // @ Given a number of layers n, generate a sequence that goes from 1 to n,
+  // that repeats the previous number of the sequence, e.g.:
+  // 4 -> [(0,1),(1,2),(2,3)]
+  //
+  auto f_generate_layer_pairs = [](auto _layer_count) -> auto
   {
-    // Step 2 - Sort layer by row barycenter
-    auto adjacent = []<typename T, typename U>(T&& t, U&& u)
-    {
-      return rg::contains(succ(t),u);
-    };
+    std::vector<std::pair<i64,i64>> pairs;
 
-    auto matrix{ incidence::run( pred, succ,  ) };
-  }
+    for (std::size_t i{}; i < _layer_count-1; ++i)
+    {
+      pairs.emplace_back(i,i+1);
+    } // for: i < _layer_count
+
+    return pairs;
+  };
+  // }}}
+
+  //
+  // @ Create a depth view
+  //
+  auto depth_view{depth::run(root,f_pred,f_succ).first};
+
+  //
+  // @ Get number of layers
+  //
+  std::size_t layer_count{depth_view.size()};
+  assertm(layer_count != 0, "Layer count equals zero");
+
+  //
+  // @ Generate layer pairs
+  //
+  auto layers = f_generate_layer_pairs(layer_count);
+
+  //
+  // @ Check if two vertices are adjacent
+  //
+  auto f_adjacent = [&]<typename V>(V _u, V _v) -> bool
+  {
+    auto successors{f_succ(_u)};
+    return rg::find(successors,_v) != rg::end(successors);
+  };
+
+
+  auto sort_by_barycenter = [&]() -> bool
+  {
+    bool sorted{true};
+
+    // Iterate through layers
+    for (auto&& [il1,il2] : layers)
+    {
+      // Create matrix for layers l1 and l2 {{{
+      auto& l1{depth_view.at(il1)};
+      auto& l2{depth_view.at(il2)};
+      auto m0 {incidence::run(l1,l2,f_adjacent)};
+      // }}}
+
+      // Step 2: Br {{{
+      auto r1{bor(m0,l1)};
+      auto m1{r1.first};
+      if ( ccrossings::run(m1) < ccrossings::run(m0) )
+      {
+        l1 = r1.second;
+        sorted = false;
+      } // if
+      // }}}
+
+      // Step 4: Bc {{{
+      auto r2{bor(reverse(m1),l2)};
+      auto m2{reverse(r2.first)};
+
+      if (ccrossings::run(m2) < ccrossings::run(m1))
+      {
+        l2 = r2.second;
+        sorted = false;
+      } // if
+      // }}}
+
+    } // for
+
+    return sorted;
+  };
+
+  for(std::size_t i{}; ! sort_by_barycenter() && i < 100; ++i) { }
+
+  return depth_view
+    | rv::transform([](auto&& e){ return e.second; })
+    | rg::to<std::vector<std::vector<i64>>>;
+
+} // }}}
 
 } // namespace celaeno::graph::operations::minimize::crossing::impl }}}

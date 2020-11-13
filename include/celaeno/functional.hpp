@@ -35,15 +35,21 @@
 // includes {{{
 #include <utility>
 #include <vector>
+
+#include <fplus/fplus.hpp>
+
 #include <celaeno/concepts.hpp>
 // }}}
 
 // namespace celaeno::functional {{{
 namespace celaeno::functional
 {
+  // namespaces {{{
+  namespace fp = fplus;
+  // }}}
+
   // using namespaces {{{
   using namespace celaeno::concepts;
-  using namespace celaeno::functional;
   // }}}
 
   // fn: zip {{{
@@ -65,6 +71,16 @@ namespace celaeno::functional
 
     return zipped;
   }; // }}}
+
+  // fn: unzip {{{
+  auto unzip = []<Iterable C1, Iterable C2>(C1 const& c1, C2 const& c2)
+    requires
+       requires(C1){ typename std::decay_t<C1>::value_type; }
+    && requires(C2){ typename std::decay_t<C2>::value_type; }
+  {
+    return fp::unzip(c1,c2);
+  };
+  // }}}
 
   // fn: values {{{
   template<Map M>

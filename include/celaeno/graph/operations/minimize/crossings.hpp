@@ -30,35 +30,29 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
+
+#include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/functional.hpp>
-#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/minimize/crossings/impl.hpp>
-#include <celaeno/graph/representations/incidence.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
 // namespace celaeno::graph::operations::minimize::crossings {{{
 namespace celaeno::graph::operations::minimize::crossings
 {
 
-// namespaces {{{
-namespace fun = celaeno::functional;
-namespace balance = celaeno::graph::operations::balance::paths;
-namespace incidence = celaeno::graph::representations::incidence;
-namespace minimize = celaeno::graph::operations::minimize::crossings::impl;
-namespace depth = celaeno::graph::views::depth;
+// using namespaces {{{
+using namespace celaeno::concepts;
 // }}}
 
-// Using namespaces {{{
-using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
+// namespaces {{{
+namespace balance = celaeno::graph::operations::balance::paths;
 // }}}
 
 // run {{{
-template<SignedIntegral T, typename N1, typename N2, typename E1, typename E2>
-decltype(auto) run(T root, N1&& f_p, N2&& f_s, E1&& f_l, E2&& f_u)
+template<SignedIntegral S, typename N1, typename N2, typename E1, typename E2>
+decltype(auto) run(S root, N1&& f_p, N2&& f_s, E1&& f_l, E2&& f_u)
 {
   //
   // @ Sugiyama algorithm requires a k-layered bipartite graph
@@ -69,27 +63,10 @@ decltype(auto) run(T root, N1&& f_p, N2&& f_s, E1&& f_l, E2&& f_u)
   );
 
   //
-  // @ Check if two vertices are adjacent
+  // @ Perform crossing minimization
   //
-  auto f_adjacent = [&f_s]<typename V>(V _u, V _v) -> bool
-  {
-    auto successors{f_s(_u)};
-    return std::ranges::find(successors,_v) != std::ranges::end(successors);
-  };
+  return impl::phase_1(root,f_p,f_s);
 
-  //
-  // @ Create layers vector
-  //
-  auto topo_view{depth::run(root,std::forward<N1>(f_p),std::forward<N2>(f_s)).first};
-  auto layers{fun::values(topo_view)};
-
-  //
-  // @ Minimize crossings of the matrix realization
-  //
-  return minimize::phase_1(layers,f_adjacent);
-
-} // function: run
-
-// }}}
+} // function: run }}}
 
 } // celaeno::graph::operations::minimize::crossings }}}
