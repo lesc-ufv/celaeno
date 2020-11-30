@@ -38,6 +38,9 @@ project(celaeno DESCRIPTION "C++ 20 Generic Algorithms" LANGUAGES CXX)
 # Conan
 set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 
+# Compiler
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
+
 # External libraries
 if(NOT spdlog_FOUND)
   find_package(spdlog REQUIRED)
