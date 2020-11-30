@@ -1,4 +1,7 @@
 # Ignore build directory
+artifacts/
+.cache/
+scripts/
 build/
 logs/
 /.gtm/
