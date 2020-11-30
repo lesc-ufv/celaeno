@@ -41,15 +41,15 @@ function(add_test target)
   add_executable(${target} ${ARGN})
   target_compile_options(${target}
     PRIVATE
-      -std=c++2a
-      -Wall
-      -Wextra
-      -Wpedantic
-      -O0
-      -Wshadow
-      # -fconcepts-diagnostics-depth=2
-      -Weffc++
-    )
+    $<IF:$<CONFIG:Debug>,
+        -std=c++2a
+        -Wall
+        -Wextra
+        -Wpedantic
+        -O0
+        -Wshadow
+        # -fconcepts-diagnostics-depth=2
+        -Weffc++, -O3>)
   target_link_libraries(${target}
     PRIVATE
       celaeno
@@ -85,5 +85,9 @@ add_test(g_operations_minimize_crossings "include/celaeno/test/graph/operations/
 
 ## Representations
 add_test(g_representations_incidence "include/celaeno/test/graph/representations/incidence.cpp")
+
+## Drawing
+
+add_test(g_draw "include/celaeno/test/graph/draw/svg.cpp")
 
 #add_test(test_a_star "include/celaeno/graph/a-star.cpp")
