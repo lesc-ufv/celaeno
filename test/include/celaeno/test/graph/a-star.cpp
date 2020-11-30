@@ -35,7 +35,7 @@
 #include <doctest/doctest.h>
 #include <celaeno/graph/a-star.hpp>
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader/verilog.hpp>
+#include <taygete/graph/reader.hpp>
 
 #include <vector>
 #include <utility>

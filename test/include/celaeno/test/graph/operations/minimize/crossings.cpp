@@ -37,7 +37,7 @@
 #include <range/v3/all.hpp>
 
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader/verilog.hpp>
+#include <taygete/graph/reader.hpp>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/test/test.hpp>
@@ -64,7 +64,7 @@ namespace rg = ranges;
 namespace fp = fplus;
 
 namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader::verilog;
+namespace reader = taygete::graph::reader;
 
 namespace test = celaeno::test;
 namespace ccrossings = celaeno::graph::operations::count::crossings;
@@ -192,6 +192,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     // test lambda {{{
     auto test = [&]<String S>(S const& str)
     {
+      fmt::print("Create graph...\n");
       // Read graph {{{
       graph::Graph<i64> g;
       auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
@@ -208,12 +209,22 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
       auto f_l = [&g](auto&& e){ g.emplace(e); };
       auto f_u = [&g](auto&& e){ g.erase(e); };
 
+      fmt::print("Balance graph...\n");
       // Balance graph
+      fmt::print("Started balancing...\n");
+      auto start {std::chrono::system_clock::now()};
       balance::run(0,f_p,f_s,f_l,f_u);
+      auto end {std::chrono::system_clock::now()};
+      std::chrono::duration<f64> dur {end-start};
+      std::stringstream ss; ss << dur.count();
+      fmt::print("Time for balance: {}\n", ss.str());
 
       // Save crossings count
+      fmt::print("Counting crossings...\n");
       auto before{ccrossings::run(0,f_p,f_s)};
+      fmt::print("Done!");
 
+      fmt::print("Minimize crossings...\n");
       auto [result,runtime]
       {
         celaeno::test::runtime([&]{return mc::run(0,f_p,f_s,f_l,f_u);})

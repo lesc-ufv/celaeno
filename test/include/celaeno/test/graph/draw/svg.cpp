@@ -37,14 +37,14 @@
 #include <maia/circuits/synth-91.hpp>
 
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader/verilog.hpp>
+#include <taygete/graph/reader.hpp>
 
 #include <celaeno/graph/draw/svg.hpp>
 // }}}
 
 // namespaces {{{
 namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader::verilog;
+namespace reader = taygete::graph::reader;
 namespace svg = celaeno::graph::draw::svg;
 namespace circ = maia::circuits;
 // }}}

@@ -42,7 +42,7 @@
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader/verilog.hpp>
+#include <taygete/graph/reader.hpp>
 
 // namespace celaeno::graph::operations::balance::paths::test {{{
 
@@ -62,7 +62,7 @@ using namespace celaeno::concepts;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader::verilog;
+namespace reader = taygete::graph::reader;
 namespace cir = maia::circuits;
 namespace balance = celaeno::graph::operations::balance::paths;
 namespace depth = celaeno::graph::views::depth;

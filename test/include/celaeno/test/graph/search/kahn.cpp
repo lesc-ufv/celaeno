@@ -34,7 +34,7 @@
 #include <doctest/doctest.h>
 
 #include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader/verilog.hpp>
+#include <taygete/graph/reader.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/test/test.hpp>
@@ -56,7 +56,7 @@ using namespace celaeno::concepts;
 
 // namespaces {{{
 namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader::verilog;
+namespace reader = taygete::graph::reader;
 namespace topo = celaeno::graph::search::kahn;
 // }}}
 

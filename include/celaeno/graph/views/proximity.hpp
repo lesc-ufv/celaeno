@@ -67,7 +67,8 @@ using rg::sort;
 // fn: run {{{
 
 template<SignedIntegral T, typename P, typename S>
-auto run(T root, P&& f_pred, S&& f_succ) -> std::pair<std::map<T,std::vector<T>>,std::map<T,T>>
+auto run(T root, P&& f_pred, S&& f_succ)
+  -> std::pair<std::map<T,std::vector<T>>,std::map<T,T>>
 {
   // Create a depth-view
   auto [lvs,vl] {depth::run(root, std::forward<P>(f_pred), std::forward<S>(f_succ))};
