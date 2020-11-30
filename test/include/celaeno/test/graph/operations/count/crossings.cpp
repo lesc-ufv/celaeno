@@ -34,276 +34,186 @@
 #include <doctest/doctest.h>
 
 #include <fplus/fplus.hpp>
-#include <range/v3/all.hpp>
+
+#include <taygete/graph/graph.hpp>
+#include <taygete/graph/reader.hpp>
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/test/test.hpp>
 #include <celaeno/test/graph/test.hpp>
+#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
-#include <celaeno/graph/operations/count/crossings/impl.hpp>
-#include <taygete/graph/graph.hpp>
-#include <taygete/graph/reader/verilog.hpp>
 
 // namespace celaeno::graph::operations::count::crossings::test {{{
 
 namespace celaeno::graph::operations::count::crossings::test
 {
 
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
+
 // namespaces {{{
-namespace rv = ranges::views;
+namespace fp = fplus;
 namespace fw = fplus::fwd;
+
 namespace graph = taygete::graph;
-namespace count_crossings = celaeno::graph::operations::count::crossings;
+namespace reader = taygete::graph::reader;
+
+namespace depth = celaeno::graph::views::depth;
+namespace balance = celaeno::graph::operations::balance::paths;
+namespace count = celaeno::graph::operations::count::crossings;
 // }}}
 
 // Tests case celaeno::graph::crossings {{{
 
 TEST_CASE("celaeno::graph::operations::count::crossings")
 {
-  // Subcase Two-layered Bipartite graph {{{
-  SUBCASE("Two-layered Bipartite graph")
+
+  // Subcase: Empiric time testing {{{
+  SUBCASE("Subcase: Empiric time testing")
   {
-    std::array<std::array<i8,5>,4> m0
-    {{
-      {1,1,0,0,0},
-      {1,0,0,1,1},
-      {0,1,0,1,1},
-      {1,0,1,0,1},
-    }};
 
-    std::array<std::array<i8,5>,4> m1
-    {{
-      {1,1,0,0,0},
-      {1,0,1,0,1},
-      {1,0,0,1,1},
-      {0,0,1,1,1},
-    }};
+    // Logger {{{
+    celaeno::test::logger_new({
+        .name="celaeno::graph::operations::count::crossings",
+        .path="logs/celaeno/graph/operations/count/crossings.csv",
+        .info="date,time,vertices,edges,runtime",
+        .pattern="%d/%m/%Y,%T,%v"
+    });
+    // }}}
 
-    std::array<std::array<i8,5>,4> m2
-    {{
-      {1,0,1,0,0},
-      {1,1,0,1,0},
-      {1,0,0,1,1},
-      {0,0,1,1,1},
-    }};
+    // test lambda {{{
+    auto test = [&]<String S>(S const& str)
+    {
+      // Read graph {{{
+      graph::Graph<i64> g;
+      auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
+      reader::Reader{str,emplace};
+      // }}}
 
-    std::array<std::array<i8,5>,4> m3
-    {{
-      {0,1,1,0,0},
-      {1,1,0,1,0},
-      {0,1,0,1,1},
-      {0,0,1,1,1},
-    }};
+      // vertices_count > 0 {{{
+      assertm(g.vertices_count() > 0, "Empty input graph");
+      // }}}
 
-    std::array<std::array<i8,5>,4> m4
-    {{
-      {1,1,0,1,0},
-      {0,1,1,0,0},
-      {0,1,0,1,1},
-      {0,0,1,1,1},
-    }};
+      // Test {{{
+      // Helpers
+      auto f_pred = [&g](auto&& v){ return g.predecessors(v); };
+      auto f_succ = [&g](auto&& v){ return g.successors(v); };
+      auto f_link = [&g](auto&& e){ g.emplace(e); };
+      auto f_unlink = [&g](auto&& e){ g.erase(e); };
+      // Balance graph
+      balance::run(0,f_pred,f_succ,f_link,f_unlink);
+      // Create depth-view
+      auto depth_view{depth::run(1,f_pred,f_succ).first};
+      // Create overlapping pairs of layers
+      auto levels_to_compute {fp::overlapping_pairs(fp::numbers({},depth_view.size()))};
+      // Exec and log runtime
+      auto runtime{celaeno::test::runtime_vt([&]
+      {
+        for (auto const& [a,b] : levels_to_compute)
+        {
+          count::run(depth_view.at(a),depth_view.at(b),f_succ);
+        } // for
+      })};
+      // }}}
 
-    std::array<std::array<i8,5>,4> m5
-    {{
-      {1,1,1,0,0},
-      {0,1,0,1,0},
-      {0,1,1,0,1},
-      {0,0,1,1,1},
-    }};
+      // Log results {{{
+      celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
+      // }}}
 
+    }; // lamb: test }}}
 
-    auto c0 {count_crossings::run(m0)};
-    auto c1 {count_crossings::run(m1)};
-    auto c2 {count_crossings::run(m2)};
-    auto c3 {count_crossings::run(m3)};
-    auto c4 {count_crossings::run(m4)};
-    auto c5 {count_crossings::run(m5)};
+    // Perform tests {{{
+    celaeno::graph::test::run(test);
+    // }}}
 
-    REQUIRE(c0 == 14);
-    REQUIRE(c1 == 10);
-    REQUIRE(c2 == 9);
-    REQUIRE(c3 == 9);
-    REQUIRE(c4 == 8);
-    REQUIRE(c5 == 7);
+  } // SUBCASE: "Subcase: Empiric time testing" }}}
 
-  } // SUBCASE: "Two-layered Bipartite graph" }}}
-
-  // SUBCASE:"h-layered graph"  {{{
-  SUBCASE("h-layered graph")
+  // Subcase: "Edge cases" {{{
+  SUBCASE("Edge cases")
   {
-    std::array<std::array<i8,3>,3> g01
-    {{
-      {0,1,0},
-      {1,0,0},
-      {1,0,0},
-    }};
-    std::array<std::array<i8,3>,3> g02
-    {{
-      {1,0,0},
-      {1,1,1},
-      {0,1,0},
-    }};
-    std::array<std::array<i8,3>,3> g03
-    {{
-      {0,0,1},
-      {1,1,0},
-      {0,0,0},
-    }};
-
-    REQUIRE(count_crossings::run(g01,g02,g03) == 5);
-
-    std::array<std::array<i8,3>,3> g11
-    {{
-      {1,0,0},
-      {0,1,0},
-      {0,1,0},
-    }};
-    std::array<std::array<i8,3>,3> g12
-    {{
-      {1,1,1},
-      {1,0,0},
-      {0,1,0},
-    }};
-    std::array<std::array<i8,3>,3> g13
-    {{
-      {0,0,1},
-      {1,1,0},
-      {0,0,0},
-    }};
-
-    REQUIRE(count_crossings::run(g11,g12,g13) == 5);
-
-    std::array<std::array<i8,3>,3> g21
-    {{
-      {1,0,0},
-      {0,1,0},
-      {0,1,0},
-    }};
-    std::array<std::array<i8,3>,3> g22
-    {{
-      {1,1,1},
-      {0,1,0},
-      {0,0,1},
-    }};
-    std::array<std::array<i8,3>,3> g23
-    {{
-      {0,0,0},
-      {0,0,1},
-      {1,1,0},
-    }};
-
-    REQUIRE(count_crossings::run(g21,g22,g23) == 3);
-
-    std::array<std::array<i8,3>,3> g31
-    {{
-      {1,0,0},
-      {0,1,0},
-      {0,1,0},
-    }};
-    std::array<std::array<i8,3>,3> g32
-    {{
-      {1,1,1},
-      {0,1,0},
-      {0,0,1},
-    }};
-    std::array<std::array<i8,3>,3> g33
-    {{
-      {0,0,0},
-      {1,0,0},
-      {0,1,1},
-    }};
-
-    REQUIRE(count_crossings::run(g31,g32,g33) == 1);
-
-    std::array<std::array<i8,3>,3> g41
-    {{
-      {0,1,0},
-      {1,0,0},
-      {1,0,0},
-    }};
-    std::array<std::array<i8,3>,3> g42
-    {{
-      {0,1,0},
-      {1,1,1},
-      {0,0,1},
-    }};
-    std::array<std::array<i8,3>,3> g43
-    {{
-      {0,0,0},
-      {1,0,0},
-      {0,1,1},
-    }};
-
-    REQUIRE(count_crossings::run(g41,g42,g43) == 3);
-
-    std::array<std::array<i8,3>,3> g51
-    {{
-      {1,0,0},
-      {1,0,0},
-      {0,1,0},
-    }};
-    std::array<std::array<i8,3>,3> g52
-    {{
-      {0,1,0},
-      {1,1,1},
-      {0,0,1},
-    }};
-    std::array<std::array<i8,3>,3> g53
-    {{
-      {0,0,0},
-      {1,0,0},
-      {0,1,1},
-    }};
-
-    REQUIRE(count_crossings::run(g51,g52,g53) == 1);
-
-    std::array<std::array<i8,3>,3> g61
-    {{
-      {1,0,0},
-      {1,0,0},
-      {0,1,0},
-    }};
-    std::array<std::array<i8,3>,3> g62
-    {{
-      {1,0,0},
-      {1,1,1},
-      {0,0,1},
-    }};
-    std::array<std::array<i8,3>,3> g63
-    {{
-      {1,0,0},
-      {0,0,0},
-      {0,1,1},
-    }};
-
-    REQUIRE(count_crossings::run(g61,g62,g63) == 0);
-  } // SUBCASE: h-layered graph }}}
-
-  // Taygete graphs {{{
-  SUBCASE("Taygete Graphs")
-  {
+    // Graph {{{
     graph::Graph<i64> g
-    {{
-       // Layer 1
-      {1,5},{2,4},{3,4},{6,8},
-       // Layer 2
+    {
+      {6,-1},{-1,8},{2,4},{3,4},{1,5},
       {4,7},{5,7},{5,8},{5,9},
-       // Layer 3
       {7,12},{8,10},{8,11},
-    }};
+    };
+    // }}}
 
-    // Lambdas to the predecessors and successors vertices
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
+    // vertices_count > 0 {{{
+    assertm(g.vertices_count() > 0, "Empty input graph");
+    // }}}
 
-    // Calculate cost
-    i64 cost {count_crossings::run(1,pred,succ)};
+    // Helpers {{{
+    auto f_p = [&g](auto&& v){ return g.predecessors(v); };
+    auto f_s = [&g](auto&& v){ return g.successors(v); };
+    // }}}
 
-    // Check if the cost is as expected
-    REQUIRE(cost == 5);
-  } // SUBCASE: "Taygete Graphs"
+    // Depth view {{{
+    auto depth_view{depth::run(1,f_p,f_s).first};
+    // }}}
 
-  // }}}
+    // Overlapping level id pairs {{{
+    auto levels_to_compute {fp::overlapping_pairs(fp::numbers({},depth_view.size()))};
+    // }}}
+
+    // No crossings
+    // lamb: t1 {{{
+    auto t1 = [=](auto view)
+    {
+      CHECK(count::run(view.at(0),view.at(1),f_s) == 0);
+    }; // lamb: t1 }}}
+
+
+    // Induced 1 crossing
+    // lamb: t2 {{{
+    auto t2 = [=](auto view)
+    {
+      view[0] = {2,1,3,6};
+      // Test count crossings {{{
+      CHECK(count::run(view.at(0),view.at(1),f_s) == 1);
+      // }}}
+
+    }; // lamb: t2 }}}
+
+    // Induced 2 crossings
+    // lamb: t3 {{{
+    auto t3 = [=](auto view)
+    {
+      view[0] = {2,1,6,3};
+      // Test count crossings {{{
+      CHECK(count::run(view.at(0),view.at(1),f_s) == 2);
+      // }}}
+
+    }; // lamb: t3 }}}
+
+    // All layers crossings
+    // lamb: t4 {{{
+    auto t4 = [=](auto view)
+    {
+      // Modify depth-view {{{
+      view[0] = {2,1,6,3};
+      view[3] = {10,12,11};
+      // }}}
+
+      // Test count crossings {{{
+      CHECK(fw::apply(levels_to_compute
+            , fw::transform([&](auto e){ return count::run(view.at(e.first),view.at(e.second),f_s); })
+            , fw::sum() ) == 4 );
+      // }}}
+
+    }; // lamb: t4 }}}
+
+    t1(depth_view);
+    t2(depth_view);
+    t3(depth_view);
+    t4(depth_view);
+
+  } // SUBCASE: "Edge cases" }}}
 
 } // TEST_CASE: "celaeno::graph::operations::count::crossings" }}}
 

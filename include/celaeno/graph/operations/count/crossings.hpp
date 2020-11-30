@@ -32,44 +32,108 @@
 
 #pragma once
 
-#include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/graph/concepts.hpp>
-#include <celaeno/graph/representations/incidence.hpp>
-#include <celaeno/graph/operations/count/crossings/impl.hpp>
 
 // namespace celaeno::graph::operations::count::crossings {{{
 namespace celaeno::graph::operations::count::crossings
 {
 
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
+
 // namespaces {{{
-namespace rg = ranges;
-namespace rv = ranges::views;
-namespace incidence = celaeno::graph::representations::incidence;
-namespace crossings = celaeno::graph::operations::count::crossings::impl;
+namespace fp = fplus;
+namespace fw = fplus::fwd;
 // }}}
 
 // Using namespaces {{{
 using namespace celaeno::graph::concepts;
 // }}}
 
+// Concepts {{{
+template<typename T, typename U = std::decay_t<T>>
+concept Layer =
+Iterable<U>
+&&
+requires(U u)
+{
+  { *(u.begin()) } -> Integral;
+};
+
+template<typename T>
+concept Successors =
+requires(T t)
+{
+  { t(i64{}) } -> Iterable;
+};
+// }}}
+
 // function: run {{{
-template<SignedIntegral T, typename N1, typename N2>
-auto run(T root, N1&& p, N2&& s)
+template<typename T = i64, Layer L1, Layer L2, Successors S>
+T run(L1&& l1, L2&& l2, S&& f_succ)
 {
-  // Create the incidence matrix
-  auto ms {incidence::run(root, p, s)};
+  //
+  // @ Index by vertices positions in layer l2
+  //
+  auto ids {fw::apply( fp::numbers({},l2.size()), fw::create_map( l2 ) )};
 
-  // Return cost
-  return rg::accumulate(rv::all(ms),0,[&](auto&& c, auto&& n){ return c + crossings::run(n); });
+  //
+  // @ Create vector of id ordered successors, for all vertices of l2
+  //
+  std::vector<std::vector<T>> succs;
 
-} // function: run }}}
+  std::ranges::for_each(l1,
+  [&](auto u)
+  {
+    // Get successors of u, sort and transform in ids
+    succs.emplace_back(fw::apply(f_succ(u)
+      , fw::sort_by([&](auto a, auto b){ return ids.at(a) < ids.at(b); })
+      , fw::transform([&](auto v){ return static_cast<T>(ids.at(v)); })
+    ));
+  });
 
-// Usage with fold expressions {{{
-template<Matrix... MS>
-decltype(auto) run(MS&&... ms)
-{
-  return (crossings::run(std::forward<MS>(ms)) + ...);
+  //
+  // @ For each level 1..n, merge with level 0, to compute crossings
+  //
+
+  // Test for empty successors vec
+  assertm( !succs.empty() , "Empty successors map!");
+
+  // Keep number of crossings
+  i64 crossings{};
+
+  // First vector accumulates all values
+  auto& acc{*succs.begin()};
+
+  for (auto it1{std::next(succs.begin())}; it1 != succs.end(); ++it1)
+  {
+    // For each value of current vector
+    for (auto it2{it1->begin()}; it2 != it1->end(); ++it2)
+    {
+      // Find a position in the accumulator
+      auto search{ std::ranges::find_if(acc,[&](auto e){ return e > *it2; }) };
+      // If pos != end, then the number of crossings equals the distance of
+      // end - current position
+      if ( search != std::ranges::end(acc) )
+      {
+        // Insert element
+        // Include the distance from inserted position in accumulator last elem
+        crossings += std::distance(acc.insert(search,*it2),std::prev(acc.end()));
+      } // if
+      else
+      {
+        // Insert at the end
+        acc.push_back(*it2);
+      } // else
+    } // for
+  } // for
+
+  return crossings;
+
 } // function: run }}}
 
 } // celaeno::graph::operations::count::crossings }}}
