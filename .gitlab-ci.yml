@@ -6,8 +6,8 @@ stages:
   - doc
 
 before_script:
+  - apk util-linux add make cmake clang ninja git py3-pip
   - lscpu
-  - apk add make cmake clang ninja git py3-pip
   - pip3 install -I conan
   - conan profile new default --detect
   - conan profile update settings.compiler.libcxx=libstdc++11 default
