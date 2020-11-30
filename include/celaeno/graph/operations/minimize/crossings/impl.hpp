@@ -169,7 +169,7 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
       // Create matrix for layers l1 and l2 {{{
       auto& l1{depth_view.at(il1)};
       auto& l2{depth_view.at(il2)};
-      auto [m0, m0_time] = test::runtime( [&]{ return incidence::run(l1,l2,f_adj); } );
+      auto m0 {incidence::run(l1,l2,f_adj)};
       // }}}
 
       // Step 2: Br {{{
