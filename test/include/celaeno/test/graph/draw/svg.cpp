@@ -31,6 +31,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Includes {{{
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <doctest/doctest.h>
+
 #include <iostream>
 #include <cstdint>
 
@@ -42,28 +45,35 @@
 #include <celaeno/graph/draw/svg.hpp>
 // }}}
 
-// namespaces {{{
-namespace graph = taygete::graph;
-namespace reader = taygete::graph::reader;
-namespace svg = celaeno::graph::draw::svg;
-namespace circ = maia::circuits;
-// }}}
-
-// fn: main  {{{
-int main()
+// Testcase: "celaeno::graph::draw::svg" {{{
+TEST_CASE("celaeno::graph::draw::svg")
 {
+
+  // namespaces {{{
+  namespace graph = taygete::graph;
+  namespace reader = taygete::graph::reader;
+  namespace svg = celaeno::graph::draw::svg;
+  namespace circ = maia::circuits;
+  // }}}
+
+  // Read graph {{{
   graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
   reader::Reader{circ::synth_91::alu2,emplace};
+  // }}}
 
+  // Helpers {{{
   auto f_p = [&g](auto&& v){ return g.predecessors(v); };
   auto f_s = [&g](auto&& v){ return g.successors(v); };
+  auto f_a = [&g](auto&& u, auto&& v){ return g.adjacent(u,v); };
   auto f_l = [&g](auto&& e){ g.emplace(e); };
   auto f_u = [&g](auto&& e){ g.erase(e); };
+  // }}}
 
-  svg::run(1,f_p,f_s,f_l,f_u,"artifacts/alu2-default.svg",false);
-  svg::run(1,f_p,f_s,f_l,f_u,"artifacts/alu2-optimized.svg",true);
+  // Test drawing {{{
+  svg::run(1,f_p,f_s,f_a,f_l,f_u,"artifacts/alu2-default.svg",false);
+  svg::run(1,f_p,f_s,f_a,f_l,f_u,"artifacts/alu2-optimized.svg",true);
+  // }}}
 
-  return EXIT_SUCCESS;
-} // main }}}
 
+} // TEST_CASE: "celaeno::graph::draw::svg" }}}

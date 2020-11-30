@@ -121,8 +121,8 @@ decltype(auto) roc(M&& m)
 } // function: roc }}}
 
 // fn: phase_1 {{{
-template<SignedIntegral S, typename F1, typename F2>
-decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ)
+template<SignedIntegral S, typename F1, typename F2, typename F3>
+decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
 {
   // Generate adjancent pairs for layer indices {{{
   //
@@ -159,16 +159,6 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ)
   //
   auto layers = f_generate_layer_pairs(layer_count);
 
-  //
-  // @ Check if two vertices are adjacent
-  //
-  auto f_adjacent = [&]<typename V>(V _u, V _v) -> bool
-  {
-    auto successors{f_succ(_u)};
-    return rg::find(successors,_v) != rg::end(successors);
-  };
-
-
   auto sort_by_barycenter = [&]() -> bool
   {
     bool sorted{true};
@@ -179,13 +169,13 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ)
       // Create matrix for layers l1 and l2 {{{
       auto& l1{depth_view.at(il1)};
       auto& l2{depth_view.at(il2)};
-      auto m0 {incidence::run(l1,l2,f_adjacent)};
+      auto [m0, m0_time] = test::runtime( [&]{ return incidence::run(l1,l2,f_adj); } );
       // }}}
 
       // Step 2: Br {{{
       auto r1{bor(m0,l1)};
       auto m1{r1.first};
-      if ( ccrossings::run(m1) < ccrossings::run(m0) )
+      if ( ccrossings::run(r1.second,l2,f_succ) < ccrossings::run(l1,l2,f_succ) )
       {
         l1 = r1.second;
         sorted = false;
@@ -196,7 +186,7 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ)
       auto r2{bor(reverse(m1),l2)};
       auto m2{reverse(r2.first)};
 
-      if (ccrossings::run(m2) < ccrossings::run(m1))
+      if (ccrossings::run(l1,r2.second,f_succ) < ccrossings::run(l1,l2,f_succ))
       {
         l2 = r2.second;
         sorted = false;
@@ -208,7 +198,7 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ)
     return sorted;
   };
 
-  for(std::size_t i{}; ! sort_by_barycenter() && i < 100; ++i) { }
+  for(std::size_t i{}; ! sort_by_barycenter() && i < 10; ++i) { }
 
   return depth_view
     | rv::transform([](auto&& e){ return e.second; })

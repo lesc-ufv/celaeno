@@ -94,10 +94,11 @@ TEST_CASE("celaeno::graph::representations::incidence"
 
 
     // Helpers
-    auto p = [&g](auto&& u){ return g.predecessors(u); };
-    auto s = [&g](auto&& u){ return g.successors(u); };
+    auto f_pred = [&g](auto u){ return g.predecessors(u); };
+    auto f_succ = [&g](auto u){ return g.successors(u); };
+    auto f_adj = [&g](auto u, auto v){ return g.adjacent(u,v); };
     // Create matrix realization
-    auto matrices {incidence::run(1,p,s)};
+    auto matrices {incidence::run(1,f_pred,f_succ,f_adj)};
 
     // Test against expected result
     REQUIRE(matrices.size() == 3);
@@ -120,10 +121,11 @@ TEST_CASE("celaeno::graph::representations::incidence"
     };
 
     // Helpers
-    auto p = [&g](auto&& u){ return g.predecessors(u); };
-    auto s = [&g](auto&& u){ return g.successors(u); };
+    auto f_pred = [&g](auto u){ return g.predecessors(u); };
+    auto f_succ = [&g](auto u){ return g.successors(u); };
+    auto f_adj = [&g](auto u, auto v){ return g.adjacent(u,v); };
     // Create matrix realization
-    auto matrices {incidence::run(1, p, s)};
+    auto matrices {incidence::run(1, f_pred, f_succ, f_adj)};
 
     // TESTS
     REQUIRE(matrices.size() == 2);

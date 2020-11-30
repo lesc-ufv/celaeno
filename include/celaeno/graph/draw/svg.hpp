@@ -96,13 +96,20 @@ constexpr std::string_view const footer{"</svg>\n"};
 // }}}
 
 // fn: run {{{
-template<SignedIntegral S, typename F1, typename F2, typename F3, typename F4, String Str>
+template<SignedIntegral S,
+  typename F1,
+  typename F2,
+  typename F3,
+  typename F4,
+  typename F5,
+  String Str>
 decltype(auto) run(
   S root,
   F1&& f_pred,
   F2&& f_succ,
-  F3&& f_link,
-  F4&& f_unlink,
+  F3&& f_adj,
+  F4&& f_link,
+  F5&& f_unlink,
   Str&& fn,
   bool optimize = true
 )
@@ -117,7 +124,7 @@ decltype(auto) run(
   std::vector<std::vector<i64>> layers;
   if ( optimize )
   {
-    layers = minimize::run(root,f_pred,f_succ,f_link,f_unlink);
+    layers = minimize::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
   } // if
   else
   {

@@ -64,8 +64,8 @@ using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, typename N1, typename N2>
-auto run(T root, N1&& f_pred, N2&& f_succ)
+template<SignedIntegral T, typename N1, typename N2, typename N3>
+auto run(T root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
 {
     // Proximity view: @level → vertex && @vertex → level
     auto [lvs,_] = proximity::run(root,f_pred,f_succ);
@@ -73,24 +73,21 @@ auto run(T root, N1&& f_pred, N2&& f_succ)
     // Number of levels must be > 1
     assertm(lvs.size() > 1, "Number of layers of the input graph is less 2");
 
-    // Lambda to verify if an edge between u → v exists
-    auto f_adjacent = [&](T u, T v){ return rg::contains(f_succ(u),v); };
-
     // Return the incidence matrix
     return incidence::all(
       std::forward<decltype(lvs)>(lvs),
-      std::forward<decltype(f_adjacent)>(f_adjacent)
+      std::forward<decltype(f_adj)>(f_adj)
     );
 
 } // function: run }}}
 
 template<typename L1, typename L2, typename A>
-auto run(L1&& l1, L2&& l2, A&& f_adjacent)
+auto run(L1&& l1, L2&& l2, A&& f_adj)
 {
   return incidence::single(
     std::forward<L1>(l1),
     std::forward<L2>(l2),
-    std::forward<A>(f_adjacent)
+    std::forward<A>(f_adj)
   );
 
 } // function: run }}}

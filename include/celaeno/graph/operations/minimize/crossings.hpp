@@ -51,8 +51,8 @@ namespace balance = celaeno::graph::operations::balance::paths;
 // }}}
 
 // run {{{
-template<SignedIntegral S, typename N1, typename N2, typename E1, typename E2>
-decltype(auto) run(S root, N1&& f_p, N2&& f_s, E1&& f_l, E2&& f_u)
+template<SignedIntegral S, typename N1, typename N2, typename N3, typename E1, typename E2>
+decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
 {
   //
   // @ Sugiyama algorithm requires a k-layered bipartite graph
@@ -65,7 +65,7 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, E1&& f_l, E2&& f_u)
   //
   // @ Perform crossing minimization
   //
-  return impl::phase_1(root,f_p,f_s);
+  return impl::phase_1(root,f_p,f_s,f_a);
 
 } // function: run }}}
 

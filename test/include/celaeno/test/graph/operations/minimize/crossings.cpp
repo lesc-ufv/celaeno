@@ -155,6 +155,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
 
       // Test minimize crossings {{{
       auto f_p = [&g](auto&& v){ return g.predecessors(v); };
+      auto f_a = [&g](auto&& u, auto&& v){ return g.adjacent(u,v); };
       auto f_s = [&g](auto&& v){ return g.successors(v); };
       auto f_l = [&g](auto&& e){ g.emplace(e); };
       auto f_u = [&g](auto&& e){ g.erase(e); };
@@ -163,7 +164,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
       // TODO erase {{{
 
       // Print ordered
-      mc::run(1,f_p,f_s,f_l,f_u);
+      mc::run(1,f_p,f_s,f_a,f_l,f_u);
 
       // TODO erase }}}
 
@@ -184,7 +185,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     celaeno::test::logger_new({
         .name="celaeno::graph::operations::minimize::crossings",
         .path="logs/celaeno/graph/operations/minimize/crossings.csv",
-        .info="date,time,prev_crossings,current_crossings,runtime",
+        .info="date,time,runtime",
         .pattern="%d/%m/%Y,%T,%v"
     });
     // }}}
@@ -192,7 +193,6 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     // test lambda {{{
     auto test = [&]<String S>(S const& str)
     {
-      fmt::print("Create graph...\n");
       // Read graph {{{
       graph::Graph<i64> g;
       auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
@@ -206,64 +206,26 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
       // Test minimize crossings {{{
       auto f_p = [&g](auto&& v){ return g.predecessors(v); };
       auto f_s = [&g](auto&& v){ return g.successors(v); };
+      auto f_a = [&g](auto&& u, auto&& v){ return g.adjacent(u,v); };
       auto f_l = [&g](auto&& e){ g.emplace(e); };
       auto f_u = [&g](auto&& e){ g.erase(e); };
 
-      fmt::print("Balance graph...\n");
       // Balance graph
-      fmt::print("Started balancing...\n");
       auto start {std::chrono::system_clock::now()};
       balance::run(0,f_p,f_s,f_l,f_u);
       auto end {std::chrono::system_clock::now()};
       std::chrono::duration<f64> dur {end-start};
       std::stringstream ss; ss << dur.count();
-      fmt::print("Time for balance: {}\n", ss.str());
 
-      // Save crossings count
-      fmt::print("Counting crossings...\n");
-      auto before{ccrossings::run(0,f_p,f_s)};
-      fmt::print("Done!");
-
-      fmt::print("Minimize crossings...\n");
       auto [result,runtime]
       {
-        celaeno::test::runtime([&]{return mc::run(0,f_p,f_s,f_l,f_u);})
+        celaeno::test::runtime([&]{return mc::run(0,f_p,f_s,f_a,f_l,f_u);})
       };
 
-      // Generate adjancent pairs for layer indices {{{
-      auto f_generate_layer_pairs = [](auto _layer_count) -> auto
-      {
-        std::vector<std::pair<i64,i64>> pairs;
-
-        for (std::size_t i{}; i < _layer_count-1; ++i)
-        {
-          pairs.emplace_back(i,i+1);
-        } // for: i < _layer_count
-
-        return pairs;
-      };
-      // }}}
-
-      auto f_adjacent = [&]<typename V>(V _u, V _v) -> bool
-      {
-        auto successors{f_s(_u)};
-        return rg::find(successors,_v) != rg::end(successors);
-      };
-
-      i64 after{};
-      for (auto&& p : f_generate_layer_pairs(result.size()))
-      {
-        auto incidence_matrix{incidence::run(
-          result.at(p.first),
-          result.at(p.second),
-          f_adjacent)
-        };
-        after += ccrossings::run(incidence_matrix);
-      } // for
       // }}}
 
       // Log results {{{
-      celaeno::test::logger_write("{},{},{}", before, after, runtime);
+      celaeno::test::logger_write("{},{},{}", g.vertices_count(), g.edges_count(), runtime);
       // }}}
 
     }; // lamb: test }}}
