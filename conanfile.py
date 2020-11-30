@@ -43,7 +43,7 @@ class CelaenoConan(ConanFile):
   requires = \
     'spdlog/1.7.0', \
     'taygete/1.0@ruanformigoni/stable', \
-    'maia/0.1@pleiades/testing', \
+    'maia/0.1@ruanformigoni/testing', \
     'fmt/6.0.0@bincrafters/stable', \
     'doctest/2.3.4@bincrafters/stable', \
     'functionalplus/v0.2.10-p0@dobiasd/stable'
