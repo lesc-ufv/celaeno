@@ -6,7 +6,8 @@ stages:
   - doc
 
 before_script:
-  - apk add make cmake clang git py3-pip
+  - lscpu
+  - apk add make cmake clang ninja git py3-pip
   - pip3 install -I conan
   - conan profile new default --detect
   - conan profile update settings.compiler.libcxx=libstdc++11 default
@@ -20,7 +21,7 @@ build_tests:
   script:
     - mkdir build && cd build
     - conan install .. --build missing && cd ..
-    - cmake -H. -DCMAKE_CXX_COMPILER=clang++-10 -GNinja -Bbuild
+    - cmake -H. -Bbuild -DCMAKE_CXX_COMPILER=clang++-10 -GNinja
     - cmake --build build
   rules:
     - when: manual
