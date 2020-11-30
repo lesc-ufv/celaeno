@@ -21,7 +21,7 @@ build_tests:
   script:
     - mkdir build && cd build
     - conan install .. --build missing && cd ..
-    - cmake -H. -Bbuild -DCMAKE_CXX_COMPILER=clang++-10 -GNinja
+    - cmake -H. -Bbuild -DCMAKE_CXX_COMPILER=clang -GNinja
     - cmake --build build
   rules:
     - when: manual
