@@ -46,7 +46,7 @@ class CelaenoConan(ConanFile):
     'maia/0.1@pleiades/testing', \
     'fmt/6.0.0@bincrafters/stable', \
     'doctest/2.3.4@bincrafters/stable', \
-    'functionalplus/v0.2.7-p0@dobiasd/stable'
+    'functionalplus/v0.2.10-p0@dobiasd/stable'
 
   def source(self):
     # Remove examples
