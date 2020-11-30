@@ -42,33 +42,33 @@
 namespace celaeno::concepts
 {
 
-template<typename T>
-concept Integral = std::integral<T>;
+template<typename T, typename U = std::decay_t<T>>
+concept Integral = std::integral<U>;
 
-template<typename T>
-concept SignedIntegral = std::signed_integral<T>;
+template<typename T, typename U = std::decay_t<T>>
+concept SignedIntegral = std::signed_integral<U>;
 
-template<typename T>
-concept Float = std::floating_point<T>;
+template<typename T, typename U = std::decay_t<T>>
+concept Float = std::floating_point<U>;
 
-template<typename T>
+template<typename T, typename U = std::decay_t<T>>
 concept String =
-requires(T t) { { std::string{t} } -> std::same_as<std::string>; };
+requires(U u) { { std::string{u} } -> std::same_as<std::string>; };
 
-template<typename T>
-concept Iterable = requires{ std::input_iterator<T> && std::incrementable<T>; };
+template<typename T, typename U = std::decay_t<T>>
+concept Iterable = requires{ std::input_iterator<U> && std::incrementable<U>; };
 
-template<typename T>
-concept ForwardIterator = std::forward_iterator<T>;
+template<typename T, typename U = std::decay_t<T>>
+concept ForwardIterator = std::forward_iterator<U>;
 
-template<typename T>
+template<typename T, typename U = std::decay_t<T>>
 concept Arithmetic =
-requires(T t)
+requires(U u)
 {
-  { t+t } -> std::same_as<T>;
-  { t-t } -> std::same_as<T>;
-  { t*t } -> std::same_as<T>;
-  { t/t } -> std::same_as<T>;
+  { u+u } -> std::same_as<U>;
+  { u-u } -> std::same_as<U>;
+  { u*u } -> std::same_as<U>;
+  { u/u } -> std::same_as<U>;
 };
 
 template<typename T>
