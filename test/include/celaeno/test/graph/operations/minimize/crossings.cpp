@@ -185,7 +185,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
     celaeno::test::logger_new({
         .name="celaeno::graph::operations::minimize::crossings",
         .path="logs/celaeno/graph/operations/minimize/crossings.csv",
-        .info="date,time,runtime",
+        .info="date,time,vertices,edges,runtime",
         .pattern="%d/%m/%Y,%T,%v"
     });
     // }}}
