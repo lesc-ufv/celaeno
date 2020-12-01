@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include <ranges>
+#include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
 #include <celaeno/aliases.hpp>
@@ -46,6 +48,7 @@ namespace celaeno::graph::operations::count::crossings
 // }}}
 
 // namespaces {{{
+namespace rg = ranges;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 // }}}
@@ -55,31 +58,22 @@ using namespace celaeno::graph::concepts;
 // }}}
 
 // Concepts {{{
-template<typename T, typename U = std::decay_t<T>>
-concept Layer =
-Iterable<U>
-&&
-requires(U u)
-{
-  { *(u.begin()) } -> Integral;
-};
+template<typename T>
+concept Range = std::ranges::range<T>;
 
 template<typename T>
-concept Successors =
-requires(T t)
-{
-  { t(i64{}) } -> Iterable;
-};
+concept Successors = CallableWith<T,i64>;
 // }}}
 
 // function: run {{{
-template<typename T = i64, Layer L1, Layer L2, Successors S>
-T run(L1&& l1, L2&& l2, S&& f_succ)
+template<SignedIntegral T = i64, Range R, Successors S>
+T run(R&& l1, R&& l2, S&& f_succ)
 {
   //
   // @ Index by vertices positions in layer l2
   //
-  auto ids {fw::apply( fp::numbers({},l2.size()), fw::create_map( l2 ) )};
+  std::map<T,T> ids;
+  rg::for_each(fp::numbers({},l2.size()),[&](T n) mutable { ids.emplace(l2.at(n),n); });
 
   //
   // @ Create vector of id ordered successors, for all vertices of l2
