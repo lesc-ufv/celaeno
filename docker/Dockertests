@@ -24,7 +24,7 @@ RUN conan install .. --build missing
 
 # Build the project
 WORKDIR /celaeno
-RUN cmake -H. -Bbuild -GNinja -DCMAKE_CXX_COMPILER=clang++
+RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++
 RUN cmake --build build
 
 # Perform tests
