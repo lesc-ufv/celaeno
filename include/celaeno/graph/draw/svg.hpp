@@ -43,8 +43,9 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
+#include <celaeno/graph/operations/minimize/crossings.hpp>
 
 // namespace celaeno::graph::draw::svg {{{
 namespace celaeno::graph::draw::svg
@@ -55,6 +56,7 @@ namespace rg = ranges;
 namespace rv = ranges::views;
 
 namespace depth = celaeno::graph::views::depth;
+namespace balance = celaeno::graph::operations::balance::paths;
 namespace minimize = celaeno::graph::operations::minimize::crossings;
 // }}}
 
@@ -128,6 +130,7 @@ decltype(auto) run(
   } // if
   else
   {
+    balance::run(root,f_pred,f_succ,f_link,f_unlink);
     auto depth_view {depth::run(root,f_pred,f_succ).first};
     layers = depth_view
       | rv::transform([](auto&& e){ return e.second; })

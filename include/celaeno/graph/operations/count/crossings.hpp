@@ -59,9 +59,6 @@ using namespace celaeno::graph::concepts;
 
 // Concepts {{{
 template<typename T>
-concept Range = std::ranges::range<T>;
-
-template<typename T>
 concept Successors = CallableWith<T,i64>;
 // }}}
 

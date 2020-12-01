@@ -55,11 +55,14 @@ template<typename T, typename U = std::decay_t<T>>
 concept String =
 requires(U u) { { std::string{u} } -> std::same_as<std::string>; };
 
+template<typename T>
+concept Range = std::ranges::range<T>;
+
 template<typename T, typename U>
 concept SameAs = std::same_as<T,U>;
 
-template<typename F, typename V>
-concept CallableWith = requires(F f, V v) { f(v); };
+template<typename F, typename... V>
+concept CallableWith = requires(F f, V... v) { f(std::forward<V>(v)...); };
 
 template<typename T, typename U = std::decay_t<T>>
 concept Iterable = requires{ std::input_iterator<U> && std::incrementable<U>; };

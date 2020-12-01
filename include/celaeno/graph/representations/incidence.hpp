@@ -40,7 +40,7 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/representations/incidence/impl.hpp>
-#include <celaeno/graph/views/proximity.hpp>
+#include <celaeno/graph/views/depth.hpp>
 
 // namespace celaeno::graph::representations::incidence {{{
 namespace celaeno::graph::representations::incidence
@@ -52,7 +52,7 @@ namespace celaeno::graph::representations::incidence
 // }}}
 
 // Namespaces {{{
-namespace proximity = celaeno::graph::views::proximity;
+namespace depth = celaeno::graph::views::depth;
 namespace incidence = celaeno::graph::representations::incidence::impl;
 // }}}
 
@@ -61,12 +61,24 @@ using namespace celaeno::concepts;
 using namespace celaeno::graph::concepts;
 // }}}
 
-// Algorithm {{{
-template<SignedIntegral T, typename N1, typename N2, typename N3>
-auto run(T root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
+// fn: run {{{
+
+//
+// @ Given an input integral value, a function P to return the predecessors of a
+// vertex, a function S to return the successors of a vertex, and a function A
+// to return if two nodes are adjacent, the function returns the incidence
+// matrix of a graph
+//
+template<SignedIntegral T, typename P, typename S, typename A>
+auto run(T root, P&& f_pred, S&& f_succ, A&& f_adj)
+  requires CallableWith<P,i64>
+  &&
+  CallableWith<S,i64>
+  &&
+  CallableWith<A,i64,i64>
 {
-    // Proximity view: @level → vertex && @vertex → level
-    auto [lvs,_] = proximity::run(root,f_pred,f_succ);
+    // depth view: @level → vertices && @vertex → level
+    auto [lvs,_] = depth::run(root,f_pred,f_succ);
 
     // Number of levels must be > 1
     assertm(lvs.size() > 1, "Number of layers of the input graph is less 2");
@@ -79,12 +91,15 @@ auto run(T root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
 
 } // function: run }}}
 
-template<typename L1, typename L2, typename A>
-auto run(L1&& l1, L2&& l2, A&& f_adj)
+// fn: run {{{
+
+template<Range R, typename A>
+auto run(R&& l1, R&& l2, A&& f_adj)
+  requires CallableWith<A,i64,i64>
 {
   return incidence::single(
-    std::forward<L1>(l1),
-    std::forward<L2>(l2),
+    std::forward<R>(l1),
+    std::forward<R>(l2),
     std::forward<A>(f_adj)
   );
 
