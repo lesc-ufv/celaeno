@@ -34,6 +34,9 @@
 #pragma once
 
 #include <vector>
+#include <execution>
+#include <fmt/core.h>
+#include <fmt/ranges.h>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
@@ -93,7 +96,8 @@ decltype(auto) bor(C const& c, L const& l)
   {
     auto zipped_values{fp::zip(_c,_l)};
 
-    rg::sort(zipped_values,[&](auto&& lhs, auto&& rhs)
+    std::sort(std::execution::par_unseq, zipped_values.begin(),zipped_values.end(),
+    [&](auto&& lhs, auto&& rhs)
     {
       return barycenter::run(lhs.first) < barycenter::run(rhs.first);
     });
@@ -135,13 +139,15 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
   assertm(layer_count != 0, "Layer count equals zero");
   auto layers = fp::overlapping_pairs(fp::numbers({},layer_count));
 
-  auto sort_by_barycenter = [&]() -> bool
+  auto sort_by_barycenter = [&]
   {
-    bool sorted{true};
+    // Compute overlapping and non overlapping pairs separately
+    auto non_overlapping{fp::keep_if([i=0](auto e) mutable { return (i++%2 == 0); },layers)};
+    auto overlapping{fp::keep_if([i=0](auto e) mutable { return (i++%2 != 0); },layers)};
 
-    // Iterate through layers
-    for (auto&& [il1,il2] : layers)
+    auto process = [&](auto il1, auto il2) -> void
     {
+
       // Create matrix for layers l1 and l2 {{{
       auto& l1{depth_view.at(il1)};
       auto& l2{depth_view.at(il2)};
@@ -154,7 +160,6 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
       if ( ccrossings::run(r1.second,l2,f_succ) < ccrossings::run(l1,l2,f_succ) )
       {
         l1 = std::move(r1.second);
-        sorted = false;
       } // if
       // }}}
 
@@ -164,16 +169,33 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
       if (ccrossings::run(l1,r2.second,f_succ) < ccrossings::run(l1,l2,f_succ))
       {
         l2 = std::move(r2.second);
-        sorted = false;
       } // if
       // }}}
 
-    } // for
+    };
 
-    return sorted;
+    //
+    // @ Enqueue and execute threads with non-overlapping pairs
+    //
+    std::vector<std::thread> thread_no;
+    for (auto il : non_overlapping)
+    {
+      thread_no.emplace_back([=]{ process(il.first,il.second); });
+    } // for
+    for (auto& t : thread_no) { t.join(); }
+
+    //
+    // @ Enqueue and execute threads with overlapping pairs
+    //
+    std::vector<std::thread> thread_ov;
+    for (auto il : overlapping)
+    {
+      thread_ov.emplace_back([=]{ process(il.first,il.second); });
+    } // for
+    for (auto& t : thread_ov) { t.join(); }
   };
 
-  for(std::size_t i{}; ! sort_by_barycenter() && i < 10; ++i) { }
+  rg::for_each(rv::iota(0,11),[&](auto){ sort_by_barycenter(); });
 
   return depth_view
     | rv::transform([](auto&& e){ return e.second; })
