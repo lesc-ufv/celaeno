@@ -50,10 +50,7 @@ namespace celaeno::graph::a_star::test
 // Namespaces {{{
 namespace a_star = celaeno::graph::a_star;
 namespace rg = ranges;
-namespace rv = ranges::views;
-namespace ra = ranges::action;
 namespace fp = fplus;
-namespace fw = fplus::fwd;
 // }}}
 
 // Aliases {{{

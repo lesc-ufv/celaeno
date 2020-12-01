@@ -41,15 +41,18 @@ function(add_test target)
   add_executable(${target} ${ARGN})
   target_compile_options(${target}
     PRIVATE
-    $<IF:$<CONFIG:Debug>,
-        -std=c++2a
+      -std=c++2a
+      -O3
+      $<IF:$<CONFIG:Debug>,
         -Wall
         -Wextra
         -Wpedantic
-        -O0
         -Wshadow
-        # -fconcepts-diagnostics-depth=2
-        -Weffc++, -O3>)
+        -Weffc++
+        ,
+        -DNDEBUG
+      >
+  )
   target_link_libraries(${target}
     PRIVATE
       celaeno

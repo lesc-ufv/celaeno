@@ -36,7 +36,7 @@
 #include <vector>
 #include <concepts>
 #include <iterator>
-#include <ranges>
+#include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
@@ -48,6 +48,10 @@ namespace celaeno::graph::representations::incidence::impl
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::graph::concepts;
+// }}}
+
+// Namespaces {{{
+namespace rg = ranges;
 // }}}
 
 // Type aliases {{{
@@ -64,10 +68,10 @@ auto single(L1&& l1, L2&& l2, A&& f_adjacent)
   Matrix m(l1.size(),std::vector<bool>(l2.size(),0));
 
   // If edge exists, 1 else 0
-  std::ranges::for_each(l1,
+  rg::for_each(l1,
   [&,i=0](auto&& u) mutable
   {
-    std::ranges::for_each(l2,[&,j=0](auto&& v) mutable
+    rg::for_each(l2,[&,j=0](auto&& v) mutable
     {
       if( f_adjacent(u,v) ){ m.at(i).at(j) = 1; }
       ++j;

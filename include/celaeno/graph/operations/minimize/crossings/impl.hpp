@@ -98,9 +98,7 @@ decltype(auto) bor(C const& c, L const& l)
       return barycenter::run(lhs.first) < barycenter::run(rhs.first);
     });
 
-    std::tie(_c,_l) = fp::unzip(zipped_values);
-
-    return std::make_pair(_c,_l);
+    return fp::unzip(zipped_values);
   };
 
   return sort(c,l);
@@ -124,24 +122,6 @@ decltype(auto) roc(M&& m)
 template<SignedIntegral S, typename F1, typename F2, typename F3>
 decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
 {
-  // Generate adjancent pairs for layer indices {{{
-  //
-  // @ Given a number of layers n, generate a sequence that goes from 1 to n,
-  // that repeats the previous number of the sequence, e.g.:
-  // 4 -> [(0,1),(1,2),(2,3)]
-  //
-  auto f_generate_layer_pairs = [](auto _layer_count) -> auto
-  {
-    std::vector<std::pair<i64,i64>> pairs;
-
-    for (std::size_t i{}; i < _layer_count-1; ++i)
-    {
-      pairs.emplace_back(i,i+1);
-    } // for: i < _layer_count
-
-    return pairs;
-  };
-  // }}}
 
   //
   // @ Create a depth view
@@ -149,15 +129,11 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
   auto depth_view{depth::run(root,f_pred,f_succ).first};
 
   //
-  // @ Get number of layers
+  // @ Generate layer pairs
   //
   std::size_t layer_count{depth_view.size()};
   assertm(layer_count != 0, "Layer count equals zero");
-
-  //
-  // @ Generate layer pairs
-  //
-  auto layers = f_generate_layer_pairs(layer_count);
+  auto layers = fp::overlapping_pairs(fp::numbers({},layer_count));
 
   auto sort_by_barycenter = [&]() -> bool
   {
@@ -174,21 +150,20 @@ decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
 
       // Step 2: Br {{{
       auto r1{bor(m0,l1)};
-      auto m1{r1.first};
+      auto& m1{r1.first};
       if ( ccrossings::run(r1.second,l2,f_succ) < ccrossings::run(l1,l2,f_succ) )
       {
-        l1 = r1.second;
+        l1 = std::move(r1.second);
         sorted = false;
       } // if
       // }}}
 
       // Step 4: Bc {{{
       auto r2{bor(reverse(m1),l2)};
-      auto m2{reverse(r2.first)};
 
       if (ccrossings::run(l1,r2.second,f_succ) < ccrossings::run(l1,l2,f_succ))
       {
-        l2 = r2.second;
+        l2 = std::move(r2.second);
         sorted = false;
       } // if
       // }}}

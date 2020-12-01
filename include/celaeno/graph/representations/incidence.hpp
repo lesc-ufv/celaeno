@@ -36,7 +36,6 @@
 #include <vector>
 #include <concepts>
 #include <iterator>
-#include <range/v3/all.hpp> // TODO remove
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/concepts.hpp>
@@ -53,7 +52,6 @@ namespace celaeno::graph::representations::incidence
 // }}}
 
 // Namespaces {{{
-namespace rg = ranges;
 namespace proximity = celaeno::graph::views::proximity;
 namespace incidence = celaeno::graph::representations::incidence::impl;
 // }}}
