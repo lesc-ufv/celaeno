@@ -3,7 +3,7 @@
 FROM formigoni/alpine-gcc-10:latest
 
 # Install packages
-RUN apk add make cmake clang git py3-pip
+RUN apk add ninja make cmake clang git py3-pip
 RUN pip3 install -I conan
 
 # Configure conan
@@ -24,7 +24,7 @@ RUN conan install .. --build missing
 
 # Build the project
 WORKDIR /celaeno
-RUN cmake -H. -Bbuild
+RUN cmake -H. -Bbuild -GNinja -DCMAKE_CXX_COMPILER=clang++
 RUN cmake --build build
 
 # Perform tests

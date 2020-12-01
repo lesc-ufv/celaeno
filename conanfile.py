@@ -41,12 +41,12 @@ class CelaenoConan(ConanFile):
   exports_sources = "include/*", "cmake/*", "LICENSE", "CMakeLists.txt"
   no_copy_source = True
   requires = \
+    'doctest/2.4.0', \
     'spdlog/1.7.0', \
+    'fmt/7.1.2', \
+    'functionalplus/v0.2.10-p0@dobiasd/stable', \
     'taygete/1.0@ruanformigoni/stable', \
-    'maia/0.1@ruanformigoni/testing', \
-    'fmt/6.0.0@bincrafters/stable', \
-    'doctest/2.3.4@bincrafters/stable', \
-    'functionalplus/v0.2.10-p0@dobiasd/stable'
+    'maia/0.1@ruanformigoni/testing'
 
   def source(self):
     # Remove examples
