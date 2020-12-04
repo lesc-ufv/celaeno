@@ -115,6 +115,9 @@ decltype(auto) run(
   Str&& fn,
   bool optimize = true
 )
+  requires CallableWith<F1,i64>
+  && CallableWith<F2,i64>
+  && CallableWith<F3,i64,i64>
 {
 
   // @ Variables {{{

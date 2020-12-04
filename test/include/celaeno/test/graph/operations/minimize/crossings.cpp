@@ -34,7 +34,6 @@
 #include <doctest/doctest.h>
 
 #include <fplus/fplus.hpp>
-#include <range/v3/all.hpp>
 
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
@@ -44,10 +43,7 @@
 #include <celaeno/test/graph/test.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
-#include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
-#include <celaeno/graph/operations/minimize/crossings/impl.hpp>
-
 
 #include "crossings/data.hpp"
 
@@ -60,18 +56,14 @@ namespace celaeno::graph::operations::minimize::crossings::test
 // }}}
 
 // Namespaces {{{
-namespace rg = ranges;
 namespace fp = fplus;
 
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader;
 
 namespace test = celaeno::test;
-namespace ccrossings = celaeno::graph::operations::count::crossings;
 namespace balance = celaeno::graph::operations::balance::paths;
-namespace incidence = celaeno::graph::representations::incidence;
-namespace mc = celaeno::graph::operations::minimize::crossings;
-namespace mci = celaeno::graph::operations::minimize::crossings::impl;
+namespace minimize = celaeno::graph::operations::minimize::crossings;
 // }}}
 
 // Using namespaces {{{
@@ -164,7 +156,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
       // TODO erase {{{
 
       // Print ordered
-      mc::run(1,f_p,f_s,f_a,f_l,f_u);
+      minimize::run(1,f_p,f_s,f_a,f_l,f_u);
 
       // TODO erase }}}
 
@@ -219,7 +211,7 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
 
       auto [result,runtime]
       {
-        celaeno::test::runtime([&]{return mc::run(0,f_p,f_s,f_a,f_l,f_u);})
+        celaeno::test::runtime([&]{return minimize::run(0,f_p,f_s,f_a,f_l,f_u);})
       };
 
       // }}}

@@ -37,7 +37,6 @@
 #include <type_traits>
 #include <range/v3/all.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 
 // namespace celaeno::graph::views::depth {{{
@@ -52,13 +51,14 @@ namespace kahn = celaeno::graph::search::kahn;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
 // }}}
 
 // Algorithm {{{
 template<SignedIntegral T, typename P, typename S>
 auto run(T root, P&& f_pred, S&& f_succ)
   -> std::pair< std::map<T,std::vector<T>>, std::map<T,T> >
+  requires CallableWith<P,i64>
+  && CallableWith<S,i64>
 {
   // vertex -> layer
   std::map<T,T> vl;

@@ -35,7 +35,6 @@
 #include <utility>  // std::forward
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 
@@ -50,7 +49,6 @@ namespace bfs = celaeno::graph::search::bfs;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
 // }}}
 
 // Using declarations {{{
@@ -60,6 +58,10 @@ using std::ranges::transform;
 // Algorithm {{{
 template<SignedIntegral T, typename P, typename S, typename L, typename U>
 void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
+  requires CallableWith<P,i64>
+  && CallableWith<S,i64>
+  && CallableWith<L,std::pair<i64,i64>>
+  && CallableWith<U,std::pair<i64,i64>>
 {
   // Dummy vertex with lowest value
   i64 idx{};

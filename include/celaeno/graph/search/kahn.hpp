@@ -36,8 +36,8 @@
 #include <deque>
 #include <unordered_map>
 #include <fplus/fplus.hpp>
+#include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 
 // namespace celaeno::graph::search::kahn {{{
@@ -51,17 +51,18 @@ namespace bfs = celaeno::graph::search::bfs;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
 // }}}
 
 // Concepts {{{
 template<typename T>
-concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
+concept Callback = requires(T t){ {t(i64{})} -> std::same_as<bool>; };
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, typename N1, typename N2, Callback C = std::function<bool(int64_t)>>
-std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return false;})
+template<SignedIntegral T, typename P, typename S, Callback C = std::function<bool(int64_t)>>
+std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return false;})
+  requires CallableWith<P,i64>
+  && CallableWith<S,i64>
 {
   // Topologically sorted result
   std::vector<T> result;
@@ -73,8 +74,8 @@ std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return fals
   std::set<std::pair<T,T>> re;
 
   // Populate the deque
-  auto has_pred = [&pred](auto&& v){ return ! pred(v).empty(); };
-  bfs::run(root,pred,succ,[&has_pred,&deque](auto&& v)
+  auto has_pred = [&f_pred](auto&& v){ return ! f_pred(v).empty(); };
+  bfs::run(root,f_pred,f_succ,[&has_pred,&deque](auto&& v)
     { if( ! has_pred(v) ){ deque.push_back(v); } return false; });
 
   while (! deque.empty() )
@@ -89,13 +90,13 @@ std::vector<T> run(T root, N1&& pred, N2&& succ, C&& cb = [](auto&&){return fals
     if( cb(c) ) return result;
 
     // Get successors
-    for( auto s : succ(c) )
+    for( auto s : f_succ(c) )
     {
       // remove edge c -> s
       re.insert({c,s});
       // If s has no more predecessors
       auto is_rm = [&s,&re](auto&& v){ return re.contains({v,s}); };
-      auto preds_s {fp::drop_if(is_rm, pred(s))};
+      auto preds_s {fp::drop_if(is_rm, f_pred(s))};
       // Insert s into the queue
       if( preds_s.empty() ) { deque.push_back(s); }
     }

@@ -38,7 +38,6 @@
 #include <iterator>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/representations/incidence/impl.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
@@ -58,7 +57,6 @@ namespace incidence = celaeno::graph::representations::incidence::impl;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
 // }}}
 
 // fn: run {{{

@@ -123,8 +123,11 @@ decltype(auto) roc(M&& m)
 } // function: roc }}}
 
 // fn: phase_1 {{{
-template<SignedIntegral S, typename F1, typename F2, typename F3>
-decltype(auto) phase_1(S root, F1&& f_pred, F2&& f_succ, F3&& f_adj)
+template<SignedIntegral S, typename N1, typename N2, typename N3>
+decltype(auto) phase_1(S root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
+  requires CallableWith<N1,i64>
+  && CallableWith<N2,i64>
+  && CallableWith<N3,i64,i64>
 {
 
   //

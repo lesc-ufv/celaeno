@@ -36,8 +36,8 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
+#include <celaeno/concepts.hpp>
 #include <celaeno/aliases.hpp>
-#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::operations::count::crossings {{{
 namespace celaeno::graph::operations::count::crossings
@@ -54,7 +54,7 @@ namespace fw = fplus::fwd;
 // }}}
 
 // Using namespaces {{{
-using namespace celaeno::graph::concepts;
+using namespace celaeno::concepts;
 // }}}
 
 // Concepts {{{

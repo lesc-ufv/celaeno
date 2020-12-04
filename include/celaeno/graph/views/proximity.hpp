@@ -37,7 +37,6 @@
 #include <utility>
 #include <range/v3/all.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
@@ -48,19 +47,16 @@ namespace celaeno::graph::views::proximity
 
 // Namespaces {{{
 namespace rg = ranges;
-namespace rv = ranges::views;
 namespace depth = celaeno::graph::views::depth;
 namespace kahn = celaeno::graph::search::kahn;
 // }}}
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
 // }}}
 
 // using declarations {{{
 using rg::for_each;
-using rv::transform;
 using rg::sort;
 // }}}
 
@@ -69,12 +65,14 @@ using rg::sort;
 template<SignedIntegral T, typename P, typename S>
 auto run(T root, P&& f_pred, S&& f_succ)
   -> std::pair<std::map<T,std::vector<T>>,std::map<T,T>>
+  requires CallableWith<P,i64>
+  && CallableWith<S,i64>
 {
   // Create a depth-view
   auto [lvs,vl] {depth::run(root, std::forward<P>(f_pred), std::forward<S>(f_succ))};
 
   // Perform Topological sorting
-  auto topo {kahn::run(std::forward<T>(root),std::forward<P>(f_pred),std::forward<S>(f_succ))};
+  auto topo {kahn::run(root,std::forward<P>(f_pred),std::forward<S>(f_succ))};
 
   // Reverse topo view
   std::reverse(topo.begin(),topo.end());

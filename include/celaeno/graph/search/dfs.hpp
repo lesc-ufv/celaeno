@@ -39,7 +39,6 @@
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::search::dfs {{{
 namespace celaeno::graph::search::dfs
@@ -53,7 +52,6 @@ namespace fw = fplus::fwd;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
 // }}}
 
 // Concepts {{{
@@ -64,6 +62,8 @@ concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
 // Algorithm {{{
 template<SignedIntegral T, typename P, typename S, Callback C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;})
+  requires CallableWith<P,i64>
+  && CallableWith<S,i64>
 {
   // Create adjacent helper
   auto nb = [&](auto&& u){ return fp::append(pred(u),succ(u)); };

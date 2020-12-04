@@ -39,7 +39,6 @@
 #include <range/v3/all.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/concepts.hpp>
 
 // namespace celaeno::graph::representations::incidence::impl {{{
 namespace celaeno::graph::representations::incidence::impl
@@ -47,7 +46,6 @@ namespace celaeno::graph::representations::incidence::impl
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
-using namespace celaeno::graph::concepts;
 // }}}
 
 // Namespaces {{{
@@ -61,8 +59,9 @@ using Matrix = std::vector<std::vector<bool>>;
 // Algorithm {{{
 
 // fn: single {{{
-template<typename L1, typename L2, typename A>
-auto single(L1&& l1, L2&& l2, A&& f_adjacent)
+template<Range R, typename A>
+auto single(R&& l1, R&& l2, A&& f_adjacent)
+  requires CallableWith<A,i64,i64>
 {
   // Create the incidence matrix
   Matrix m(l1.size(),std::vector<bool>(l2.size(),0));
@@ -85,8 +84,9 @@ auto single(L1&& l1, L2&& l2, A&& f_adjacent)
 } // function: single }}}
 
 // fn: all {{{
-template<typename L, typename A>
-auto all(L&& layers, A&& f_adjacent)
+template<Range R, typename A>
+auto all(R&& layers, A&& f_adjacent)
+  requires CallableWith<A,i64,i64>
 {
   // Result is the representation of the grpah as an incidence matrix
   std::vector<Matrix> result;
