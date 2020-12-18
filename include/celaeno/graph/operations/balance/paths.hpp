@@ -67,7 +67,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   i64 idx{};
 
   // Define function to compare values lt 0
-  auto f_lowest = [&idx](auto&& e) { if(e < idx){ idx=e; } return true; };
+  auto f_lowest = [&idx](auto&& e) { if(e < idx){ idx=e; } return false; };
 
   // Get the dummy vertex with the lowest value
   bfs::run(root,f_pred,f_succ,f_lowest);
