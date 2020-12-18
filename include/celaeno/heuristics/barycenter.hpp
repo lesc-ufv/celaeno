@@ -31,6 +31,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # pragma once
+#include <algorithm>
+#include <execution>
 #include <numeric>
 #include <celaeno/concepts.hpp>
 
@@ -44,13 +46,12 @@ using namespace celaeno::concepts;
 
 // Algorithm {{{
 template<Vector V>
-auto run(V&& v)
+[[nodiscard]] auto run(V&& v)
 {
-  auto mult_by_index = [i=1](auto&& acc, auto&& curr) mutable { return acc + curr*i++; };
+  auto f = [i=1](auto&& acc, auto&& curr) mutable { return acc + curr*i++; };
 
-  auto a { std::accumulate(v.begin(),v.end(),0,mult_by_index) };
-
-  auto b { std::accumulate(v.begin(),v.end(),0) };
+  auto a { std::accumulate(v.begin(), v.end(), 0, f) };
+  auto b { std::reduce(std::execution::par_unseq, v.begin(), v.end(), 0) };
 
   return (b != 0)? static_cast<double>(a)/b : 0;
 } // function: run }}}
