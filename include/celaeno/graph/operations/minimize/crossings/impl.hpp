@@ -69,7 +69,7 @@ namespace ccrossings = celaeno::graph::operations::count::crossings;
 
 // fn: reverse {{{
 template<Matrix M>
-decltype(auto) reverse(M&& m)
+[[nodiscard]] decltype(auto) reverse(M&& m)
 {
   using matrix_t = typename std::decay_t<M>;
 
@@ -88,7 +88,7 @@ decltype(auto) reverse(M&& m)
 
 // fn: bor {{{
 template<typename C, typename L>
-decltype(auto) bor(C const& c, L const& l)
+[[nodiscard]] decltype(auto) bor(C const& c, L const& l)
 {
   assertm(c.size() > 0, "Empty matrix");
 
@@ -124,7 +124,7 @@ decltype(auto) roc(M&& m)
 
 // fn: phase_1 {{{
 template<SignedIntegral S, typename N1, typename N2, typename N3>
-decltype(auto) phase_1(S root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
+[[nodiscard]] decltype(auto) phase_1(S root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
   requires CallableWith<N1,i64>
   && CallableWith<N2,i64>
   && CallableWith<N3,i64,i64>
