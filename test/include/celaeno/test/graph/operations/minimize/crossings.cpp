@@ -209,9 +209,9 @@ TEST_CASE("celaeno::graph::operations::minimize::crossings"
       std::chrono::duration<f64> dur {end-start};
       std::stringstream ss; ss << dur.count();
 
-      auto [result,runtime]
+      auto runtime
       {
-        celaeno::test::runtime([&]{return minimize::run(0,f_p,f_s,f_a,f_l,f_u);})
+        celaeno::test::runtime_vt([&]{return minimize::run(0,f_p,f_s,f_a,f_l,f_u);})
       };
 
       // }}}
