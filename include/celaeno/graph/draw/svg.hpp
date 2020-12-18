@@ -45,6 +45,7 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
+#include <celaeno/graph/operations/balance/outgoing.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 
 // namespace celaeno::graph::draw::svg {{{
@@ -55,9 +56,9 @@ namespace celaeno::graph::draw::svg
 namespace rg = ranges;
 namespace rv = ranges::views;
 
-namespace depth = celaeno::graph::views::depth;
-namespace balance = celaeno::graph::operations::balance::paths;
-namespace minimize = celaeno::graph::operations::minimize::crossings;
+namespace ns_depth = celaeno::graph::views::depth;
+namespace ns_balance = celaeno::graph::operations::balance;
+namespace ns_minimize = celaeno::graph::operations::minimize;
 // }}}
 
 // Using namespaces {{{
@@ -126,15 +127,16 @@ decltype(auto) run(
   std::ofstream of{fn};
 
   // Edge minimization Oriented Drawing
+  ns_balance::outgoing::run(root,f_pred,f_succ,f_link,f_unlink);
+  ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
   std::vector<std::vector<i64>> layers;
   if ( optimize )
   {
-    layers = minimize::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
+    layers = ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
   } // if
   else
   {
-    balance::run(root,f_pred,f_succ,f_link,f_unlink);
-    auto depth_view {depth::run(root,f_pred,f_succ).first};
+    auto depth_view {ns_depth::run(root,f_pred,f_succ).first};
     layers = depth_view
       | rv::transform([](auto&& e){ return e.second; })
       | rg::to<std::vector<std::vector<i64>>>;
