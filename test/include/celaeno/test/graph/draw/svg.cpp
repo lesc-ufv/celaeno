@@ -59,7 +59,7 @@ TEST_CASE("celaeno::graph::draw::svg")
   // Read graph {{{
   graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  reader::Reader{circ::synth_91::b1,emplace};
+  auto metadata {reader::Reader{circ::synth_91::b1,emplace}};
   // }}}
 
   // Helpers {{{
