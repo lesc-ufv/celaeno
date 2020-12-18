@@ -54,16 +54,12 @@ namespace fw = fplus::fwd;
 using namespace celaeno::concepts;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Callback = requires(T t){ {t(int64_t{})} -> std::same_as<bool>; };
-// }}}
-
 // Algorithm {{{
-template<SignedIntegral T, typename P, typename S, Callback C = std::function<bool(int64_t)>>
+template<SignedIntegral T, typename P, typename S, typename C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;})
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
+  && CallableWith<C,i64>
 {
   // Create adjacent helper
   auto nb = [&](auto&& u){ return fp::append(pred(u),succ(u)); };

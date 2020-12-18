@@ -53,16 +53,12 @@ namespace bfs = celaeno::graph::search::bfs;
 using namespace celaeno::concepts;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Callback = requires(T t){ {t(i64{})} -> std::same_as<bool>; };
-// }}}
-
 // Algorithm {{{
-template<SignedIntegral T, typename P, typename S, Callback C = std::function<bool(int64_t)>>
+template<SignedIntegral T, typename P, typename S, typename C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return false;})
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
+  && CallableWith<C,i64>
 {
   // Topologically sorted result
   std::vector<T> result;

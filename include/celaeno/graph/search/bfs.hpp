@@ -55,16 +55,12 @@ namespace ra = ranges::actions;
 using namespace celaeno::concepts;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Callback = requires(T t){ {t(i64{})} -> std::same_as<bool>; };
-// }}}
-
 // Algorithm {{{
-template<SignedIntegral T, typename P, typename S, Callback C = std::function<bool(i64)>>
+template<SignedIntegral T, typename P, typename S, typename C = std::function<bool(i64)>>
 std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return false;})
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
+  && CallableWith<C,i64>
 {
   // Create adjacent helper
   auto f_nb = [&](auto&& u){ return fp::append(f_pred(u),f_succ(u)); };

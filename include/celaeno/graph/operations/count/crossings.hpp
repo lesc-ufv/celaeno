@@ -57,14 +57,10 @@ namespace fw = fplus::fwd;
 using namespace celaeno::concepts;
 // }}}
 
-// Concepts {{{
-template<typename T>
-concept Successors = CallableWith<T,i64>;
-// }}}
-
 // function: run {{{
-template<SignedIntegral T = i64, Range R, Successors S>
+template<SignedIntegral T = i64, Range R, typename S>
 T run(R&& l1, R&& l2, S&& f_succ)
+  requires CallableWith<S,i64>
 {
   //
   // @ Index by vertices positions in layer l2
