@@ -9,9 +9,8 @@ RUN pip3 install -I conan
 # Configure conan
 RUN conan profile new default --detect
 RUN conan profile update settings.compiler.libcxx=libstdc++11 default
+RUN conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
 RUN conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
-RUN conan remote add spdlog https://api.bintray.com/conan/ruanformigoni/spdlog
-RUN conan remote add fmt https://api.bintray.com/conan/ruanformigoni/fmt
 RUN conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
 
 # Configure project

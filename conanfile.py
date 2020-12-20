@@ -40,13 +40,14 @@ class CelaenoConan(ConanFile):
   generators = "cmake_find_package"
   exports_sources = "include/*", "cmake/*", "LICENSE", "CMakeLists.txt"
   no_copy_source = True
-  requires = \
-    'doctest/2.4.0', \
-    'spdlog/1.7.0', \
-    'fmt/6.0.0@bincrafters/stable', \
-    'functionalplus/v0.2.10-p0@dobiasd/stable', \
-    'taygete/1.0@ruanformigoni/stable', \
-    'maia/0.1@ruanformigoni/testing'
+
+  def requirements(self):
+    self.requires('doctest/2.4.1')
+    self.requires('spdlog/1.8.2')
+    self.requires('fmt/7.1.3')
+    self.requires('functionalplus/v0.2.13-p0@dobiasd/stable')
+    self.requires('taygete/1.0@ruanformigoni/stable')
+    self.requires('maia/0.1@ruanformigoni/testing')
 
   def source(self):
     # Remove examples

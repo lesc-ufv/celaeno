@@ -11,9 +11,8 @@ before_script:
   - pip3 install -I conan
   - conan profile new default --detect
   - conan profile update settings.compiler.libcxx=libstdc++11 default
+  - conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
   - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
-  - conan remote add spdlog https://api.bintray.com/conan/ruanformigoni/spdlog
-  - conan remote add fmt https://api.bintray.com/conan/ruanformigoni/fmt
   - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
 
 build_tests:
