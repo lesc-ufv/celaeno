@@ -1,10 +1,7 @@
-# [preprocessor]
-# [preprocessor.mermaid]
-# command = "mdbook-mermaid"
-# [preprocessor]
-# [preprocessor.toc]
-# command = "mdbook-toc"
-# renderer = ["html"]
+[preprocessor]
+[preprocessor.toc]
+command = "mdbook-toc"
+renderer = ["html"]
 
 [book]
 authors = ["Ruan Evangelista Formigoni"]
@@ -18,8 +15,6 @@ default-theme = "rust"
 no-section-label = false
 preferred-dark-theme = "navy"
 mathjax-support = true
-# additional-css = ["mermaid.css"]
-# additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [output.html.fold]
 enable = true

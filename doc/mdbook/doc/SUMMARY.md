@@ -34,4 +34,6 @@
 
 - [Incidence Matrix](./graph/representations/incidence/incidence.md)
 
-<!-- - [A\* Algorithm](./a-star.md) -->
+# Draw
+
+- [SVG](./graph/draw/svg/svg.md)

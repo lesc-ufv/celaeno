@@ -1,5 +1,7 @@
 # Topological View
 
+<!-- toc -->
+
 ## Definition
 
 > Give a graph \\(G(V,E)\\) a topological view of a graph, is a representation,
