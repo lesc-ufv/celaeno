@@ -33,13 +33,13 @@
 #pragma once
 
 #include <utility>
-#include <maia/circuits/synth-91.hpp>
+#include <celaeno/test/graph/data/synth-91.hpp>
 
 namespace celaeno::graph::test
 {
 
 // namespaces {{{
-namespace circ = maia::circuits;
+namespace circ = celaeno::test::graph::data;
 // }}}
 
 template<typename T>

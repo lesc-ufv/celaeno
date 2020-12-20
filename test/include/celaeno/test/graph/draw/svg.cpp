@@ -37,7 +37,7 @@
 #include <iostream>
 #include <cstdint>
 
-#include <maia/circuits/synth-91.hpp>
+#include <celaeno/test/graph/data/synth-91.hpp>
 
 #include <taygete/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
@@ -53,7 +53,7 @@ TEST_CASE("celaeno::graph::draw::svg")
   namespace graph = taygete::graph;
   namespace reader = taygete::graph::reader;
   namespace svg = celaeno::graph::draw::svg;
-  namespace circ = maia::circuits;
+  namespace circ = celaeno::test::graph::data;
   // }}}
 
   // Read graph {{{

@@ -63,7 +63,6 @@ namespace rg = ranges;
 namespace rv = ranges::views;
 namespace graph = taygete::graph;
 namespace reader = taygete::graph::reader;
-namespace cir = maia::circuits;
 namespace balance = celaeno::graph::operations::balance::paths;
 namespace depth = celaeno::graph::views::depth;
 // }}}

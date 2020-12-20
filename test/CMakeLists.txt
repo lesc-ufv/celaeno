@@ -59,7 +59,6 @@ function(add_test target)
       spdlog::spdlog
       Threads::Threads
       taygete::taygete
-      maia::maia
   )
   target_include_directories(${target}
     PRIVATE

@@ -50,10 +50,6 @@ if(NOT taygete_FOUND)
   find_package(taygete REQUIRED)
 endif()
 
-if(NOT maia_FOUND)
-  find_package(maia REQUIRED)
-endif()
-
 if(NOT fmt_FOUND)
   find_package(fmt REQUIRED)
 endif()
