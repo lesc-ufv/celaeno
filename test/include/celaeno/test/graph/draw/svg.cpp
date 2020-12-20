@@ -70,9 +70,27 @@ TEST_CASE("celaeno::graph::draw::svg")
   auto f_u = [&g](auto&& e){ g.erase(e); };
   // }}}
 
+  // Gate type {{{
+  auto f_label = [&metadata](auto id)
+  {
+    using Type = taygete::graph::reader::GateType;
+    auto data{metadata.data()};
+    if( ! data.contains(id) )  { return " "; }
+    switch (data.at(id))
+    {
+      case Type::AND: return "∧";
+      case Type::OR: return "∨";
+      case Type::NAND: return "~∧";
+      case Type::NOR: return "~∨";
+      case Type::XOR: return "⊕";
+      case Type::XNOR: return "~⊕";
+      case Type::MAJ3: return "M";
+    } // switch
+  };
+  // }}}
+
   // Test drawing {{{
-  svg::run(1,f_p,f_s,f_a,f_l,f_u,"artifacts/b1-default.svg",false);
-  svg::run(1,f_p,f_s,f_a,f_l,f_u,"artifacts/b1-optimized.svg",true);
+  svg::run(1,f_p,f_s,f_a,f_l,f_u,f_label,"artifacts/b1-default.svg");
   // }}}
 
 

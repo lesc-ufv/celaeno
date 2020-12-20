@@ -54,9 +54,7 @@ namespace celaeno::graph::draw::svg
 
 // namespaces {{{
 namespace rg = ranges;
-namespace rv = ranges::views;
 
-namespace ns_depth = celaeno::graph::views::depth;
 namespace ns_balance = celaeno::graph::operations::balance;
 namespace ns_minimize = celaeno::graph::operations::minimize;
 // }}}
@@ -80,7 +78,7 @@ constexpr std::string_view const h_template
 
 constexpr std::string_view const v_label_template
 {
-  "<text x='{}' y='{}' font-size='{}' fill='black'>{}</text>\n"
+  "<text x='{}' y='{}' text-anchor='middle' font-size='{}' fill='black'>{}</text>\n"
 };
 
 constexpr std::string_view const v_template
@@ -95,7 +93,6 @@ const std::string_view e_template
 };
 
 constexpr std::string_view const footer{"</svg>\n"};
-
 // }}}
 
 // fn: run {{{
@@ -105,6 +102,7 @@ template<SignedIntegral S,
   typename F3,
   typename F4,
   typename F5,
+  typename F6,
   String Str>
 decltype(auto) run(
   S root,
@@ -113,127 +111,178 @@ decltype(auto) run(
   F3&& f_adj,
   F4&& f_link,
   F5&& f_unlink,
-  Str&& fn,
-  bool optimize = true
+  F6&& f_label,
+  Str&& fn
 )
   requires CallableWith<F1,i64>
   && CallableWith<F2,i64>
   && CallableWith<F3,i64,i64>
 {
 
-  // @ Variables {{{
+  // @ Vertices settings {{{
+  // Radius
+  constexpr i32 const vertex_radius{50};
+  // Horizontal space between vertices
+  constexpr i32 const vertex_hspacing{vertex_radius*3};
+  // Vertical space between vertices
+  constexpr i32 const vertex_vspacing{vertex_radius*3};
+  // Offset of circles from the edges
+  constexpr i32 const circle_offset{vertex_radius};
+  // }}}
 
-  // Output file
-  std::ofstream of{fn};
+  // @ Vertex Placement {{{
+
+  // Save vertices positions
+  std::map<S,std::pair<i64,i64>> vertex_pos;
+
+  auto f_place =
+  [&](auto x, auto y, auto u)
+  {
+      vertex_pos.emplace(
+        std::make_pair(
+          u,
+          std::make_pair(x*vertex_hspacing+circle_offset,y*vertex_vspacing+circle_offset)
+        )
+      );
+  }; // lamb: f_place
 
   // Edge minimization Oriented Drawing
   ns_balance::outgoing::run(root,f_pred,f_succ,f_link,f_unlink);
   ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
-  std::vector<std::vector<i64>> layers;
-  if ( optimize )
+  auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
+
+  // Find level with higher number of vertices
+  auto const it_base
+    {rg::max_element(layers,[](auto a, auto b){ return a.size() < b.size(); })};
+
+  // Save x coordinates of vertices
+  std::map<i64,i64> vx;
+
+  // Save occupation of x positions for each layer
+  std::set<i64> occupation;
+
+  // Place level with higher number of vertices
+  rg::for_each(*it_base,
+  [&,x=0,y=std::distance(layers.begin(),it_base)](auto u) mutable
   {
-    layers = ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
-  } // if
-  else
+    f_place(x,y,u);
+    vx[u] = x;
+    ++x;
+  });
+
+  // Calculate the mean of the predecessors/successors positions
+  auto mean_of_pos = [&](auto const& vs)
   {
-    auto depth_view {ns_depth::run(root,f_pred,f_succ).first};
-    layers = depth_view
-      | rv::transform([](auto&& e){ return e.second; })
-      | rg::to<std::vector<std::vector<i64>>>;
-  } // else
+    i64 pos
+    {
+      rg::accumulate(vs,0,[&](auto acc, auto u){ return acc + vx[u]; })
+      /
+      static_cast<i64>(vs.size())
+    };
+    while( occupation.contains(pos) ) { ++pos; }
+    return pos;
+  };
+
+  // Place next levels
+  {
+    auto y{std::distance(layers.begin(),it_base)+1};
+    for (auto it{std::next(it_base)}; it != layers.cend(); ++it)
+    {
+      // Place remaining levels after current
+      for (i64 x{}; auto const& u : *it)
+      {
+        // Set the x position to a mean of the predecessors positions
+        x = mean_of_pos(f_pred(u));
+        // Save the position
+        vx[u] = x;
+        // Mark position as used
+        occupation.emplace(x);
+        // Position the vertex
+        f_place(x,y,u);
+      } // for
+      // Increase layer counter
+      ++y;
+      // Reset occupation, for next layer
+      occupation.clear();
+    } // for
+  }
+
+  // Place previous levels
+  {
+    auto y{std::distance(layers.begin(),it_base)-1};
+    for (auto it{std::prev(it_base)};; --it)
+    {
+      // Place remaining levels before current
+      for (i64 x{}; auto const& u : *it)
+      {
+        // Set the x position to a mean of the predecessors positions
+        x = mean_of_pos(f_succ(u));
+        // Save the position
+        vx[u] = x;
+        // Mark position as used
+        occupation.emplace(x);
+        // Position the vertex
+        f_place(x,y,u);
+      } // for
+      // Stop if current level == begin
+      if(it == layers.begin()){ break; }
+      // Increase layer counter
+      --y;
+      // Reset occupation, for next layer
+      occupation.clear();
+    } // for
+  } // }}}
+
+  // @ Output streams {{{
+
+  // Output file
+  std::ofstream of{fn};
 
   // Streams
   std::stringstream header;
   std::stringstream vertices;
   std::stringstream edges;
 
-  // Viewbox size
-  i64 view_box_x {};
-  i64 view_box_y {};
-
-  // Vertices settings
-  auto vertex_radius{30};
-  auto vertex_hspacing{vertex_radius+80};
-  auto vertex_vspacing{vertex_radius+80};
-
-  // Vertices positions
-  std::map<S,std::pair<i64,i64>> vertex_pos;
-
-  // }}}
-
-  // @ Vertices positioning {{{
-
-  //
-  // @ Vertex Placement
-  //
-  rg::for_each(layers,[&,y=1](auto&& layer) mutable
-  {
-    rg::for_each(layer,[&,x=1](auto&& vertex) mutable
-    {
-
-      if ( x*vertex_hspacing > view_box_x ) { view_box_x = x*vertex_hspacing; }
-
-      if ( y*vertex_vspacing > view_box_y ) { view_box_y = y*vertex_vspacing; }
-
-      vertices <<
-        fmt::format(
-            v_template
-          , vertex_radius
-          , x*vertex_hspacing
-          , y*vertex_vspacing
-        );
-
-      vertices <<
-        fmt::format(
-            v_label_template
-          , x*vertex_hspacing-15
-          , y*vertex_vspacing+15
-          , 40
-          , vertex
-        );
-
-        vertex_pos.emplace(
-          std::make_pair(
-            vertex,
-            std::make_pair(x*vertex_hspacing-15,y*vertex_vspacing+15)
-          )
-        );
-
-      ++x;
-    });
-    ++y;
-  });
-  // }}}
-
-  // @ Header {{{
-  header <<
-    fmt::format(h_template,view_box_x+2*vertex_radius,view_box_y+2*vertex_radius);
   // }}}
 
   // @ Edge Routing {{{
   rg::for_each(vertex_pos, [&](auto&& e)
   {
-    auto u { e.first };
-    auto pos_parent { e.second };
-    auto succ { f_succ(u) };
+    auto succ { f_succ(e.first) };
 
     rg::for_each(succ, [&](auto&& v)
     {
-      auto pos_child{vertex_pos[v]};
-
-      edges <<
-        fmt::format(
-            e_template
-          , pos_parent.first+(vertex_radius/2)
-          , pos_parent.second-(vertex_radius/2)
-          , pos_child.first+(vertex_radius/2)
-          , pos_child.second-(vertex_radius/2)
-        );
+      auto [ux,uy] = e.second;
+      auto [vx,vy] = vertex_pos[v];
+      edges << fmt::format(e_template, ux, uy, vx, vy);
     });
-  });
-  // }}}
+  }); // }}}
 
-  // @ File output {{{
+  // @ Get farthest vertices to build viewport {{{
+  auto view_box_x {rg::max_element(vertex_pos,
+  [](auto a, auto b)
+  {
+    return a.second.first < b.second.first;
+  })->second.first+circle_offset};
+
+  auto view_box_y {rg::max_element(vertex_pos,
+  [](auto a, auto b)
+  {
+    return a.second.second < b.second.second;
+  })->second.second+circle_offset}; // }}}
+
+  // @ Stream/File writting {{{
+  header << fmt::format(h_template,view_box_x,view_box_y);
+
+  // Vertices and labels
+  for (auto [v,pos] : vertex_pos)
+  {
+    auto [x,y] = pos;
+    vertices << fmt::format(v_template, vertex_radius, x, y);
+    vertices << fmt::format(v_label_template, x, y, 40, f_label(v));
+  } // for
+
+  // File writting
   of << fmt::format("{}\n", header.str());
   of << fmt::format("{}\n", edges.str());
   of << fmt::format("{}\n", vertices.str());
