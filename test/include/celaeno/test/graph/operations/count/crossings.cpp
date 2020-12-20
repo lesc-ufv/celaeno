@@ -35,7 +35,7 @@
 
 #include <fplus/fplus.hpp>
 
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 
 #include <celaeno/aliases.hpp>
@@ -59,7 +59,7 @@ namespace celaeno::graph::operations::count::crossings::test
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 
-namespace graph = taygete::graph;
+namespace graph = celaeno::graph;
 namespace reader = taygete::graph::reader;
 
 namespace depth = celaeno::graph::views::depth;

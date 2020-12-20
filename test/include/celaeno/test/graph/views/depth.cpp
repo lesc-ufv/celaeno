@@ -40,7 +40,7 @@
 #include <celaeno/test/test.hpp>
 #include <celaeno/test/graph/test.hpp>
 #include <celaeno/graph/views/depth.hpp>
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 
 
@@ -57,7 +57,7 @@ using namespace celaeno::concepts;
 // }}}
 
 // Namespaces {{{
-namespace graph = taygete::graph;
+namespace graph = celaeno::graph;
 namespace reader = taygete::graph::reader;
 namespace depth = celaeno::graph::views::depth;
 // }}}

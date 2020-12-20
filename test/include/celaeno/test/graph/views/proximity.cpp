@@ -41,7 +41,7 @@
 #include <celaeno/test/graph/test.hpp>
 #include <celaeno/graph/views/proximity.hpp>
 
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 
 // namespace celaeno::graph::view::proximity::test {{{
@@ -58,7 +58,7 @@ using namespace celaeno::concepts;
 // }}}
 
 // Namespaces {{{
-namespace graph = taygete::graph;
+namespace graph = celaeno::graph;
 namespace reader = taygete::graph::reader;
 namespace proximity = celaeno::graph::views::proximity;
 // }}}

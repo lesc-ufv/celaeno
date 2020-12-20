@@ -14,7 +14,7 @@
 #include <fplus/fplus.hpp>
 
 // Taygete
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 
 // Celaeno
 #include <celaeno/aliases.hpp>
@@ -28,7 +28,7 @@ namespace celaeno::graph::representations::incidence::test
 {
 
 // Namespaces {{{
-namespace graph = taygete::graph;
+namespace graph = celaeno::graph;
 namespace incidence = celaeno::graph::representations::incidence;
 // }}}
 

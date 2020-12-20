@@ -35,7 +35,7 @@
 
 #include <fplus/fplus.hpp>
 
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 
 #include <celaeno/aliases.hpp>
@@ -58,7 +58,7 @@ namespace celaeno::graph::operations::minimize::crossings::test
 // Namespaces {{{
 namespace fp = fplus;
 
-namespace graph = taygete::graph;
+namespace graph = celaeno::graph;
 namespace reader = taygete::graph::reader;
 
 namespace test = celaeno::test;

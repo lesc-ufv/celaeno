@@ -34,7 +34,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 #include <celaeno/graph/a-star.hpp>
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 
 #include <vector>

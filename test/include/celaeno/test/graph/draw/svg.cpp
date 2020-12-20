@@ -39,7 +39,7 @@
 
 #include <celaeno/test/graph/data/synth-91.hpp>
 
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 
 #include <celaeno/graph/draw/svg.hpp>
@@ -50,7 +50,7 @@ TEST_CASE("celaeno::graph::draw::svg")
 {
 
   // namespaces {{{
-  namespace graph = taygete::graph;
+  namespace graph = celaeno::graph;
   namespace reader = taygete::graph::reader;
   namespace svg = celaeno::graph::draw::svg;
   namespace circ = celaeno::test::graph::data;

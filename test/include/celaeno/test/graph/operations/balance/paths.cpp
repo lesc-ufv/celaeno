@@ -41,7 +41,7 @@
 #include <celaeno/test/graph/test.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 
 // namespace celaeno::graph::operations::balance::paths::test {{{
@@ -61,7 +61,7 @@ using namespace celaeno::concepts;
 // namespaces {{{
 namespace rg = ranges;
 namespace rv = ranges::views;
-namespace graph = taygete::graph;
+namespace graph = celaeno::graph;
 namespace reader = taygete::graph::reader;
 namespace balance = celaeno::graph::operations::balance::paths;
 namespace depth = celaeno::graph::views::depth;

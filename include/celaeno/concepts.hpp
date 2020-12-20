@@ -61,6 +61,25 @@ concept Range = std::ranges::range<T>;
 template<typename T, typename U>
 concept SameAs = std::same_as<T,U>;
 
+template<typename T, typename U>
+concept ConvertibleTo = std::convertible_to<std::decay_t<T>,std::decay_t<U>>;
+
+template<typename T, typename U>
+concept IsPairOf =
+requires(U u)
+{
+  {u.first} -> std::convertible_to<std::decay_t<T>>;
+  {u.second} -> std::convertible_to<std::decay_t<T>>;
+};
+
+template<typename T, typename... U>
+concept IsPairsOf =
+requires(U... u)
+{
+  { ((u.first),...) } -> std::convertible_to<std::decay_t<T>>;
+  { ((u.second),...) } -> std::convertible_to<std::decay_t<T>>;
+};
+
 template<typename F, typename... V>
 concept CallableWith = requires(F f, V... v) { f(std::forward<V>(v)...); };
 

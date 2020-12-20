@@ -33,12 +33,13 @@
 
 #pragma once
 
+#include <concepts>
 #include <queue>
 #include <set>
 #include <vector>
+#include <celaeno/aliases.hpp>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
-#include <concepts>
 
 namespace celaeno::graph::a_star
 {
@@ -46,13 +47,7 @@ namespace celaeno::graph::a_star
 //
 // Aliases
 //
-
-namespace rg = ranges;
-namespace rv = ranges::views;
-namespace ra = ranges::action;
 namespace fp = fplus;
-namespace fw = fplus::fwd;
-using float64_t = double;
 
 //
 // Concepts
@@ -64,8 +59,8 @@ template<typename T>
 concept BaseType =
 requires(T t)
 {
-  { t.first  } -> std::convertible_to<int64_t>;
-  { t.second } -> std::convertible_to<int64_t>;
+  { t.first  } -> std::convertible_to<i64>;
+  { t.second } -> std::convertible_to<i64>;
 }
 ||
 requires (T t)
@@ -96,9 +91,7 @@ bool operator==(std::pair<T1,T2> a, std::pair<T3,T4> b)
 template<typename Map, typename T>
 auto rebuild_path(Map& m, T curr)
 {
-  using Base = std::conditional_t<
-    std::is_integral_v<T>, int64_t, std::pair<int64_t,int64_t>
-  >;
+  using Base = std::conditional_t<std::is_integral_v<T>, i64, std::pair<i64,i64>>;
 
   m = fp::swap_keys_and_values(m);
 
@@ -116,20 +109,18 @@ auto rebuild_path(Map& m, T curr)
 }
 
 template<BaseType T, typename F1, typename F2, typename F3>
-decltype(auto) run(T&& start, T&& end, F1&& f_neighbors, F2&& f_distance, F3&& f_heuristic)
+decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_distance, F3&& f_heuristic)
 {
-  using Base = std::conditional_t<std::is_integral_v<T>,
-    int64_t, std::pair<int64_t,int64_t>
-  >;
+  using Base = std::conditional_t<std::is_integral_v<T>, i64, std::pair<i64,i64> >;
 
   // Open set in ascending order
-  std::multimap<float64_t,Base> open;
+  std::multimap<f64,Base> open;
 
   // Closed set
   std::set<Base> closed;
 
   // G-Score
-  std::map<Base,float64_t> g_score;
+  std::map<Base,f64> g_score;
 
   // Paths memory
   std::map<Base,Base> mem;

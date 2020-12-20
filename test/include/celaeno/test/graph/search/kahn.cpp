@@ -33,7 +33,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
-#include <taygete/graph/graph.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <taygete/graph/reader.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -55,7 +55,7 @@ using namespace celaeno::concepts;
 // }}}
 
 // namespaces {{{
-namespace graph = taygete::graph;
+namespace graph = celaeno::graph;
 namespace reader = taygete::graph::reader;
 namespace topo = celaeno::graph::search::kahn;
 // }}}
