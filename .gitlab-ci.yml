@@ -12,8 +12,6 @@ before_script:
   - conan profile new default --detect
   - conan profile update settings.compiler.libcxx=libstdc++11 default
   - conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
-  - conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
-  - conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
 
 build_tests:
   stage: build
