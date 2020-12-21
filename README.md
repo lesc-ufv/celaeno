@@ -5,14 +5,16 @@
     <td style="text-align: center" width="9999">
       <img width="200px" src="doc/character/celaeno.png">
     </td>
+    <td style="text-align: center" width="9999">
+      Hi! My name is celæno, and I'm here to provide several algorithms
+      to use with <b>your</b> data structures! Each algorithm is designed to work perfectly with <i>behaviors</i> passed as lambda expressions,
+      complicated? Not at all! Check out the examples in the oficial documentation, and also, keep reading to see a preview the
+      provided functionalities.
+    </td>
   </tr>
 </table>
 
 
-Hi! My name is celæno, and I'm here to provide several algorithms
-to use with **your** data structures! Each algorithm is designed to work perfectly with _behaviors_ passed as lambda expressions,
-complicated? Not at all! Check out the examples in the oficial documentation, and also, keep reading to see a preview the
-provided functionalities
 
 
 [[_TOC_]]
