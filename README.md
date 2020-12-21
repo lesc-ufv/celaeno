@@ -19,8 +19,6 @@
 </table>
 
 
-
-
 [[_TOC_]]
 
 ## Examples
@@ -358,7 +356,7 @@ For a quick summary, here's my list of implemented algorithms:
 
 ## Benchmarks
 
-## Libraries Used
+## Made Possible With
 
 <img width="200px" src="https://raw.githubusercontent.com/onqtam/doctest/master/scripts/data/logo/logo_1.svg">
 <img width="200px" src="doc/libraries-artwork/range-v3.png">
