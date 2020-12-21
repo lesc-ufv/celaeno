@@ -1,4 +1,4 @@
-# Celaeno
+# Celaeno - A Graph Algorithms Library Written in C++20
 
 <table>
   <tr>
@@ -9,29 +9,17 @@
 </table>
 
 
+Hi! My name is celæno, and I'm here to provide several algorithms
+to use with **your** data structures! Each algorithm is designed to work perfectly with _behaviors_ passed as lambda expressions,
+complicated? Not at all! Check out the examples in the oficial documentation, and also, keep reading to see a preview the
+provided functionalities
+
+
 [[_TOC_]]
 
-## Algorithms
+## Examples
 
 ### Breadth-First Search
-
-<details>
-<summary>Breadth-First Search Example</summary>
-
-```mermaid
-graph TB;
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	6 --- 9
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	7 --- 12
-	8 --- 10
-	8 --- 11
-````
 
 ```cpp
 #include <iostream>
@@ -82,277 +70,8 @@ Result:
 
 `1,5,7,8,9,12,4,10,11,6,2,3,`
 
-</details>
 
-### Depth-First Search
-
-<details>
-<summary>Depth-First Search Example</summary>
-
-```mermaid
-graph TB;
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	6 --- 9
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	7 --- 12
-	8 --- 10
-	8 --- 11
-````
-
-```cpp
-#include <iostream>
-#include <map>
-#include <cstdlib>
-#include <range/v3/all.hpp>
-#include <celaeno/graph/dfs.hpp>
-
-int main()
-{
-  namespace rg = ranges;
-  namespace rv = ranges::views;
-  namespace dfs = celaeno::graph::dfs;
-
-  // Create a simple graph
-  std::multimap<int32_t,int32_t> graph
-  {
-    {1,5},{2,4},{3,4},{6,9},
-    {4,7},{5,7},{5,8},{5,9},
-    {7,12},{8,10},{8,11},
-  };
-
-  // Create a lambda to obtain neighboring vertices
-  auto neighbors = [&graph](auto&& v) -> std::vector<int32_t>
-  {
-    auto pred = graph
-      | rv::filter([&v](auto&& e){ return e.second == v; })
-      | rv::transform([](auto&& e){ return e.first; });
-    auto succ = graph
-      | rv::filter([&v](auto&& e){ return e.first == v; })
-      | rv::transform([](auto&& e){ return e.second; });
-    return rv::concat(succ,pred) | rg::to<std::vector>;
-  };
-
-  // OPTIONAL callback applied to each node in a depth-first order
-  // Must return boolean to continue, useful searching for a
-  // specific node in a dfs order
-  auto callback = [](auto&& e){ std::cout << e << ",";  return false;};
-
-  // Run the dfs algorithm
-  auto result {dfs::run(1, neighbors, callback)};
-
-  return EXIT_SUCCESS;
-} // main
-
-```
-
-Result:
-
- `1,5,9,6,8,11,10,7,4,3,2,12,`
-
-</details>
-
-### Topological Sorting
-
-<details>
-<summary>Graph Topological Sorting Example</summary>
-
-```mermaid
-graph TB;
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	6 --- 9
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	7 --- 12
-	8 --- 10
-	8 --- 11
-````
-
-```cpp
-#include <iostream>
-#include <map>
-#include <cstdlib>
-#include <range/v3/all.hpp>
-#include <celaeno/graph/kahn.hpp>
-
-int main()
-{
-  namespace rg = ranges;
-  namespace rv = ranges::views;
-  namespace kahn = celaeno::graph::kahn;
-
-  // Create a simple graph
-  std::multimap<int32_t,int32_t> graph
-  {
-    {1,5},{2,4},{3,4},{6,9},
-    {4,7},{5,7},{5,8},{5,9},
-    {7,12},{8,10},{8,11},
-  };
-
-  // Create a lambda to obtain predecessor vertices
-  auto pred = [&graph](auto&& src) -> std::vector<int32_t>
-  {
-    return graph
-    | rv::filter([&src](auto&& e){ return src == e.second; })
-    | rv::transform([](auto&& e){ return e.first; })
-    | rg::to<std::vector>;
-  };
-
-  // Create a lambda to obtain successor vertices
-  auto succ = [&graph](auto&& src) -> std::vector<int32_t>
-  {
-    return graph
-    | rv::filter([&src](auto&& e){ return src == e.first; })
-    | rv::transform([](auto&& e){ return e.second; })
-    | rg::to<std::vector>;
-  };
-
-  // Callback applied in a topological order to each vertex
-  auto callback = [](auto&& e){ std::cout << e << ",";  return false;};
-
-  // Run the topological sorting algorithm
-  auto result {kahn::run(1, pred, succ, callback)};
-
-  return EXIT_SUCCESS;
-} // main
-```
-
-Result:
-
-`1,6,2,3,5,4,8,9,7,10,11,12,`
-
-</details>
-
-### Graph Path Balancing
-
-<details>
-<summary>Graph Balancing Test</summary>
-
-```mermaid
-graph TB;
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	6 --- 9
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	7 --- 12
-	8 --- 10
-	8 --- 11
-````
-
-```cpp
-#include <iostream>
-#include <map>
-#include <cstdlib>
-#include <range/v3/all.hpp>
-#include <celaeno/graph/balance.hpp>
-
-int main()
-{
-  namespace rg = ranges;
-  namespace rv = ranges::views;
-  namespace balance = celaeno::graph::balance;
-
-  // Create a simple graph
-  std::multimap<int32_t,int32_t> graph
-  {
-    {1,5},{2,4},{3,4},{6,9},
-    {4,7},{5,7},{5,8},{5,9},
-    {7,12},{8,10},{8,11},
-  };
-
-  // Create a lambda to obtain predecessor vertices
-  auto pred = [&graph](auto&& src) -> std::vector<int32_t>
-  {
-    return graph
-    | rv::filter([&src](auto&& e){ return src == e.second; })
-    | rv::transform([](auto&& e){ return e.first; })
-    | rg::to<std::vector>;
-  };
-
-  // Create a lambda to obtain successor vertices
-  auto succ = [&graph](auto&& src) -> std::vector<int32_t>
-  {
-    return graph
-    | rv::filter([&src](auto&& e){ return src == e.first; })
-    | rv::transform([](auto&& e){ return e.second; })
-    | rg::to<std::vector>;
-  };
-
-  // Create a lambda to link vertices
-  auto link = [&graph](auto&& e) -> void { graph.emplace(e); };
-
-  // Create a lambda to unlink vertices
-  auto unlink = [&graph](auto&& e) -> void
-  {
-    auto rng {graph.equal_range(e.first)};
-    for (auto it{rng.first}; it != rng.second; ++it)
-    {
-      if( it->second == e.second )
-      {
-        graph.erase(it);
-        break;
-      }
-    } // for: it != it.second
-  };
-
-  balance::run(1, pred, succ, link, unlink);
-
-  return EXIT_SUCCESS;
-} // main
-
-```
-
-Result:
-
-```mermaid
-graph TB;
-	0 --- 9
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	6 --- 0
-	7 --- 12
-	8 --- 10
-	8 --- 11
-```
-
-</details>
-
-### Graph Topological (Depth) View
-
-<details>
-<summary>Graph Topological View Example</summary>
-
-```mermaid
-graph TB;
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	6 --- 9
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	7 --- 12
-	8 --- 10
-	8 --- 11
-````
+### Graph Topological View
 
 ```cpp
 #include <iostream>
@@ -413,27 +132,7 @@ Result:
 
 `Level 3: [3,10] [3,11] [3,12] `
 
-</details>
-
 ### Adjacency Matrix
-
-<details>
-<summary>Adjacency Matrix Example</summary>
-
-```mermaid
-graph TB;
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	6 --- 9
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	7 --- 12
-	8 --- 10
-	8 --- 11
-````
 
 ```cpp
 #include <iostream>
@@ -528,27 +227,7 @@ Result:
 [0,0]
 ```
 
-</details>
-
 ### Graph Edge Crossings Count
-
-<details>
-<summary>Graph Edge Crossings Count Example</summary>
-
-```mermaid
-graph TB;
-	1 --- 5
-	2 --- 4
-	3 --- 4
-	6 --- 9
-	4 --- 7
-	5 --- 7
-	5 --- 8
-	5 --- 9
-	7 --- 12
-	8 --- 10
-	8 --- 11
-````
 
 ```cpp
 #include <iostream>
@@ -648,13 +327,8 @@ Result:
 
 The drawing of the example graph already used an algorithm for edge crossing minimization, that is why it has no crossings.
 
-</details>
+### Graph SVG Writer
 
-### Graph Crossings Minimization
-
-### Barycenter Heuristic
-
-### A* Path Finder
 
 ## Documentation
 
@@ -662,4 +336,18 @@ You can read the full API documentation in my  [gitlab pages](https://formigoni.
 
 For a quick summary, here's my list of implemented algorithms:
 
-vim: set ts=2 sw=2 tw=0 et :
+| Class                  | Algorithm | Execution |
+|:----------------------:|:-----:|:---------:|
+| Reader |  Verilog | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| Search | Breadth-First Search | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| Search |  Depth-First Search | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| Search |  Topological Sorting | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| View |  Topological | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| View |  Proximity | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| Representation |  Incidence | ![](https://img.shields.io/static/v1?label=&message=Concurrent&color=blue) |
+| Operation |  Balance Outcoming Edges | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| Operation |  Balance Paths | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| Operation |  Count Crossings | ![](https://img.shields.io/static/v1?label=&message=Sequential&color=green) |
+| Operation |  Minimize Crossings | ![](https://img.shields.io/static/v1?label=&message=Concurrent&color=blue) |
+
+## Benchmarks
