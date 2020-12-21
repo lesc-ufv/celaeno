@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : graph
@@ -113,11 +114,6 @@ class Graph
     void emplace(U&&... u);
     template<typename U = std::pair<T,T>> requires IsPairOf<T,U>
     void erase(U&& u);
-    // }}}
-
-    // Operators {{{
-    Graph<T> operator=(Graph<T> const& rhs);
-    Graph<T> operator=(Graph<T>&& rhs);
     // }}}
 
   // }}}
@@ -237,24 +233,6 @@ void Graph<T>::erase(U&& u)
     }
   } // for: it != rng.second
 } // function: erase
-
-// }}}
-
-// Operators {{{
-
-template<Arithmetic T>
-Graph<T> Graph<T>::operator=(Graph<T> const& rhs)
-{
-  this->g = std::make_unique<Vertices<T>>(*rhs.g);
-  return *this;
-} // function: operator=
-
-template<Arithmetic T>
-Graph<T> Graph<T>::operator=(Graph<T>&& rhs)
-{
-  this->g = std::exchange(rhs.g, std::make_unique<Vertices<T>>());
-  return *this;
-} // function: operator=
 
 // }}}
 
