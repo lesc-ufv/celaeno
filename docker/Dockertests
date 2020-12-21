@@ -10,8 +10,6 @@ RUN pip3 install -I conan
 RUN conan profile new default --detect
 RUN conan profile update settings.compiler.libcxx=libstdc++11 default
 RUN conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
-RUN conan remote add pleiades https://api.bintray.com/conan/ruanformigoni/pleiades
-RUN conan remote add epfl https://api.bintray.com/conan/ruanformigoni/epfl
 
 # Configure project
 ADD ./ /celaeno/
@@ -23,7 +21,7 @@ RUN conan install .. --build missing
 
 # Build the project
 WORKDIR /celaeno
-RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++
+RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++
 RUN cmake --build build
 
 # Perform tests
