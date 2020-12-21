@@ -7,7 +7,7 @@
     {
       "name": "Linux",
       "intelliSenseMode": "clang-x64",
-      "includePath": ["${myDefaultIncludePath}", "/another/path"],
+      "includePath": ["${myDefaultIncludePath}", "/home/ruan/.conan/data/*"],
       "macFrameworkPath": ["/System/Library/Frameworks"],
       "defines": ["FOO", "BAR=100"],
       "forcedInclude": ["${workspaceFolder}/include/config.h"],
