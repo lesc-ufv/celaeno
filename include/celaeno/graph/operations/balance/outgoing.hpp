@@ -34,6 +34,9 @@
 
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
 
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/search/bfs.hpp>
@@ -64,6 +67,11 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   && CallableWith<L,std::pair<i64,i64>>
   && CallableWith<U,std::pair<i64,i64>>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::operations::balance::outgoing");
+#endif
+
   auto depth_view {ns_depth_view::run(root,
     std::forward<P>(f_pred),
     std::forward<S>(f_succ)

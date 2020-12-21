@@ -36,8 +36,13 @@
 #include <unordered_map>
 #include <type_traits>
 #include <concepts>
+
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/concepts.hpp>
 
 // namespace celaeno::graph::search::dfs {{{
@@ -61,6 +66,11 @@ std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;
   && CallableWith<S,i64>
   && CallableWith<C,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::search::dfs");
+#endif
+
   // Create adjacent helper
   auto nb = [&](auto&& u){ return fp::append(pred(u),succ(u)); };
 

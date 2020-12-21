@@ -35,7 +35,12 @@
 #include <vector>
 #include <deque>
 #include <unordered_map>
+
 #include <fplus/fplus.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/search/bfs.hpp>
@@ -60,6 +65,11 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return fa
   && CallableWith<S,i64>
   && CallableWith<C,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::search::kahn");
+#endif
+
   // Topologically sorted result
   std::vector<T> result;
 

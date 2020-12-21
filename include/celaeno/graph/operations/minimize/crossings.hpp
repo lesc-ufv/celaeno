@@ -32,6 +32,10 @@
 #pragma once
 
 #include <range/v3/all.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
@@ -59,6 +63,10 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
   && CallableWith<E1,std::pair<i64,i64>>
   && CallableWith<E2,std::pair<i64,i64>>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::operations::minimize::crossings");
+#endif
   //
   // @ Sugiyama algorithm requires a k-layered bipartite graph
   //

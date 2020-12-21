@@ -35,7 +35,12 @@
 
 #include <ranges>
 #include <utility>
+
 #include <range/v3/all.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -68,6 +73,11 @@ auto run(T root, P&& f_pred, S&& f_succ)
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::views::proximity");
+#endif
+
   // Create a depth-view
   auto [lvs,vl] {depth::run(root, std::forward<P>(f_pred), std::forward<S>(f_succ))};
 

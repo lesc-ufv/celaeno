@@ -37,8 +37,13 @@
 #include <set>
 #include <tuple>
 #include <concepts>
+
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 
@@ -62,6 +67,11 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return 
   && CallableWith<S,i64>
   && CallableWith<C,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::search::bfs");
+#endif
+
   // Create adjacent helper
   auto f_nb = [&](auto&& u){ return fp::append(f_pred(u),f_succ(u)); };
 

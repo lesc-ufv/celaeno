@@ -35,7 +35,12 @@
 
 #include <map>
 #include <type_traits>
+
 #include <range/v3/all.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 
@@ -60,6 +65,11 @@ auto run(T root, P&& f_pred, S&& f_succ)
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::views::depth");
+#endif
+
   // vertex -> layer
   std::map<T,T> vl;
 

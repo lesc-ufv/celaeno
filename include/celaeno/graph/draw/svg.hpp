@@ -40,6 +40,9 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 #include <range/v3/all.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -118,6 +121,10 @@ decltype(auto) run(
   && CallableWith<F2,i64>
   && CallableWith<F3,i64,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::draw::svg");
+#endif
 
   // @ Vertices settings {{{
   // Radius

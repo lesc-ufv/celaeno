@@ -33,8 +33,12 @@
 #pragma once
 
 #include <ranges>
+
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
 
 #include <celaeno/concepts.hpp>
 #include <celaeno/aliases.hpp>
@@ -62,6 +66,11 @@ template<SignedIntegral T = i64, Range R, typename S>
 T run(R&& l1, R&& l2, S&& f_succ)
   requires CallableWith<S,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::operations::count::crossings");
+#endif
+
   //
   // @ Index by vertices positions in layer l2
   //

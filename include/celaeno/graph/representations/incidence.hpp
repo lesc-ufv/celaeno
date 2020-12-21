@@ -36,6 +36,11 @@
 #include <vector>
 #include <concepts>
 #include <iterator>
+
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/representations/incidence/impl.hpp>
@@ -75,6 +80,11 @@ auto run(T root, P&& f_pred, S&& f_succ, A&& f_adj)
   &&
   CallableWith<A,i64,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::representations::incidence");
+#endif
+
     // depth view: @level → vertices && @vertex → level
     auto [lvs,_] = depth::run(root,f_pred,f_succ);
 
@@ -95,6 +105,11 @@ template<Range R, typename A>
 auto run(R&& l1, R&& l2, A&& f_adj)
   requires CallableWith<A,i64,i64>
 {
+
+#ifndef NDEBUG
+  spdlog::debug("Algorithm: celaeno::graph::representations::incidence");
+#endif
+
   return incidence::single(
     std::forward<R>(l1),
     std::forward<R>(l2),
