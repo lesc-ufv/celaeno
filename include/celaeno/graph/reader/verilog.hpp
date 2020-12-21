@@ -41,6 +41,7 @@
 #include <spdlog/spdlog.h>
 #include <range/v3/all.hpp>
 
+#include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 
 // celaeno::graph::reader::verilog {{{
@@ -89,9 +90,9 @@ class Reader
     static std::string_view const expr_or;
 
     mutable T callback;
-    mutable int64_t id_counter;
-    mutable std::map<std::string,int64_t> ids;
-    mutable std::map<int64_t,GateType> gate_type;
+    mutable i64 id_counter;
+    mutable std::map<std::string,i64> ids;
+    mutable std::map<i64,GateType> gate_type;
   // }}}
 
   // Constructors {{{
@@ -101,7 +102,7 @@ class Reader
   // }}}
 
   // Element Access {{{
-    std::map<int64_t,GateType> const& data() const noexcept;
+    std::map<i64,GateType> const& data() const noexcept;
   // }}}
 
   // Private Methods {{{
@@ -194,7 +195,7 @@ Reader<T>::Reader(S&& input, T callback)
 
 // Element Access {{{
 template<typename T>
-std::map<int64_t,GateType> const& Reader<T>::data() const noexcept
+std::map<i64,GateType> const& Reader<T>::data() const noexcept
 {
   return this->gate_type;
 }
@@ -267,7 +268,8 @@ void Reader<T>::update(auto&& lhs, GateType const& type, auto&&... ops) const
   }(std::forward<decltype(ops)>(ops)...);
 
   // Insert gate type for lhs
-  if( ! this->ids.contains(lhs) ){
+  if( ! this->ids.contains(lhs) )
+  {
     this->ids[lhs] = this->id_counter++;
     this->gate_type[this->id_counter] = type;
   }
