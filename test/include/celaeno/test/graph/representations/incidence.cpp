@@ -13,7 +13,7 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
-// Taygete
+// Graph
 #include <celaeno/graph/graph.hpp>
 
 // Celaeno

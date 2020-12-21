@@ -36,7 +36,7 @@
 #include <fplus/fplus.hpp>
 
 #include <celaeno/graph/graph.hpp>
-#include <taygete/graph/reader.hpp>
+#include <celaeno/graph/reader/verilog.hpp>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -60,7 +60,7 @@ namespace fp = fplus;
 namespace fw = fplus::fwd;
 
 namespace graph = celaeno::graph;
-namespace reader = taygete::graph::reader;
+namespace reader = celaeno::graph::reader::verilog;
 
 namespace depth = celaeno::graph::views::depth;
 namespace balance = celaeno::graph::operations::balance::paths;

@@ -46,10 +46,6 @@ if(NOT spdlog_FOUND)
   find_package(spdlog REQUIRED)
 endif()
 
-if(NOT taygete_FOUND)
-  find_package(taygete REQUIRED)
-endif()
-
 if(NOT fmt_FOUND)
   find_package(fmt REQUIRED)
 endif()
@@ -64,6 +60,10 @@ endif()
 
 if(NOT range-v3_FOUND)
   find_package(range-v3 REQUIRED)
+endif()
+
+if(NOT functionalplus_FOUND)
+  find_package(functionalplus REQUIRED)
 endif()
 
 # Source files

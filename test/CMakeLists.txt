@@ -57,8 +57,9 @@ function(add_test target)
     PRIVATE
       celaeno
       spdlog::spdlog
+      doctest::doctest
+      functionalplus::functionalplus
       Threads::Threads
-      taygete::taygete
   )
   target_include_directories(${target}
     PRIVATE

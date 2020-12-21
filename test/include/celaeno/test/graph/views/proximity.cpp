@@ -42,7 +42,7 @@
 #include <celaeno/graph/views/proximity.hpp>
 
 #include <celaeno/graph/graph.hpp>
-#include <taygete/graph/reader.hpp>
+#include <celaeno/graph/reader/verilog.hpp>
 
 // namespace celaeno::graph::view::proximity::test {{{
 
@@ -59,7 +59,7 @@ using namespace celaeno::concepts;
 
 // Namespaces {{{
 namespace graph = celaeno::graph;
-namespace reader = taygete::graph::reader;
+namespace reader = celaeno::graph::reader::verilog;
 namespace proximity = celaeno::graph::views::proximity;
 // }}}
 

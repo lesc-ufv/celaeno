@@ -1,4 +1,7 @@
 #pragma once
+
+#include <string_view>
+
 std::string_view const b1
 {
 "module b1 ( "
