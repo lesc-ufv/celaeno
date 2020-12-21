@@ -123,6 +123,7 @@ decltype(auto) run(
 {
 
 #ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::draw::svg");
 #endif
 

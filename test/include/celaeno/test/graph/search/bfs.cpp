@@ -62,7 +62,7 @@ namespace bfs = celaeno::graph::search::bfs;
 
 // Test Case: celaeno::graph::search::bfs {{{
 TEST_CASE("celaeno::graph::search::bfs"
-  * doctest::timeout(10.0f)
+  * doctest::timeout(100.0f)
 )
 {
   // Logger {{{

@@ -62,7 +62,7 @@ namespace topo = celaeno::graph::search::kahn;
 
 // Test Case celaeno::graph::search::kahn {{{
 TEST_CASE("celaeno::graph::search::kahn"
-  * doctest::timeout(10.0f)
+  * doctest::timeout(100.0f)
 )
 {
   // Logger {{{

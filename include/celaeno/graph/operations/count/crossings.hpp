@@ -68,6 +68,7 @@ T run(R&& l1, R&& l2, S&& f_succ)
 {
 
 #ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::operations::count::crossings");
 #endif
 

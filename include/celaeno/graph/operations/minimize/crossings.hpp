@@ -66,6 +66,7 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
 
 #ifndef NDEBUG
   spdlog::debug("Algorithm: celaeno::graph::operations::minimize::crossings");
+  spdlog::set_level(spdlog::level::debug);
 #endif
   //
   // @ Sugiyama algorithm requires a k-layered bipartite graph

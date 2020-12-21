@@ -82,6 +82,7 @@ auto run(T root, P&& f_pred, S&& f_succ, A&& f_adj)
 {
 
 #ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::representations::incidence");
 #endif
 
@@ -107,6 +108,7 @@ auto run(R&& l1, R&& l2, A&& f_adj)
 {
 
 #ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::representations::incidence");
 #endif
 

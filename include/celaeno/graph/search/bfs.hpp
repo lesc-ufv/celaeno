@@ -69,6 +69,7 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return 
 {
 
 #ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::search::bfs");
 #endif
 

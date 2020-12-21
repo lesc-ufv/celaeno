@@ -70,6 +70,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
 {
 
 #ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::operations::balance::paths");
 #endif
 

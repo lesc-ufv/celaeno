@@ -64,7 +64,7 @@ namespace dfs = celaeno::graph::search::dfs;
 
 TEST_CASE("celaeno::graph::search::dfs"
   * doctest::description("Depth-First Search test")
-  * doctest::timeout(10.0f)
+  * doctest::timeout(100.0f)
 )
 {
   // Logger {{{
