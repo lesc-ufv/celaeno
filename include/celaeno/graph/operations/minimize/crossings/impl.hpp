@@ -145,8 +145,8 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
   auto sort_by_barycenter = [&]
   {
     // Compute overlapping and non overlapping pairs separately
-    auto non_overlapping{fp::keep_if([i=0](auto e) mutable { return (i++%2 == 0); },layers)};
-    auto overlapping{fp::keep_if([i=0](auto e) mutable { return (i++%2 != 0); },layers)};
+    auto non_overlapping{fp::keep_if([i=0](auto&&) mutable { return (i++%2 == 0); },layers)};
+    auto overlapping{fp::keep_if([i=0](auto&&) mutable { return (i++%2 != 0); },layers)};
 
     auto process = [&](auto il1, auto il2) -> void
     {
