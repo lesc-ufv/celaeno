@@ -9,7 +9,7 @@
       Hi! My name is celæno, and I'm here to provide several algorithms
       to use with <b>your</b> data structures! Each algorithm is designed to work perfectly with <i>behaviors</i> passed as lambda expressions,
       complicated? Not at all! Check out the examples in the oficial documentation, and also, keep reading to see a preview the
-      provided functionalities. But... <b> "What if I do not want to implement an data structure?"</b> :sweat:. Celæno has your back!
+      provided functionalities. But... <b> "What if I do not want to implement a data structure?"</b> :sweat:. Celæno has your back!
       "Nani?!" :open_mouth:. Yes, that is right, there is a very efficient graph class already implemented with the library! :heart_eyes:.
       And only for an <b>UNLIMITED</b> time you get, not one, not five, not seven, but ten algorithms! For free, forever!
       If you find an issue :scream:, no need for a tissue :cry:, open an issue! Thus, helping make this library better! "But, that one algorithm
