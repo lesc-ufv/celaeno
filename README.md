@@ -3,7 +3,7 @@
 <table>
   <tr>
     <td style="text-align: center" width="9999">
-      <img width="150px" src="doc/character/celaeno.png">
+      <img width="200px" src="doc/character/celaeno.png">
     </td>
     <td style="text-align: justify" width="9999">
       Hi! My name is celæno, and I'm here to provide several algorithms
