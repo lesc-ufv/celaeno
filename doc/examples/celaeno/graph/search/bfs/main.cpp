@@ -30,44 +30,39 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <iostream>
-#include <cstdlib>
 #include <fplus/fplus.hpp>
 #include <fmt/ranges.h>
-#include <taygete/graph/graph.hpp>
+
 #include <celaeno/aliases.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 
+// Using declarations
+using namespace celaeno::aliases;
 
-// namespaces {{{
-namespace fp = fplus;
-namespace graph = taygete::graph;
+// namespaces
+namespace graph = celaeno::graph;
 namespace bfs = celaeno::graph::search::bfs;
-// }}}
 
 int main()
 {
-  // Graph {{{
+  // Graph
   graph::Graph<i64> g
   {
     {1,5},{2,4},{3,4},{6,9},
     {4,7},{5,7},{5,8},{5,9},
     {7,12},{8,10},{8,11},
   };
-  // }}}
 
-  // Required behaviors {{{
+  // Required behaviors
   auto p = [&g](auto&& u){ return g.predecessors(u); };
   auto s = [&g](auto&& u){ return g.successors(u); };
-  // }}}
 
-  // Run algorithm {{{
+  // Run algorithm
   auto result {bfs::run(1,p,s)};
-  // }}}
 
-  // Print to after {{{
+  // Print Result
   fmt::print("Bfs ordering: {}\n", result);
-  // }}}
 
-  return EXIT_SUCCESS;
+  return 0;
 } // main
