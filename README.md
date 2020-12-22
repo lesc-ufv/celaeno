@@ -356,6 +356,48 @@ For a quick summary, here's my list of implemented algorithms:
 
 ## Benchmarks
 
+
+<table>
+  <tr>
+    <td style="text-align: center" width="9999">
+      <h2>Breadth-First Search</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-bfs.png">
+    </td>
+    <td style="text-align: justify" width="9999">
+      <h2>Depth-First Search</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-dfs.png">
+    </td>
+    <td style="text-align: justify" width="9999">
+      <h2>Topological Search</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-kahn.png">
+    </td>
+  </tr>
+  <tr>
+    <td style="text-align: center" width="9999">
+      <h2>Balance Paths</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-balance-paths.png">
+    </td>
+    <td style="text-align: justify" width="9999">
+      <h2>Count Edge Crossings</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-count-crossings.png">
+    </td>
+    <td style="text-align: justify" width="9999">
+      <h2>Minimize Edge Crossings</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-minimize-crossings.png">
+    </td>
+  </tr>
+  <tr>
+    <td style="text-align: center" width="9999">
+      <h2>Topological (Depth) View</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-depth.png">
+    </td>
+    <td style="text-align: justify" width="9999">
+      <h2>Proximity View</h2>
+      <img width="800px" src="doc/benchmarks/benchmark-proximity.png">
+    </td>
+  </tr>
+</table>
+
 ## Made Possible With
 
 <img width="200px" src="https://raw.githubusercontent.com/onqtam/doctest/master/scripts/data/logo/logo_1.svg">
