@@ -42,6 +42,7 @@
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 
 
 // namespace celaeno::graph::views::depth::test {{{
@@ -85,9 +86,14 @@ TEST_CASE("celaeno::graph::views::depth")
     // }}}
 
     // Create depth view {{{
-    auto pred = [&g](auto&& v){ return g.predecessors(v); };
-    auto succ = [&g](auto&& v){ return g.successors(v); };
-    auto [result,runtime] = celaeno::test::runtime([&]{ return depth::run(0, pred, succ); });
+    auto f_p = [&g](auto&& v){ return g.predecessors(v); };
+    auto f_s = [&g](auto&& v){ return g.successors(v); };
+    auto f_l = [&g](auto&& u){ return g.emplace(u); };
+    auto f_u = [&g](auto&& u){ return g.erase(u); };
+
+    celaeno::graph::operations::balance::paths::run(0,f_p,f_s,f_l,f_u);
+
+    auto [result,runtime] = celaeno::test::runtime([&]{ return depth::run(0, f_p, f_s); });
     // }}}
 
 

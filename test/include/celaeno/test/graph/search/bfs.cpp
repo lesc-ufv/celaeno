@@ -40,6 +40,7 @@
 #include <celaeno/test/test.hpp>
 #include <celaeno/test/graph/test.hpp>
 #include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 
 // namespace celaeno::graph::search::bfs::test {{{
 
@@ -90,6 +91,11 @@ TEST_CASE("celaeno::graph::search::bfs"
     // Test bfs {{{
     auto f_p = [&g](auto&& u){ return g.predecessors(u); };
     auto f_s = [&g](auto&& u){ return g.successors(u); };
+    auto f_l = [&g](auto&& u){ return g.emplace(u); };
+    auto f_u = [&g](auto&& u){ return g.erase(u); };
+
+    celaeno::graph::operations::balance::paths::run(0,f_p,f_s,f_l,f_u);
+
     auto [result,runtime] = celaeno::test::runtime([&]{ return bfs::run(0,f_p,f_s); });
     // }}}
 

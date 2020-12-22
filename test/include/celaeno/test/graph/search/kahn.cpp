@@ -40,6 +40,7 @@
 #include <celaeno/test/test.hpp>
 #include <celaeno/test/graph/test.hpp>
 #include <celaeno/graph/search/kahn.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 
 // namespace celaeno::graph::search::kahn::test {{{
 
@@ -90,6 +91,11 @@ TEST_CASE("celaeno::graph::search::kahn"
     // Test Kahn {{{
     auto f_p = [&g](auto&& v){ return g.predecessors(v); };
     auto f_s = [&g](auto&& v){ return g.successors(v); };
+    auto f_l = [&g](auto&& u){ return g.emplace(u); };
+    auto f_u = [&g](auto&& u){ return g.erase(u); };
+
+    celaeno::graph::operations::balance::paths::run(0,f_p,f_s,f_l,f_u);
+
     auto [result,runtime] = celaeno::test::runtime([&]{ return kahn::run(0,f_p,f_s); });
     // }}}
 
