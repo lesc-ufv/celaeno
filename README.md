@@ -6,14 +6,13 @@
       <img width="200px" src="doc/character/celaeno.png">
     </td>
     <td style="text-align: justify" width="9999">
-      Hi! My name is celæno, and I'm here to provide several algorithms
-      to use with <b>your</b> data structures! Each algorithm is designed to work perfectly with <i>behaviors</i> passed as lambda expressions,
-      complicated? Not at all! Check out the examples in the oficial documentation, and also, keep reading to see a preview the
-      provided functionalities. But... <b> "What if I do not want to implement a data structure?"</b>. Celæno has your back!
-      "Nani?!". Yes, that is right, there is a very efficient graph class already implemented with the library!.
-      And only for an <b>UNLIMITED</b> time you get, not one, not five, not seven, but ten algorithms! For free, forever!
-      If you find an issue, no need for a tissue, open an issue! Thus, helping make this library better! "But, that one algorithm
-      that I really need is not implemented". No worries, you can open an issue with algorithm request!
+      Hi! My name is celæno, and I'm here to provide several algorithms to use with your data structures!
+      Each algorithm is designed to work perfectly with behaviors passed as lambda expressions, complicated?
+      Not at all! Check out all examples in the official documentation, and also, see the remainder of this document
+      for a preview of the provided functionalities. But...  "What if I do not want to implement a data structure?".
+      Celæno has your back! There is a very efficient graph class already implemented with the library!
+      If you find an issue, no need for a tissue, open an issue! Thus, helping make this library better!
+      Issues of algorithm requests are also most welcome!
     </td>
   </tr>
 </table>
