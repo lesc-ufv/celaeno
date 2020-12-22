@@ -30,7 +30,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <fplus/fplus.hpp>
 #include <fmt/ranges.h>
 
 #include <celaeno/aliases.hpp>
@@ -44,7 +43,7 @@ using namespace celaeno::aliases;
 namespace graph = celaeno::graph;
 namespace bfs = celaeno::graph::search::bfs;
 
-int main()
+i32 main()
 {
   // Graph
   graph::Graph<i64> g
@@ -55,14 +54,14 @@ int main()
   };
 
   // Required behaviors
-  auto p = [&g](auto&& u){ return g.predecessors(u); };
-  auto s = [&g](auto&& u){ return g.successors(u); };
+  auto f_pred = [&g](auto&& u){ return g.predecessors(u); };
+  auto f_succ = [&g](auto&& u){ return g.successors(u); };
 
   // Run algorithm
-  auto result {bfs::run(1,p,s)};
+  auto search {bfs::run(1,f_pred,f_succ)};
 
   // Print Result
-  fmt::print("Bfs ordering: {}\n", result);
+  fmt::print("Bfs ordering: {}\n", search);
 
   return 0;
 } // main
