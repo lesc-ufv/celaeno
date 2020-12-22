@@ -360,39 +360,39 @@ For a quick summary, here's my list of implemented algorithms:
 <table>
   <tr>
     <td style="text-align: center" width="9999">
-      <h2>Breadth-First Search</h2>
+      <h3>Breadth-First Search</h3>
       <img width="800px" src="doc/benchmarks/benchmark-bfs.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h2>Depth-First Search</h2>
+      <h3>Depth-First Search</h3>
       <img width="800px" src="doc/benchmarks/benchmark-dfs.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h2>Topological Search</h2>
+      <h3>Topological Search</h3>
       <img width="800px" src="doc/benchmarks/benchmark-kahn.png">
     </td>
   </tr>
   <tr>
     <td style="text-align: center" width="9999">
-      <h2>Balance Paths</h2>
+      <h3>Balance Paths</h3>
       <img width="800px" src="doc/benchmarks/benchmark-balance-paths.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h2>Count Edge Crossings</h2>
+      <h3>Count Edge Crossings</h3>
       <img width="800px" src="doc/benchmarks/benchmark-count-crossings.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h2>Minimize Edge Crossings</h2>
+      <h3>Minimize Edge Crossings</h3>
       <img width="800px" src="doc/benchmarks/benchmark-minimize-crossings.png">
     </td>
   </tr>
   <tr>
     <td style="text-align: center" width="9999">
-      <h2>Topological (Depth) View</h2>
+      <h3>Topological (Depth) View</h3>
       <img width="800px" src="doc/benchmarks/benchmark-depth.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h2>Proximity View</h2>
+      <h3>Proximity View</h3>
       <img width="800px" src="doc/benchmarks/benchmark-proximity.png">
     </td>
   </tr>
