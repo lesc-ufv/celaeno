@@ -1,39 +1,22 @@
----
-layout: handbook-page-toc
-title: "Markdown Guide"
-description: "Read through our Markdown kramdown Style Guide!"
----
-
 # Celaeno - A Graph Algorithms Library Written in C++20
 
-
-{::options parse_block_html="true" /}
-
-<div class="panel panel-info">
-**Note**
-{: .panel-heading}
-<div class="panel-body">
-<div class="column">
-  <img width="200px" src="doc/character/celaeno.png">
-</div>
-<div class="column">
-    Hi! My name is celæno, and I'm here to provide several algorithms
-    to use with <b>your</b> data structures! Each algorithm is designed to work perfectly with <i>behaviors</i> passed as lambda expressions,
-    complicated? Not at all! Check out the examples in the oficial documentation, and also, keep reading to see a preview the
-    provided functionalities. But... <b> "What if I do not want to implement a data structure?"</b>. Celæno has your back!
-    "Nani?!". Yes, that is right, there is a very efficient graph class already implemented with the library!
-    If you find an issue, no need for a tissue, open an issue! Thus, helping make this library better! "But, that one algorithm
-    that I really need is not implemented". No worries, you can open an issue with algorithm request!
-</div>
-</div>
-</div>
-
-<style>
-.content {
-  column-count: 2;
-}
-</style>
-
+<table>
+  <tr>
+    <td style="text-align: center" width="9999">
+      <img width="200px" src="doc/character/celaeno.png">
+    </td>
+    <td style="text-align: justify" width="9999">
+      Hi! My name is celæno, and I'm here to provide several algorithms
+      to use with <b>your</b> data structures! Each algorithm is designed to work perfectly with <i>behaviors</i> passed as lambda expressions,
+      complicated? Not at all! Check out the examples in the oficial documentation, and also, keep reading to see a preview the
+      provided functionalities. But... <b> "What if I do not want to implement a data structure?"</b> :sweat:. Celæno has your back!
+      "Nani?!" :open_mouth:. Yes, that is right, there is a very efficient graph class already implemented with the library! :heart_eyes:.
+      And only for an <b>UNLIMITED</b> time you get, not one, not five, not seven, but ten algorithms! For free, forever!
+      If you find an issue :scream:, no need for a tissue :cry:, open an issue! Thus, helping make this library better! "But, that one algorithm
+      that I really need is not implemented". No worries, you can open an issue with algorithm request! Isn't that great guys and gals! Hmmm?!
+    </td>
+  </tr>
+</table>
 
 
 [[_TOC_]]
