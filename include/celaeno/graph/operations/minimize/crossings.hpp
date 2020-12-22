@@ -48,6 +48,7 @@ namespace celaeno::graph::operations::minimize::crossings
 
 // using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{

@@ -55,6 +55,10 @@ namespace celaeno::graph::operations::count::crossings::test
 #define assertm(exp, msg) assert(((void)msg, exp))
 // }}}
 
+// Using namespace {{{
+using namespace celaeno::aliases;
+// }}}
+
 // namespaces {{{
 namespace fp = fplus;
 namespace fw = fplus::fwd;

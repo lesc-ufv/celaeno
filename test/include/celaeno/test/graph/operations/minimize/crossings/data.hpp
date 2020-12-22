@@ -38,6 +38,8 @@
 namespace data
 {
 
+using namespace celaeno::aliases;
+
 // Barycenter reordering {{{
 
 // Base matrix sample 1

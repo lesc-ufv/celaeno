@@ -64,6 +64,7 @@ namespace ns_minimize = celaeno::graph::operations::minimize;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // Shapes {{{

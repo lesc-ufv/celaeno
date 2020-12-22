@@ -48,6 +48,9 @@
 // Testcase: "celaeno::graph::draw::svg" {{{
 TEST_CASE("celaeno::graph::draw::svg")
 {
+  // Using namespace {{{
+  using namespace celaeno::aliases;
+  // }}}
 
   // namespaces {{{
   namespace graph = celaeno::graph;

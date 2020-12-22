@@ -62,6 +62,7 @@ namespace incidence = celaeno::graph::representations::incidence::impl;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // fn: run {{{

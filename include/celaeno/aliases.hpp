@@ -10,6 +10,8 @@
 #include <cstdlib>
 
 // namespace celaeno::aliases {{{
+namespace celaeno::aliases
+{
 
 // Integral types {{{
 using i8 = int8_t;
@@ -33,4 +35,4 @@ using c32 = char32_t;
 using wc32 = wchar_t;
 // }}}
 
-// }}}
+} // namespace celaeno::aliases }}}

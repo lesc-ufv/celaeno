@@ -46,6 +46,7 @@ namespace celaeno::graph::representations::incidence::impl
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // Namespaces {{{

@@ -57,6 +57,7 @@ namespace fw = fplus::fwd;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // Algorithm {{{

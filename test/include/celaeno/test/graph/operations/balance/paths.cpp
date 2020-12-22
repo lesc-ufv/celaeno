@@ -55,6 +55,7 @@ namespace celaeno::graph::operations::balance::paths::test
 
 // using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 

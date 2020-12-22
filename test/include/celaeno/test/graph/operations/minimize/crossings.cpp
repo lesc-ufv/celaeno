@@ -68,6 +68,7 @@ namespace minimize = celaeno::graph::operations::minimize::crossings;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // TEST_CASE: "celaeno::graph::operations::minimize::crossings" {{{

@@ -50,6 +50,7 @@ namespace celaeno::graph
 
 // Using namespace {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // Namespaces {{{

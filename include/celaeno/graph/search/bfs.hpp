@@ -58,6 +58,7 @@ namespace ra = ranges::actions;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // Algorithm {{{

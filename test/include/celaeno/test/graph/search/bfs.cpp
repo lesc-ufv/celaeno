@@ -53,6 +53,7 @@ namespace celaeno::graph::search::bfs::test
 
 // using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // Namespaces {{{

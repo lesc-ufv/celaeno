@@ -55,6 +55,7 @@ namespace celaeno::graph::operations::minimize::crossings::impl
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{

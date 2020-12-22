@@ -27,6 +27,10 @@
 namespace celaeno::graph::representations::incidence::test
 {
 
+// Using namespaces {{{
+using namespace celaeno::aliases;
+// }}}
+
 // Namespaces {{{
 namespace graph = celaeno::graph;
 namespace incidence = celaeno::graph::representations::incidence;

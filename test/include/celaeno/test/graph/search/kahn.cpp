@@ -53,6 +53,7 @@ namespace celaeno::graph::search::kahn::test
 
 // using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{

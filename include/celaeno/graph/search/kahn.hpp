@@ -56,6 +56,7 @@ namespace bfs = celaeno::graph::search::bfs;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // Algorithm {{{

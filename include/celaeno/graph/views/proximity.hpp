@@ -58,6 +58,7 @@ namespace kahn = celaeno::graph::search::kahn;
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
+using namespace celaeno::aliases;
 // }}}
 
 // using declarations {{{
