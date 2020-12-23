@@ -171,14 +171,14 @@ Reader<T>::Reader(S&& input, T callback)
         fmt::format("Module: {}",line))
     // Endmodule
     || eval_regex(line,"endmodule","Endmodule")
-    // Wire declarations
-    || eval_regex(line,
-            fmt::format("({}[,;]?)+",expr_id),
-            fmt::format("IO: {}",line))
     // Inputs/Outputs
     || eval_regex(line,
-        fmt::format("({}[,;]?)+",expr_id),
+        fmt::format("((input)|(output))({}[,;]?)+",expr_id),
         fmt::format("IO: {}",line))
+    // Wire declarations
+    || eval_regex(line,
+            fmt::format("(wire)?({}[,;]?)+",expr_id),
+            fmt::format("Wire: {}",line))
     // Assigns
     || this->on_assign(line)
     // And gates
