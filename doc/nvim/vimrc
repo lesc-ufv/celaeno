@@ -1,0 +1,245 @@
+" vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
+
+set encoding=utf-8
+
+" Leader {{{
+
+map <Space> <Leader>
+
+" }}}
+
+" Plugins {{{
+
+filetype off
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
+Plugin 'VundleVim/Vundle.vim'
+
+" Initialization
+source $HOME/.config/nvim/modules/vim-templates.vim " File templates
+source $HOME/.config/nvim/modules/ctrlp.vim         " Fuzzy finder
+Plugin 'tpope/vim-obsession'                        " Save vim sessions
+
+" Snippets
+source $HOME/.config/nvim/modules/neosnippet.vim    " Snippets
+
+" Git
+Plugin 'tpope/vim-surround'                         " Surrounding words
+source $HOME/.config/nvim/modules/gitgutter.vim     " Shows + & - signs for git
+source $HOME/.config/nvim/modules/vim-fugitive.vim  " Git wrapper
+Plugin 'junegunn/gv.vim'                            " Commit browser
+
+" Editor
+source $HOME/.config/nvim/modules/easyalign.vim     " Align text
+Plugin 'tomtom/tcomment_vim.git'
+Plugin 'whatyouhide/vim-lengthmatters'              " Max line length indicator
+source $HOME/.config/nvim/modules/indentline.vim    " Indentation guides for spaces
+Plugin 'jiangmiao/auto-pairs'                       " Pairs of quotes, brackets...
+source $HOME/.config/nvim/modules/devicons.vim      " Cute icons
+source $HOME/.config/nvim/modules/coc.vim           " Code completion for several languages
+Plugin 'tpope/vim-repeat'
+source $HOME/.config/nvim/modules/goyo.vim          " Zen mode
+
+" Language support
+Plugin 'sheerun/vim-polyglot'                       " Highlight for various languages
+Plugin 'ap/vim-css-color'                           " Show hex colors
+Plugin 'neomake/neomake'                            " Syntax checks
+Plugin 'vhda/verilog_systemverilog.vim'
+
+" Search
+source $HOME/.config/nvim/modules/nnn.vim           " File browser
+source $HOME/.config/nvim/modules/tagbar.vim        " Browse file tags and a structure.
+source $HOME/.config/nvim/modules/fzf.vim           " Fuzzy finder
+source $HOME/.config/nvim/modules/nerdtree.vim      " Sidebar file browser
+
+" Code execution
+"Plugin 'python-mode/python-mode', { 'for': 'python', 'branch': 'develop' }
+
+" Themes
+source $HOME/.config/nvim/modules/theme.vim         " Theme and UI addons
+
+call vundle#end()                          " required
+filetype plugin indent on                  " required
+
+" }}}
+
+" Standard Configurations {{{
+
+" Theme
+set background=dark
+set termguicolors
+colorscheme deep-space
+let g:deepspace_italics=1
+let g:airline_theme='deep_space'
+
+" exrc allows loading local executing local rc files.
+" secure disallows the use of :autocmd, shell and write commands in local .vimrc files.
+set exrc secure
+
+" Use 2 spaces for indentation
+set expandtab sw=2 ts=2 tw=80
+
+" Improved search
+set ignorecase smartcase
+
+" Syntax coloring
+syntax on
+filetype plugin on
+
+" Show trailing whitespace
+set listchars=trail:─ list
+
+" This adds the current directory
+" to the vim native FIND command
+set path=**
+
+" Override search highlight colors
+set hlsearch
+hi! Search ctermbg=9 ctermfg=0 cterm=underline
+
+" Visual Search
+vnoremap // y/\V<C-R>"<CR>
+
+" Line numbers
+set nu rnu
+
+" Force the current directory to be the same of the current file
+set fillchars=stl:-,stlnc:-,vert:\|,fold:-,diff:-
+set autochdir
+
+" Timestamps
+nmap <C-w> i<C-R>=strftime("+%F-%T")<CR><Esc>
+imap <C-w> <C-R>=strftime("+%F-%T")<CR>
+cmap <C-w> <C-R>=strftime("+%F-%T")<CR>
+
+" Custom highlights
+hi Note ctermfg=235 ctermbg=65 guifg=black guibg=#709d6c cterm=bold gui=bold
+hi Warn cterm=bold ctermfg=235 ctermbg=137 gui=bold guifg=black guibg=#b3785d
+hi WarnRev gui=bold,italic guifg=#E06C75
+hi Bug  ctermfg=12  ctermbg=6 guifg=black guibg=#b15e7c cterm=bold gui=bold
+hi Desc guifg=#51617d guibg=#1b202a gui=bold
+hi Attr ctermfg=132 ctermbg=235 guifg=#b15e7c guibg=#232936
+
+match Desc /\'[A-Za-z ]*\'\|\/\/.*{{{\|\/\/.*}}}/
+
+let mbug  = matchadd("Bug"  , "\\<BUG\\>")
+let mnote = matchadd("Note" , "\\<NOTE\\>")
+let mnote = matchadd("Note" , "\\<CASE\\>")
+let mnote = matchadd("Note" , "\\<SUBCASE\\>")
+let mimp  = matchadd("Warn" , "\\<IMPORTANT\\>")
+let mwarn = matchadd("Warn" , "\\<WARNING\\>")
+let mwarn = matchadd("WarnRev" , "\\<assertm\\>")
+let i8    = matchadd("Type" , "\\<siz\\>")
+let i8    = matchadd("Type" , "\\<i8\\>")
+let i32   = matchadd("Type" , "\\<i32\\>")
+let i64   = matchadd("Type" , "\\<i64\\>")
+let f32   = matchadd("Type" , "\\<f32\\>")
+let f64   = matchadd("Type" , "\\<f64\\>")
+let ld64  = matchadd("Type" , "\\<ld64\\>")
+let u8    = matchadd("Type" , "\\<u8\\>")
+let u32   = matchadd("Type" , "\\<u32\\>")
+let u64   = matchadd("Type" , "\\<u64\\>")
+let c8    = matchadd("Type" , "\\<c8\\>")
+let c16   = matchadd("Type" , "\\<c16\\>")
+let c32   = matchadd("Type" , "\\<c32\\>")
+let wc32  = matchadd("Type" , "\\<wc32\\>")
+let attr  = matchadd("Attr" , "\\[\\[\\w\*\\]\\]")
+
+
+" }}}
+
+" Remaps {{{
+
+map <LEADER>ss :%s;^\(\s\+\);\=repeat(' ', len(submatch(0))/2);g<CR>
+
+" Copy and paste from system clipboard
+" Enables copying to clipboard
+set mouse=v
+nnoremap <LEADER>y "+y
+vnoremap <LEADER>y "+y
+nnoremap <LEADER>p "+p
+vnoremap <LEADER>p "+p
+
+" Move to windows
+nnoremap <C-l> <C-w><C-l>
+nnoremap <C-h> <C-w><C-h>
+nnoremap <C-j> <C-w><C-j>
+nnoremap <C-k> <C-w><C-k>
+tnoremap <C-l> <C-\><C-n><C-w>h
+tnoremap <C-h> <C-\><C-n><C-w>j
+tnoremap <C-j> <C-\><C-n><C-w>k
+tnoremap <C-k> <C-\><C-n><C-w>l
+
+" Rearrange windows
+nnoremap <S-l> <C-W>L
+nnoremap <S-h> <C-W>H
+nnoremap <S-j> <C-W>J
+nnoremap <S-k> <C-W>K
+
+" Resize windows
+nnoremap <silent> = :exe "vertical resize " . (winwidth(0) * 5/4)<CR>
+nnoremap <silent> - :exe "vertical resize " . (winwidth(0) * 4/5)<CR>
+nnoremap <silent> _ :exe "resize " . (winheight(0) * 5/4)<CR>
+nnoremap <silent> + :exe "resize " . (winheight(0) * 4/5)<CR>
+
+" Auto adjust window size
+set winheight=20
+set winwidth=30
+
+" Move to Tabs
+nnoremap tm <C-W>T
+nnoremap tn :tabnew<Space>
+nnoremap tl :tabnext<CR>
+nnoremap th :tabprev<CR>
+nnoremap tH :-tabm<CR>
+nnoremap tL :+tabm<CR>
+
+" Terminal in vim
+tnoremap tn <C-\><C-n>:tabnew<CR>
+tnoremap tl <C-\><C-n>:tabnext<CR>
+tnoremap th <C-\><C-n>:tabprev<CR>
+tnoremap tH <C-\><C-n>:-tabm<CR>
+tnoremap tL <C-\><C-n>:+tabm<CR>
+
+" Fix tab
+nnoremap h <BS>
+
+" 4 Spaces to 2 Spaces
+nmap <LEADER>2s :%s;^\(\s\+\);\=repeat(' ', len(submatch(0))/2);g<CR>
+
+
+" }}}
+
+" Functions {{{
+
+" Open new terminal
+function! g:NewTerminal()
+  exec "!nohup kitty -d %:p:h >/dev/null 2>&1 & disown"
+endfunction
+nnoremap <silent> <LEADER>t :call NewTerminal()<CR><CR>
+
+" Zoom / Restore window.
+function! s:ZoomToggle() abort
+  if exists('t:zoomed') && t:zoomed
+    execute t:zoom_winrestcmd
+    let t:zoomed = 0
+  else
+    let t:zoom_winrestcmd = winrestcmd()
+    resize
+    vertical resize
+    let t:zoomed = 1
+  endif
+endfunction
+command! ZoomToggle call s:ZoomToggle()
+nnoremap <C-a> :ZoomToggle<CR>
+
+" Modeline
+"" SRC: https://vim.fandom.com/wiki/Modeline_magic
+function! AppendModeline()
+  let l:modeline = printf(" vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :")
+  let l:modeline = substitute(&commentstring, "%s", l:modeline, "")
+  call append(0, l:modeline)
+endfunction
+nnoremap <silent> <LEADER>ml :call AppendModeline()<CR>
+
+" }}}

@@ -1,0 +1,18 @@
+snippet maj "maj"
+	assign ${1:maj} = (${2:i0} & ${3:i1}) | ($2 & ${4:i2}) | ($3 & $4);
+endsnippet
+
+snippet bench "bench"
+	\`include "${0:include}"
+
+	\`timescale 1ns/1ns
+	module bench;
+		reg ${1:regs};
+		wire ${2:wires};
+
+		reg[${3:it}] permute;
+
+		`!p snip.rv="TEST"` adder($1,$2);
+
+	endmodule
+endsnippet
