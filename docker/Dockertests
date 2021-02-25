@@ -3,7 +3,7 @@
 FROM formigoni/alpine-gcc-10:latest
 
 # Install packages
-RUN apk add ninja make cmake clang git py3-pip
+RUN apk add build-base ninja make cmake clang git py3-pip neovim clang-extra-tools nodejs npm nnn
 RUN pip3 install -I conan
 
 # Configure conan
@@ -16,12 +16,20 @@ ADD ./ /celaeno/
 RUN rm -rf /celaeno/build
 WORKDIR /celaeno/build
 
+# Configure Neovim
+RUN git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
+RUN mkdir -p /root/.config/nvim
+RUN cp -r /celaeno/doc/nvim/* /root/.config/nvim/
+RUN mv /root/.config/nvim/vimrc /root/.config/nvim/init.vim
+RUN nvim -c "PluginInstall" -c "qa!"
+
 # Install dependencies
 RUN conan install .. --build missing
 
 # Build the project
 WORKDIR /celaeno
-RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++
+RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1
+RUN cp build/compile_commands.json .
 RUN cmake --build build
 
 # Perform tests
