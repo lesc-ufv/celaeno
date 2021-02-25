@@ -62,7 +62,7 @@ TEST_CASE("celaeno::graph::draw::svg")
   // Read graph {{{
   graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  auto metadata {reader::Reader{circ::synth_91::alu2,emplace}};
+  auto metadata {reader::Reader{circ::synth_91::b1,emplace}};
   // }}}
 
   // Helpers {{{
@@ -93,7 +93,7 @@ TEST_CASE("celaeno::graph::draw::svg")
   // }}}
 
   // Test drawing {{{
-  svg::run(1,f_p,f_s,f_a,f_l,f_u,f_label,"artifacts/alu2-default.svg");
+  svg::run(1,f_p,f_s,f_a,f_l,f_u,f_label,"artifacts/b1-default.svg");
   // }}}
 
 

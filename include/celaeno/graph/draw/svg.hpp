@@ -73,7 +73,6 @@ constexpr std::string_view const h_template
   "<svg version='1.1' viewBox='0 0 {} {}'>\n"
   "<style>\n"
   "  circle {{\n"
-  "    fill: white;\n"
   "    stroke: black;\n"
   "    stroke-width: 2px;\n"
   "  }}\n"
@@ -87,10 +86,10 @@ constexpr std::string_view const v_label_template
 
 constexpr std::string_view const v_template
 {
-  "<circle r='{}' cx='{}' cy='{}' fill='white'/>\n",
+  "<circle r='{}' cx='{}' cy='{}' fill='{}'/>\n",
 };
 
-const std::string_view e_template
+constexpr std::string_view const e_template
 {
   "<line x1 = '{}' y1 = '{}' x2 = '{}' y2 = '{}' "
   "stroke = 'black' stroke-width = '3'/>\n"
@@ -139,6 +138,13 @@ decltype(auto) run(
   constexpr i32 const circle_offset{vertex_radius};
   // }}}
 
+  // @ Pre-processing {{{
+  // Edge minimization Oriented Drawing
+  ns_balance::outgoing::run(root,f_pred,f_succ,f_link,f_unlink);
+  ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
+  auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
+  // }}}
+
   // @ Vertex Placement {{{
 
   // Save vertices positions
@@ -147,22 +153,14 @@ decltype(auto) run(
   auto f_place =
   [&](auto x, auto y, auto u)
   {
-      vertex_pos.emplace(
-        std::make_pair(
-          u,
-          std::make_pair(x*vertex_hspacing+circle_offset,y*vertex_vspacing+circle_offset)
-        )
-      );
+    vertex_pos.emplace(
+      u,
+      std::make_pair(x*vertex_hspacing+circle_offset, y*vertex_vspacing+circle_offset)
+    );
   }; // lamb: f_place
 
-  // Edge minimization Oriented Drawing
-  ns_balance::outgoing::run(root,f_pred,f_succ,f_link,f_unlink);
-  ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
-  auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
-
   // Find level with higher number of vertices
-  auto const it_base
-    {rg::max_element(layers,[](auto a, auto b){ return a.size() < b.size(); })};
+  auto const it_base {rg::max_element(layers, {}, [](auto e){ return e.size(); })};
 
   // Save x coordinates of vertices
   std::map<i64,i64> vx;
@@ -182,12 +180,7 @@ decltype(auto) run(
   // Calculate the mean of the predecessors/successors positions
   auto mean_of_pos = [&](auto const& vs)
   {
-    i64 pos
-    {
-      rg::accumulate(vs,0,[&](auto acc, auto u){ return acc + vx[u]; })
-      /
-      static_cast<i64>(vs.size())
-    };
+    auto pos { rg::accumulate(vs,0,{},[&](auto u){ return vx[u];}) / vs.size() };
     while( occupation.contains(pos) ) { ++pos; }
     return pos;
   };
@@ -268,17 +261,12 @@ decltype(auto) run(
   }); // }}}
 
   // @ Get farthest vertices to build viewport {{{
-  auto view_box_x {rg::max_element(vertex_pos,
-  [](auto a, auto b)
-  {
-    return a.second.first < b.second.first;
-  })->second.first+circle_offset};
+  auto view_box_x {rg::max_element(vertex_pos,{},
+  [](auto e) { return e.second.first; })->second.first+circle_offset};
 
-  auto view_box_y {rg::max_element(vertex_pos,
-  [](auto a, auto b)
-  {
-    return a.second.second < b.second.second;
-  })->second.second+circle_offset}; // }}}
+  auto view_box_y {rg::max_element(vertex_pos,{},
+  [](auto e) { return e.second.second; })->second.second+circle_offset};
+  // }}}
 
   // @ Stream/File writting {{{
   header << fmt::format(h_template,view_box_x,view_box_y);
@@ -287,7 +275,15 @@ decltype(auto) run(
   for (auto [v,pos] : vertex_pos)
   {
     auto [x,y] = pos;
-    vertices << fmt::format(v_template, vertex_radius, x, y);
+    // Draw pseudo-nodes with black filling
+    if (v < 0)
+    {
+      vertices << fmt::format(v_template, vertex_radius, x, y, "black");
+    } // if v < 0
+    else
+    {
+      vertices << fmt::format(v_template, vertex_radius, x, y, "white");
+    } // else
     vertices << fmt::format(v_label_template, x, y, 40, f_label(v));
   } // for
 
