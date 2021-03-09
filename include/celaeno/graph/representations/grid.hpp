@@ -1,0 +1,139 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
+//
+// @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
+// @file        : grid
+// @created     : thrusday feb 25, 2021 16:06:04 -03
+//
+// BSD 2-Clause License
+
+// Copyright (c) 2020, Ruan Evangelista Formigoni
+// All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+
+// * Redistributions of source code must retain the above copyright notice, this
+//   list of conditions and the following disclaimer.
+
+// * Redistributions in binary form must reproduce the above copyright notice,
+//   this list of conditions and the following disclaimer in the documentation
+//   and/or other materials provided with the distribution.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#pragma once
+
+#include <map>
+#include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
+
+#include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/operations/minimize/crossings.hpp>
+
+// TODO remove
+#include <celaeno/graph/search/bfs.hpp>
+
+// namespace celaeno::graph::representations::grid {{{
+namespace celaeno::graph::representations::grid
+{
+
+// Using declarations {{{
+using namespace celaeno::aliases;
+using namespace celaeno::concepts;
+// }}}
+
+// namespaces {{{
+namespace rg = ranges;
+namespace rv = ranges::views;
+namespace ra = ranges::actions;
+namespace fp = fplus;
+namespace ns_minimize = celaeno::graph::operations::minimize;
+namespace ns_views = celaeno::graph::views;
+// }}}
+
+// fn: run {{{
+template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
+auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+{
+  // Get layers
+  auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
+
+  // Save vertices positions
+  std::map<i64,std::pair<i64,i64>> vertex_xy;
+
+  // Find level with highest number of vertices
+  auto const it_base {rg::max_element(layers, {}, [](auto e){ return e.size(); })};
+
+  // Place vertex u in coordinate {x,y}
+  auto f_place = [&](auto x, auto y, auto u) { vertex_xy.insert({u, {x,y}}); };
+
+  // Index of it_base in layers container
+  u64 idx_base{static_cast<u64>(std::distance(layers.begin(),it_base))};
+
+  // Place level with higher number of vertices
+  rg::for_each(*it_base, [&,x=0,y=idx_base](auto u) mutable { f_place(x++,y,u); });
+
+  // Save occupation of x positions for each layer
+  std::set<i64> occupation;
+
+  // Calculate the mean of the predecessors/successors positions
+  auto mean_of_pos = [&]<Range R>(R const& vs)
+  {
+    auto pos { rg::accumulate(vs,0,{},[&](auto u){ return vertex_xy[u].first;}) / vs.size() };
+    while( occupation.contains(pos) ) { ++pos; }
+    return pos;
+  };
+
+  //
+  // Place subsequent layers with respect to first positioned layers, e.g, given
+  // [1..5] layers, if first positioned layer was 3, then subsequent layers
+  // [3,4],[4,5] must be positioned sequentially in this order; and layers
+  // [3,2],[2,1] must be positioned sequentially in this order.
+  //
+
+  // First half of positions for placement
+  auto first_half {fp::numbers(u64{},idx_base)};
+
+  // Reverse container and elements
+  first_half = ra::reverse(first_half);
+
+  // Second half of positions for placement
+  auto second_half {fp::numbers(idx_base+1,layers.size())};
+
+  for (auto e : fp::append(first_half,second_half))
+  {
+    fmt::print("e : {}\n", e);
+  } // for
+
+  for (auto y : fp::append(first_half,second_half))
+  {
+    for (auto u : layers.at(y))
+    {
+      // Set the x position to a mean of the predecessors positions
+      auto x { (y > idx_base)? mean_of_pos(f_pred(u)) : mean_of_pos(f_succ(u)) };
+      // Save the position
+      vertex_xy.insert({u,{x,y}});
+      // Mark position as used
+      occupation.emplace(x);
+      // Position the vertex
+      f_place(x,y,u);
+    } // for
+    occupation.clear();
+  } // for
+
+  return std::make_pair(layers,vertex_xy);
+}
+// }}}
+
+} // namespace celaeno::graph::representations::grid }}}
