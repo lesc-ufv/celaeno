@@ -55,11 +55,9 @@ using namespace celaeno::concepts;
 
 // namespaces {{{
 namespace rg = ranges;
-namespace rv = ranges::views;
 namespace ra = ranges::actions;
 namespace fp = fplus;
 namespace ns_minimize = celaeno::graph::operations::minimize;
-namespace ns_views = celaeno::graph::views;
 // }}}
 
 // fn: run {{{
@@ -110,11 +108,6 @@ auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
 
   // Second half of positions for placement
   auto second_half {fp::numbers(idx_base+1,layers.size())};
-
-  for (auto e : fp::append(first_half,second_half))
-  {
-    fmt::print("e : {}\n", e);
-  } // for
 
   for (auto y : fp::append(first_half,second_half))
   {
