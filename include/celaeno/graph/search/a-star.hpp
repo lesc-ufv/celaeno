@@ -44,6 +44,10 @@
 namespace celaeno::graph::a_star
 {
 
+// Using Namespaces {{{
+using namespace celaeno::aliases;
+// }}}
+
 //
 // Aliases
 //
