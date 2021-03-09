@@ -51,7 +51,9 @@
 #include <celaeno/graph/operations/balance/outgoing.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/operations/minimize/pseudo.hpp>
+#include <celaeno/graph/operations/minimize/edge-length.hpp>
 #include <celaeno/graph/representations/grid.hpp>
+#include <celaeno/heuristics/manhattan.hpp>
 
 // namespace celaeno::graph::draw::svg {{{
 namespace celaeno::graph::draw::svg
@@ -67,6 +69,7 @@ namespace rg = ranges;
 namespace ns_balance = celaeno::graph::operations::balance;
 namespace ns_minimize = celaeno::graph::operations::minimize;
 namespace ns_representations = celaeno::graph::representations;
+namespace ns_heuristics = celaeno::heuristics;
 // }}}
 
 // Using namespaces {{{
@@ -154,6 +157,16 @@ decltype(auto) run(
 
   // @ Vertex Placement {{{
   auto grid{ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
+
+  auto f_dist = [&](auto u, auto v)
+  {
+    grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
+    return ns_heuristics::manhattan::run(grid.second[u],grid.second[v]);
+  };
+
+  ns_minimize::edge_length::run(root,f_pred,f_succ,f_link,f_unlink,f_dist);
+
+  grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
 
   auto layers = grid.first;
   auto vertex_pos = grid.second;
