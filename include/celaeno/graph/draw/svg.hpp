@@ -50,7 +50,7 @@
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/balance/outgoing.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
-#include <celaeno/graph/operations/minimize/horizontal-distance.hpp>
+#include <celaeno/graph/operations/minimize/pseudo.hpp>
 #include <celaeno/graph/representations/grid.hpp>
 
 // namespace celaeno::graph::draw::svg {{{
@@ -149,7 +149,7 @@ decltype(auto) run(
   // Edge minimization Oriented Drawing
   ns_balance::outgoing::run(root,f_pred,f_succ,f_link,f_unlink);
   ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
-  ns_minimize::horizontal_distance::run(root,f_pred,f_succ,f_link,f_unlink);
+  ns_minimize::pseudo::run(root,f_pred,f_succ,f_link,f_unlink);
   // }}}
 
   // @ Vertex Placement {{{
