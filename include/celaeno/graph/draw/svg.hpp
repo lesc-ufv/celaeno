@@ -50,16 +50,23 @@
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/balance/outgoing.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
+#include <celaeno/graph/operations/minimize/horizontal-distance.hpp>
+#include <celaeno/graph/representations/grid.hpp>
 
 // namespace celaeno::graph::draw::svg {{{
 namespace celaeno::graph::draw::svg
 {
+
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
 
 // namespaces {{{
 namespace rg = ranges;
 
 namespace ns_balance = celaeno::graph::operations::balance;
 namespace ns_minimize = celaeno::graph::operations::minimize;
+namespace ns_representations = celaeno::graph::representations;
 // }}}
 
 // Using namespaces {{{
@@ -81,7 +88,7 @@ constexpr std::string_view const h_template
 
 constexpr std::string_view const v_label_template
 {
-  "<text x='{}' y='{}' text-anchor='middle' font-size='{}' fill='black'>{}</text>\n"
+  "<text x='{}' y='{}' text-anchor='middle' font-size='{}' fill='{}'>{}</text>\n"
 };
 
 constexpr std::string_view const v_template
@@ -142,98 +149,25 @@ decltype(auto) run(
   // Edge minimization Oriented Drawing
   ns_balance::outgoing::run(root,f_pred,f_succ,f_link,f_unlink);
   ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
-  auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
+  ns_minimize::horizontal_distance::run(root,f_pred,f_succ,f_link,f_unlink);
   // }}}
 
   // @ Vertex Placement {{{
+  auto grid{ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
 
-  // Save vertices positions
-  std::map<S,std::pair<i64,i64>> vertex_pos;
+  auto layers = grid.first;
+  auto vertex_pos = grid.second;
 
-  auto f_place =
-  [&](auto x, auto y, auto u)
+  // Adjust positions for drawing
+  for (auto& e : vertex_pos)
   {
-    vertex_pos.emplace(
-      u,
-      std::make_pair(x*vertex_hspacing+circle_offset, y*vertex_vspacing+circle_offset)
-    );
-  }; // lamb: f_place
+    auto& pos = e.second;
+    auto& [x,y] = pos;
+    x = x*vertex_hspacing+circle_offset;
+    y = y*vertex_vspacing+circle_offset;
+  } // for
 
-  // Find level with higher number of vertices
-  auto const it_base {rg::max_element(layers, {}, [](auto e){ return e.size(); })};
-
-  // Save x coordinates of vertices
-  std::map<i64,i64> vx;
-
-  // Save occupation of x positions for each layer
-  std::set<i64> occupation;
-
-  // Place level with higher number of vertices
-  rg::for_each(*it_base,
-  [&,x=0,y=std::distance(layers.begin(),it_base)](auto u) mutable
-  {
-    f_place(x,y,u);
-    vx[u] = x;
-    ++x;
-  });
-
-  // Calculate the mean of the predecessors/successors positions
-  auto mean_of_pos = [&](auto const& vs)
-  {
-    auto pos { rg::accumulate(vs,0,{},[&](auto u){ return vx[u];}) / vs.size() };
-    while( occupation.contains(pos) ) { ++pos; }
-    return pos;
-  };
-
-  // Place next levels
-  {
-    auto y{std::distance(layers.begin(),it_base)+1};
-    for (auto it{std::next(it_base)}; it != layers.cend(); ++it)
-    {
-      // Place remaining levels after current
-      for (i64 x{}; auto const& u : *it)
-      {
-        // Set the x position to a mean of the predecessors positions
-        x = mean_of_pos(f_pred(u));
-        // Save the position
-        vx[u] = x;
-        // Mark position as used
-        occupation.emplace(x);
-        // Position the vertex
-        f_place(x,y,u);
-      } // for
-      // Increase layer counter
-      ++y;
-      // Reset occupation, for next layer
-      occupation.clear();
-    } // for
-  }
-
-  // Place previous levels
-  {
-    auto y{std::distance(layers.begin(),it_base)-1};
-    for (auto it{std::prev(it_base)};; --it)
-    {
-      // Place remaining levels before current
-      for (i64 x{}; auto const& u : *it)
-      {
-        // Set the x position to a mean of the predecessors positions
-        x = mean_of_pos(f_succ(u));
-        // Save the position
-        vx[u] = x;
-        // Mark position as used
-        occupation.emplace(x);
-        // Position the vertex
-        f_place(x,y,u);
-      } // for
-      // Stop if current level == begin
-      if(it == layers.begin()){ break; }
-      // Increase layer counter
-      --y;
-      // Reset occupation, for next layer
-      occupation.clear();
-    } // for
-  } // }}}
+  // }}}
 
   // @ Output streams {{{
 
@@ -279,12 +213,13 @@ decltype(auto) run(
     if (v < 0)
     {
       vertices << fmt::format(v_template, vertex_radius, x, y, "black");
+      vertices << fmt::format(v_label_template, x, y, 40, "white", f_label(v));
     } // if v < 0
     else
     {
       vertices << fmt::format(v_template, vertex_radius, x, y, "white");
+      vertices << fmt::format(v_label_template, x, y, 40, "black", f_label(v));
     } // else
-    vertices << fmt::format(v_label_template, x, y, 40, f_label(v));
   } // for
 
   // File writting

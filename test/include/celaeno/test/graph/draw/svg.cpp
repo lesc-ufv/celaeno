@@ -74,27 +74,27 @@ TEST_CASE("celaeno::graph::draw::svg")
   // }}}
 
   // Gate type {{{
-  auto f_label = [&metadata](auto id)
+  auto f_label = [&](auto id)
   {
-    using Type = celaeno::graph::reader::verilog::GateType;
-    auto data{metadata.data()};
-    if( ! data.contains(id) )  { return " "; }
-    switch (data.at(id))
-    {
-      case Type::AND: return "∧";
-      case Type::OR: return "∨";
-      case Type::NAND: return "~∧";
-      case Type::NOR: return "~∨";
-      case Type::XOR: return "⊕";
-      case Type::XNOR: return "~⊕";
-      case Type::MAJ3: return "M";
-    } // switch
+    return id;
+    // using Type = celaeno::graph::reader::verilog::GateType;
+    // auto data{metadata.data()};
+    // if( ! data.contains(id) )  { return " "; }
+    // switch (data.at(id))
+    // {
+    //   case Type::AND: return "∧";
+    //   case Type::OR: return "∨";
+    //   case Type::NAND: return "~∧";
+    //   case Type::NOR: return "~∨";
+    //   case Type::XOR: return "⊕";
+    //   case Type::XNOR: return "~⊕";
+    //   case Type::MAJ3: return "M";
+    // } // switch
   };
   // }}}
 
   // Test drawing {{{
   svg::run(1,f_p,f_s,f_a,f_l,f_u,f_label,"artifacts/b1-default.svg");
   // }}}
-
 
 } // TEST_CASE: "celaeno::graph::draw::svg" }}}
