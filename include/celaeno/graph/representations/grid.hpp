@@ -45,9 +45,6 @@
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 
-// TODO remove
-#include <celaeno/graph/search/bfs.hpp>
-
 // namespace celaeno::graph::representations::grid {{{
 namespace celaeno::graph::representations::grid
 {

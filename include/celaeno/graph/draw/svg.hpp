@@ -40,6 +40,7 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 #include <range/v3/all.hpp>
+#include <fplus/fplus.hpp>
 #ifndef NDEBUG
   #include <spdlog/spdlog.h>
 #endif
@@ -47,13 +48,13 @@
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/balance/outgoing.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/operations/minimize/pseudo.hpp>
 #include <celaeno/graph/operations/minimize/edge-length.hpp>
 #include <celaeno/graph/representations/grid.hpp>
-#include <celaeno/heuristics/manhattan.hpp>
 
 // namespace celaeno::graph::draw::svg {{{
 namespace celaeno::graph::draw::svg
@@ -65,11 +66,12 @@ namespace celaeno::graph::draw::svg
 
 // namespaces {{{
 namespace rg = ranges;
+namespace fp = fplus;
 
 namespace ns_balance = celaeno::graph::operations::balance;
 namespace ns_minimize = celaeno::graph::operations::minimize;
 namespace ns_representations = celaeno::graph::representations;
-namespace ns_heuristics = celaeno::heuristics;
+namespace ns_search = celaeno::graph::search;
 // }}}
 
 // Using namespaces {{{
@@ -137,16 +139,6 @@ decltype(auto) run(
   spdlog::debug("Algorithm: celaeno::graph::draw::svg");
 #endif
 
-  // @ Vertices settings {{{
-  // Radius
-  constexpr i32 const vertex_radius{50};
-  // Horizontal space between vertices
-  constexpr i32 const vertex_hspacing{vertex_radius*3};
-  // Vertical space between vertices
-  constexpr i32 const vertex_vspacing{vertex_radius*3};
-  // Offset of circles from the edges
-  constexpr i32 const circle_offset{vertex_radius};
-  // }}}
 
   // @ Pre-processing {{{
   // Edge minimization Oriented Drawing
@@ -161,18 +153,148 @@ decltype(auto) run(
   auto f_dist = [&](auto u, auto v)
   {
     grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
-    return ns_heuristics::manhattan::run(grid.second[u],grid.second[v]);
+    auto layers = grid.first;
+    auto vertex_xy = grid.second;
+    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
   };
 
   ns_minimize::edge_length::run(root,f_pred,f_succ,f_link,f_unlink,f_dist);
 
   grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
-
   auto layers = grid.first;
-  auto vertex_pos = grid.second;
+  auto vertex_xy = grid.second;
+
+  // Pseudo number index
+  i64 counter{};
+
+  // Define function to compare values lt 0
+  auto f_lowest = [&](auto e)
+  {
+    if(e < counter){ counter=e; } return false;
+  };
+
+  // Get the dummy vertex with the lowest value
+  ns_search::bfs::run(root,f_pred,f_succ,f_lowest);
+
+  // A struct to control the value of pseudo nodes
+  auto make_pseudo = [counter]
+  {
+    struct Pseudo
+    {
+      private:
+        i64 c;
+      public:
+        Pseudo(i64 c) : c(c) {}
+        i64 next(){ return --c; }
+        i64 curr(){ return c; }
+    };
+    return Pseudo{counter};
+  }();
+
+  // Find distances of each level
+  for (i64 i{}; auto const& layer : layers)
+  {
+
+    if( i+1 == layers.size() ){ break; }
+
+    // Find max x distance
+    i64 x_max{};
+    for (auto node : layer)
+    {
+      for (auto succ : f_succ(node))
+      {
+        if( auto dist{f_dist(node,succ)}; dist > x_max ){ x_max = dist; }
+      } // for
+    } // for
+
+    if (x_max > 1)
+    {
+      for (auto node : layers.at(i))
+      {
+        for (auto succ : f_succ(node))
+        {
+          for (i64 i{}; i < x_max/2; ++i)
+          {
+            auto new_node{make_pseudo.next()};
+            f_link(std::make_pair(node,new_node));
+            f_link(std::make_pair(new_node,succ));
+            f_unlink(std::make_pair(node,succ));
+          } // for: i < x_max/2
+        } // for
+      } // for
+    } // if x_max > 1
+    ++i;
+  } // for
+
+  grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
+  layers = grid.first;
+  vertex_xy = grid.second;
+
+  // Make a second pass, adjust vertex_xy according to successors
+  for (auto const& layer : layers)
+  {
+    for (auto node : layer)
+    {
+      auto succs{f_succ(node)};
+
+      if (succs.size() > 1)
+      {
+        for (auto succ : succs)
+        {
+          if( auto dist{f_dist(node,succ)}; dist > 1 )
+          {
+            auto nx = vertex_xy[node].first;
+            auto& sx = vertex_xy[succ].first;
+            if( sx > nx )
+            {
+              sx = nx+1;
+            }
+            else
+            {
+              sx = nx-1;
+            }
+          }
+        } // for
+      } // if
+
+      auto preds{f_pred(node)};
+      if (preds.size() > 1)
+      {
+        for (auto pred : preds)
+        {
+          auto dist{f_dist(pred,node)};
+          if( dist > 1 )
+          {
+            auto nx = vertex_xy[node].first;
+            auto& px = vertex_xy[pred].first;
+            if( px > nx )
+            {
+              px = nx+1;
+            }
+            else
+            {
+              px = nx-1;
+            }
+          }
+        } // for
+      } // if
+    } // for
+  } // for
+
+
+  // @ Vertices settings {{{
+  // Radius
+  constexpr i32 const vertex_radius{50};
+  // Horizontal space between vertices
+  constexpr i32 const vertex_hspacing{vertex_radius*3};
+  // Vertical space between vertices
+  constexpr i32 const vertex_vspacing{vertex_radius*3};
+  // Offset of circles from the edges
+  constexpr i32 const circle_offset{vertex_radius};
+  // }}}
 
   // Adjust positions for drawing
-  for (auto& e : vertex_pos)
+  for (auto& e : vertex_xy)
   {
     auto& pos = e.second;
     auto& [x,y] = pos;
@@ -195,23 +317,23 @@ decltype(auto) run(
   // }}}
 
   // @ Edge Routing {{{
-  rg::for_each(vertex_pos, [&](auto&& e)
+  rg::for_each(vertex_xy, [&](auto&& e)
   {
     auto succ { f_succ(e.first) };
 
     rg::for_each(succ, [&](auto&& v)
     {
       auto [ux,uy] = e.second;
-      auto [vx,vy] = vertex_pos[v];
+      auto [vx,vy] = vertex_xy[v];
       edges << fmt::format(e_template, ux, uy, vx, vy);
     });
   }); // }}}
 
   // @ Get farthest vertices to build viewport {{{
-  auto view_box_x {rg::max_element(vertex_pos,{},
+  auto view_box_x {rg::max_element(vertex_xy,{},
   [](auto e) { return e.second.first; })->second.first+circle_offset};
 
-  auto view_box_y {rg::max_element(vertex_pos,{},
+  auto view_box_y {rg::max_element(vertex_xy,{},
   [](auto e) { return e.second.second; })->second.second+circle_offset};
   // }}}
 
@@ -219,7 +341,7 @@ decltype(auto) run(
   header << fmt::format(h_template,view_box_x,view_box_y);
 
   // Vertices and labels
-  for (auto [v,pos] : vertex_pos)
+  for (auto [v,pos] : vertex_xy)
   {
     auto [x,y] = pos;
     // Draw pseudo-nodes with black filling
