@@ -46,6 +46,7 @@ namespace celaeno::graph::operations::minimize::pseudo
 // Namespaces {{{
 namespace rg = ranges;
 namespace ns_views = celaeno::graph::views;
+namespace ns_search = celaeno::graph::search;
 // }}}
 
 // Using declarations {{{
@@ -67,14 +68,20 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink)
   spdlog::debug("Algorithm: celaeno::graph::operations::minimize::pseudo");
 #endif
 
+  // Node count as stop condition
+  i64 begin_node_count{};
+
   // Pseudo number index
   i64 counter{};
 
   // Define function to compare values lt 0
-  auto f_lowest = [&counter](auto&& e) { if(e < counter){ counter=e; } return false; };
+  auto f_lowest = [&](auto e)
+  {
+    if(e < counter){ counter=e; } ++begin_node_count; return false;
+  };
 
   // Get the dummy vertex with the lowest value
-  celaeno::graph::search::bfs::run(root,f_pred,f_succ,f_lowest);
+  ns_search::bfs::run(root,f_pred,f_succ,f_lowest);
 
   // A struct to control the value of pseudo nodes
   auto make_pseudo = [counter]
@@ -141,7 +148,21 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink)
     // Update layers
     view_depth = ns_views::depth::run(root,f_pred,f_succ).first;
 
-  } // while
+    // Check if another pass is required
+    if (i+1 == view_depth.size())
+    {
+      i64 end_node_count{};
+      ns_search::bfs::run(root,f_pred,f_succ,
+        [&](auto){ ++end_node_count; return false;}
+      );
+      if( begin_node_count != end_node_count )
+      {
+        begin_node_count = end_node_count;
+        i=0;
+      }
+    } // if
+
+  } // for
 
 } // function: run }}}
 
