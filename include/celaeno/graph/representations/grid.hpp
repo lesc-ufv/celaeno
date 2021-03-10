@@ -36,6 +36,10 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
+#ifndef NDEBUG
+  #include <spdlog/spdlog.h>
+#endif
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -64,6 +68,11 @@ namespace ns_minimize = celaeno::graph::operations::minimize;
 template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
 auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
 {
+#ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
+  spdlog::debug("Algorithm: celaeno::graph::representations::grid");
+#endif
+
   // Get layers
   auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
 
@@ -86,9 +95,14 @@ auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
   std::set<i64> occupation;
 
   // Calculate the mean of the predecessors/successors positions
-  auto mean_of_pos = [&]<Range R>(R const& vs)
+  auto mean_of_pos = [&]<Range R>(R const& vs, auto node) -> std::optional<u64>
   {
-    auto pos { rg::accumulate(vs,0,{},[&](auto u){ return vertex_xy[u].first;}) / vs.size() };
+    if (vs.empty())
+    {
+      spdlog::warn("Dangling node {} will be ignored!", node);
+      return std::nullopt;
+    } // if
+    auto pos {rg::accumulate(vs,0,{},[&](auto u){return vertex_xy[u].first;}) / vs.size()};
     while( occupation.contains(pos) ) { ++pos; }
     return pos;
   };
@@ -114,13 +128,15 @@ auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
     for (auto u : layers.at(y))
     {
       // Set the x position to a mean of the predecessors positions
-      auto x { (y > idx_base)? mean_of_pos(f_pred(u)) : mean_of_pos(f_succ(u)) };
+      auto x { (y > idx_base)? mean_of_pos(f_pred(u),u) : mean_of_pos(f_succ(u),u) };
+      // Check if position is valid
+      if( !x ){ continue; }
       // Save the position
-      vertex_xy.insert({u,{x,y}});
+      vertex_xy.insert({u,{*x,y}});
       // Mark position as used
-      occupation.emplace(x);
+      occupation.emplace(*x);
       // Position the vertex
-      f_place(x,y,u);
+      f_place(*x,y,u);
     } // for
     occupation.clear();
   } // for
