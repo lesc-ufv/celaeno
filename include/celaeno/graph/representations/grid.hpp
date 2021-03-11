@@ -40,7 +40,9 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/operations/minimize/edge-length.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 
 // namespace celaeno::graph::representations::grid {{{
@@ -57,17 +59,17 @@ namespace rg = ranges;
 namespace ra = ranges::actions;
 namespace fp = fplus;
 namespace ns_minimize = celaeno::graph::operations::minimize;
+namespace ns_search = celaeno::graph::search;
 // }}}
 
-// fn: run {{{
-template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
-auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
-{
-#ifndef NDEBUG
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::representations::grid");
-#endif
+// fn: phase_2 {{{
 
+//
+// Crossing minimization oriented coordinates
+//
+template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
+decltype(auto) phase_2(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+{
   // Get layers
   auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
 
@@ -137,6 +139,133 @@ auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
   } // for
 
   return std::make_pair(layers,vertex_xy);
+} // function: phase_2 }}}
+
+// fn: phase_3 {{{
+template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
+decltype(auto) phase_3(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+{
+  auto grid {phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink)};
+  auto layers{grid.first};
+  auto vertex_xy{grid.second};
+
+  //
+  // Insert intra layer pseudo nodes for binary tree-like drawing
+  //
+
+  auto f_dist = [&](auto u, auto v)
+  {
+    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
+  };
+
+  // Pseudo number index
+  i64 counter{};
+
+  // Define function to compare values lt 0
+  auto f_lowest = [&](auto e)
+  {
+    if(e < counter){ counter=e; } return false;
+  };
+
+  // Get the dummy vertex with the lowest value
+  ns_search::bfs::run(root,f_pred,f_succ,f_lowest);
+
+  // A struct to control the value of pseudo nodes
+  auto make_pseudo = [counter]
+  {
+    struct Pseudo
+    {
+      private:
+        i64 c;
+      public:
+        Pseudo(i64 c) : c(c) {}
+        i64 next(){ return --c; }
+        i64 curr(){ return c; }
+    };
+    return Pseudo{counter};
+  }();
+
+  // Find distances of each level
+  for (i64 i{}; auto const& layer : layers)
+  {
+
+    if( static_cast<u64>(i+1) == layers.size() ){ break; }
+
+    // Find max x distance
+    i64 x_max{};
+    for (auto node : layer)
+    {
+      for (auto succ : f_succ(node))
+      {
+        if( auto dist{f_dist(node,succ)}; dist > x_max ){ x_max = dist; }
+      } // for
+    } // for
+
+    if (x_max > 1)
+    {
+      for (auto node : layers.at(i))
+      {
+        for (auto succ : f_succ(node))
+        {
+          auto curr{node};
+          for (i64 j{}; j < std::ceil(static_cast<f64>(x_max)/2); ++j)
+          {
+            auto new_node{make_pseudo.next()};
+            f_link(std::make_pair(curr,new_node));
+            f_link(std::make_pair(new_node,succ));
+            f_unlink(std::make_pair(curr,succ));
+            curr=new_node;
+          } // for: i < x_max/2
+        } // for
+      } // for
+    } // if x_max > 1
+    ++i;
+  } // for
+
+  return phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink);
+} // function: phase_3 }}}
+
+// fn: phase_1 {{{
+
+//
+// Minimize edge length by pseudo-node relinking
+//
+template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
+decltype(auto) phase_1(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+{
+
+  //
+  // Minimize edge length by pseudo-node relinking
+  //
+
+  auto grid {phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink)};
+
+  auto f_dist = [&](auto u, auto v)
+  {
+    grid = phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink);
+    auto layers = grid.first;
+    auto vertex_xy = grid.second;
+    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
+  };
+
+  ns_minimize::edge_length::run(root,f_pred,f_succ,f_link,f_unlink,f_dist);
+
+  grid = phase_3(root, f_pred, f_succ, f_adj, f_link, f_unlink);
+
+  return grid;
+
+} // function: phase_1 }}}
+
+// fn: run {{{
+template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
+auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+{
+#ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
+  spdlog::debug("Algorithm: celaeno::graph::representations::grid");
+#endif
+
+  return phase_1(root, f_pred, f_succ, f_adj, f_link, f_unlink);
 }
 // }}}
 

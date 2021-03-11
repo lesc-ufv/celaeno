@@ -183,198 +183,47 @@ decltype(auto) run(
   auto layers = grid.first;
   auto vertex_xy = grid.second;
 
-  remove_dangling();
-
-  //
-  // Minimize edge length by pseudo-node relinking
-  //
-
-  auto f_dist = [&](auto u, auto v)
-  {
-    grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
-    auto layers = grid.first;
-    auto vertex_xy = grid.second;
-    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
-  };
-
-  ns_minimize::edge_length::run(root,f_pred,f_succ,f_link,f_unlink,f_dist);
-
-  ns_minimize::pseudo::run(root,f_pred,f_succ,f_link,f_unlink);
-  ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
-
-  remove_dangling();
-
-  grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
-  layers = grid.first;
-  vertex_xy = grid.second;
-
-  //
-  // Insert intra layer pseudo nodes for binary tree-like drawing
-  //
-
-  auto f_dist_2 = [&](auto u, auto v)
-  {
-    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
-  };
-
-  // Pseudo number index
-  i64 counter{};
-
-  // Define function to compare values lt 0
-  auto f_lowest = [&](auto e)
-  {
-    if(e < counter){ counter=e; } return false;
-  };
-
-  // Get the dummy vertex with the lowest value
-  ns_search::bfs::run(root,f_pred,f_succ,f_lowest);
-
-  // A struct to control the value of pseudo nodes
-  auto make_pseudo = [counter]
-  {
-    struct Pseudo
-    {
-      private:
-        i64 c;
-      public:
-        Pseudo(i64 c) : c(c) {}
-        i64 next(){ return --c; }
-        i64 curr(){ return c; }
-    };
-    return Pseudo{counter};
-  }();
-
-  // Find distances of each level
-  for (i64 i{}; auto const& layer : layers)
-  {
-
-    if( static_cast<u64>(i+1) == layers.size() ){ break; }
-
-    // Find max x distance
-    i64 x_max{};
-    for (auto node : layer)
-    {
-      for (auto succ : f_succ(node))
-      {
-        if( auto dist{f_dist_2(node,succ)}; dist > x_max ){ x_max = dist; }
-      } // for
-    } // for
-
-    if (x_max > 1)
-    {
-      for (auto node : layers.at(i))
-      {
-        for (auto succ : f_succ(node))
-        {
-          auto curr{node};
-          for (i64 j{}; j < std::ceil(static_cast<f64>(x_max)/2); ++j)
-          {
-            auto new_node{make_pseudo.next()};
-            f_link(std::make_pair(curr,new_node));
-            f_link(std::make_pair(new_node,succ));
-            f_unlink(std::make_pair(curr,succ));
-            curr=new_node;
-          } // for: i < x_max/2
-        } // for
-      } // for
-    } // if x_max > 1
-    ++i;
-  } // for
-
-  ns_minimize::pseudo::run(root,f_pred,f_succ,f_link,f_unlink);
-  ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
-
-  grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
-  layers = grid.first;
-  vertex_xy = grid.second;
-
   //
   // Make a second pass, adjust vertex_xy according to successors and
   // predecessors
   //
   auto second_pass =
-  [&](bool bs)
+  [&]
   {
+    auto f_dist = [&](auto u, auto v)
+    {
+      return std::abs(vertex_xy[u].first-vertex_xy[v].first);
+    };
+
     ns_search::bfs::run(root, f_pred, f_succ,
     [&](auto node)
     {
-      if (bs)
+      for (auto succs{f_succ(node)}; auto succ : succs)
       {
-        auto succs{f_succ(node)};
+        if( auto dist{f_dist(node,succ)}; dist > 1 )
+        {
+          auto nx = vertex_xy[node].first;
+          auto& sx = vertex_xy[succ].first;
+          sx = (sx > nx)? nx+1 : nx-1;
+        } // if
+      } // for
 
-        if (succs.size() >= 1)
-        {
-          for (auto succ : succs)
-          {
-            if( auto dist{f_dist_2(node,succ)}; dist > 1 )
-            {
-              auto nx = vertex_xy[node].first;
-              auto& sx = vertex_xy[succ].first;
-              if( sx > nx )
-              {
-                sx = nx+1;
-              }
-              else
-              {
-                sx = nx-1;
-              }
-            } // if
-          } // for
-        } // if
-      } // if bs
-      else
+      for (auto preds{f_pred(node)}; auto pred : preds)
       {
-        auto preds{f_pred(node)};
-        if (preds.size() >= 1)
+        if( auto dist{f_dist(pred,node)}; dist > 1 )
         {
-          for (auto pred : preds)
-          {
-            auto dist{f_dist_2(pred,node)};
-            if( dist > 1 )
-            {
-              auto nx = vertex_xy[node].first;
-              auto& px = vertex_xy[pred].first;
-              if( px > nx )
-              {
-                px = nx+1;
-              }
-              else
-              {
-                px = nx-1;
-              }
-            } // if
-          } // for
+          auto nx = vertex_xy[node].first;
+          auto& px = vertex_xy[pred].first;
+          px = (px > nx)? nx+1 : nx-1;
         } // if
-      } // else
+      } // for
+
       return false;
     });
+
   }; // lamb: second_pass
 
-  // for (i64 i{}; i < 100; ++i)
-  // {
-  //   (i%2 == 0)? second_pass(true) : second_pass(false);
-  // } // for
-
-  for (i64 i{}; i < 1000; ++i)
-  {
-    (i%200 == 0)? second_pass(true) : second_pass(false);
-  } // for
-
-  for (i64 i{}; i < 1000; ++i)
-  {
-    (i%200 == 0)? second_pass(false) : second_pass(true);
-  } // for
-
-  for (i64 i{}; i < 1000; ++i)
-  {
-    (i%200 == 0)? second_pass(true) : second_pass(false);
-  } // for
-
-  for (i64 i{}; i < 1000; ++i)
-  {
-    (i%200 == 0)? second_pass(false) : second_pass(true);
-  } // for
-
+  second_pass();
 
   // @ Vertices settings {{{
   // Radius

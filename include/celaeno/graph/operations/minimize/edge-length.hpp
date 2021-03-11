@@ -79,11 +79,11 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, D&& f_dist)
   ns_bfs::run(root,f_pred,f_succ,f_lowest);
 
   // Create depth view
-  auto [view_counter_layer,view_vertex_depth] = ns_depth::run(root, f_pred, f_succ);
+  auto [view_id_layer,view_vertex_depth] = ns_depth::run(root, f_pred, f_succ);
 
   // For the current level, check horizontal distances of each vertex against
   // the ones in its outgoing edges
-  for (auto const& [_level_id,nodes] : view_counter_layer)
+  for (auto const& [_,nodes] : view_id_layer)
   {
     for (auto n : nodes)
     {
@@ -95,7 +95,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, D&& f_dist)
         // Predecessors of n
         auto preds{f_pred(n)};
 
-        if( dist > 0 && (! preds.empty()) )
+        if( dist > 1 && (! preds.empty()) )
         {
           // Find predecessor of n, which is not a pseudo vertex
           // TODO improve this
@@ -137,18 +137,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, D&& f_dist)
             f_unlink(std::make_pair(n,s));
             f_link(std::make_pair(closest,s));
           } // if
-          else
-          {
-            // f_unlink(std::make_pair(n,s));
-            // f_link(std::make_pair(pred,s));
-            // fmt::print("unlink ({},{})\n", n, s);
-            // fmt::print("link ({},{})\n", pred, s);
-          } // else
-        }
-        else
-        {
-          // TODO
-        } // else
+        } // if
       } // for
     } // for
   } // for
