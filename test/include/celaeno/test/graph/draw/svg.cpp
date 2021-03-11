@@ -31,23 +31,18 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Includes {{{
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
-
 #include <iostream>
 #include <cstdint>
+#include <fstream>
+#include <sstream>
 
-#include <celaeno/test/graph/data/synth-91.hpp>
+#include <spdlog/spdlog.h>
 
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
-
 #include <celaeno/graph/draw/svg.hpp>
 // }}}
 
-// Testcase: "celaeno::graph::draw::svg" {{{
-TEST_CASE("celaeno::graph::draw::svg")
-{
   // Using namespace {{{
   using namespace celaeno::aliases;
   // }}}
@@ -56,27 +51,50 @@ TEST_CASE("celaeno::graph::draw::svg")
   namespace graph = celaeno::graph;
   namespace reader = celaeno::graph::reader::verilog;
   namespace svg = celaeno::graph::draw::svg;
-  namespace circ = celaeno::test::graph::data;
   // }}}
 
-  // Read graph {{{
+int main(int argc, char* argv[])
+{
+
+#ifndef NDEBUG
+  spdlog::set_level(spdlog::level::debug);
+  spdlog::debug("Algorithm: celaeno::graph::representations::grid");
+#endif
+
+  // Check input arguments
+  if( argc != 2 )
+  {
+    spdlog::error("No input file given");
+    exit(1);
+  }
+
+  // Read input file
+  std::string filename{argv[1]};
+  spdlog::info("Reading input file {}", filename);
+  std::ifstream file{filename};
+  if( ! file.good() )
+  {
+    spdlog::error("Error to read input file");
+    exit(1);
+  } // if
+  std::stringstream ss; ss << file.rdbuf();
+
+  // Read graph
   graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  auto metadata {reader::Reader{circ::synth_91::b1,emplace}};
-  // }}}
+  auto metadata {reader::Reader{ss.str(),emplace}};
 
-  // Helpers {{{
+  // Helpers
   auto f_p = [&g](auto&& v){ return g.predecessors(v); };
   auto f_s = [&g](auto&& v){ return g.successors(v); };
   auto f_a = [&g](auto&& u, auto&& v){ return g.adjacent(u,v); };
   auto f_l = [&g](auto&& e){ g.emplace(e); };
   auto f_u = [&g](auto&& e){ g.erase(e); };
-  // }}}
 
-  // Gate type {{{
-  auto f_label = [&](auto id)
+  // Gate label
+  auto f_label = [&](auto)
   {
-    return id;
+    return " ";
     // using Type = celaeno::graph::reader::verilog::GateType;
     // auto data{metadata.data()};
     // if( ! data.contains(id) )  { return " "; }
@@ -91,10 +109,8 @@ TEST_CASE("celaeno::graph::draw::svg")
     //   case Type::MAJ3: return "M";
     // } // switch
   };
-  // }}}
 
-  // Test drawing {{{
-  svg::run(1,f_p,f_s,f_a,f_l,f_u,f_label,"artifacts/b1-default.svg");
-  // }}}
+  // Test drawing
+  svg::run(1,f_p,f_s,f_a,f_l,f_u,f_label,"artifacts/graph-drawing.svg");
 
-} // TEST_CASE: "celaeno::graph::draw::svg" }}}
+} // main

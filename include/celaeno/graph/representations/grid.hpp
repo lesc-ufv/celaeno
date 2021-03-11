@@ -36,9 +36,7 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
-#ifndef NDEBUG
-  #include <spdlog/spdlog.h>
-#endif
+#include <spdlog/spdlog.h>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>

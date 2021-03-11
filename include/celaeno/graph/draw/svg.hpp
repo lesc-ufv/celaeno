@@ -195,7 +195,7 @@ decltype(auto) run(
   for (i64 i{}; auto const& layer : layers)
   {
 
-    if( i+1 == layers.size() ){ break; }
+    if( static_cast<u64>(i+1) == layers.size() ){ break; }
 
     // Find max x distance
     i64 x_max{};
@@ -213,7 +213,7 @@ decltype(auto) run(
       {
         for (auto succ : f_succ(node))
         {
-          for (i64 i{}; i < x_max/2; ++i)
+          for (i64 j{}; j < x_max/2; ++j)
           {
             auto new_node{make_pseudo.next()};
             f_link(std::make_pair(node,new_node));
