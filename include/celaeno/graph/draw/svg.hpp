@@ -36,14 +36,13 @@
 #include <string_view>
 #include <sstream>
 #include <fstream>
+#include <queue>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
-#ifndef NDEBUG
-  #include <spdlog/spdlog.h>
-#endif
+#include <spdlog/spdlog.h>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -72,6 +71,7 @@ namespace ns_balance = celaeno::graph::operations::balance;
 namespace ns_minimize = celaeno::graph::operations::minimize;
 namespace ns_representations = celaeno::graph::representations;
 namespace ns_search = celaeno::graph::search;
+namespace ns_views = celaeno::graph::views;
 // }}}
 
 // Using namespaces {{{
@@ -141,14 +141,53 @@ decltype(auto) run(
 
 
   // @ Pre-processing {{{
+  // Remove dangling nodes
+  auto remove_dangling =
+  [&]
+  {
+    auto view_depth{ns_views::depth::run(root, f_pred, f_succ).first};
+    for (auto it{view_depth.begin()}; it != std::prev(view_depth.end()); ++it)
+    {
+      for (auto parent : it->second)
+      {
+        if (f_succ(parent).empty() && parent < 0)
+        {
+          std::queue<i64> q;
+          q.emplace(parent);
+          while( ! q.empty() )
+          {
+            auto node{q.front()}; q.pop();
+            spdlog::warn("Node {} is dangling and will be removed", node);
+            for (auto pred : f_pred(node))
+            {
+              f_unlink(std::make_pair(pred,node));
+              if( pred < 0 && f_succ(pred).empty() ){ q.push(pred); }
+            } // for
+          } // while
+        } // if
+      } // for
+    } // for
+  };
+
+  remove_dangling();
+
   // Edge minimization Oriented Drawing
   ns_balance::outgoing::run(root,f_pred,f_succ,f_link,f_unlink);
   ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
   ns_minimize::pseudo::run(root,f_pred,f_succ,f_link,f_unlink);
   // }}}
 
+
   // @ Vertex Placement {{{
   auto grid{ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
+  auto layers = grid.first;
+  auto vertex_xy = grid.second;
+
+  remove_dangling();
+
+  //
+  // Minimize edge length by pseudo-node relinking
+  //
 
   auto f_dist = [&](auto u, auto v)
   {
@@ -160,9 +199,23 @@ decltype(auto) run(
 
   ns_minimize::edge_length::run(root,f_pred,f_succ,f_link,f_unlink,f_dist);
 
+  ns_minimize::pseudo::run(root,f_pred,f_succ,f_link,f_unlink);
+  ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
+
+  remove_dangling();
+
   grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
-  auto layers = grid.first;
-  auto vertex_xy = grid.second;
+  layers = grid.first;
+  vertex_xy = grid.second;
+
+  //
+  // Insert intra layer pseudo nodes for binary tree-like drawing
+  //
+
+  auto f_dist_2 = [&](auto u, auto v)
+  {
+    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
+  };
 
   // Pseudo number index
   i64 counter{};
@@ -203,7 +256,7 @@ decltype(auto) run(
     {
       for (auto succ : f_succ(node))
       {
-        if( auto dist{f_dist(node,succ)}; dist > x_max ){ x_max = dist; }
+        if( auto dist{f_dist_2(node,succ)}; dist > x_max ){ x_max = dist; }
       } // for
     } // for
 
@@ -213,12 +266,14 @@ decltype(auto) run(
       {
         for (auto succ : f_succ(node))
         {
-          for (i64 j{}; j < x_max/2; ++j)
+          auto curr{node};
+          for (i64 j{}; j < std::ceil(static_cast<f64>(x_max)/2); ++j)
           {
             auto new_node{make_pseudo.next()};
-            f_link(std::make_pair(node,new_node));
+            f_link(std::make_pair(curr,new_node));
             f_link(std::make_pair(new_node,succ));
-            f_unlink(std::make_pair(node,succ));
+            f_unlink(std::make_pair(curr,succ));
+            curr=new_node;
           } // for: i < x_max/2
         } // for
       } // for
@@ -226,59 +281,98 @@ decltype(auto) run(
     ++i;
   } // for
 
+  ns_minimize::pseudo::run(root,f_pred,f_succ,f_link,f_unlink);
+  ns_balance::paths::run(root,f_pred,f_succ,f_link,f_unlink);
+
   grid = ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink);
   layers = grid.first;
   vertex_xy = grid.second;
 
-  // Make a second pass, adjust vertex_xy according to successors
-  for (auto const& layer : layers)
+  //
+  // Make a second pass, adjust vertex_xy according to successors and
+  // predecessors
+  //
+  auto second_pass =
+  [&](bool bs)
   {
-    for (auto node : layer)
+    ns_search::bfs::run(root, f_pred, f_succ,
+    [&](auto node)
     {
-      auto succs{f_succ(node)};
-
-      if (succs.size() > 1)
+      if (bs)
       {
-        for (auto succ : succs)
-        {
-          if( auto dist{f_dist(node,succ)}; dist > 1 )
-          {
-            auto nx = vertex_xy[node].first;
-            auto& sx = vertex_xy[succ].first;
-            if( sx > nx )
-            {
-              sx = nx+1;
-            }
-            else
-            {
-              sx = nx-1;
-            }
-          }
-        } // for
-      } // if
+        auto succs{f_succ(node)};
 
-      auto preds{f_pred(node)};
-      if (preds.size() > 1)
-      {
-        for (auto pred : preds)
+        if (succs.size() >= 1)
         {
-          auto dist{f_dist(pred,node)};
-          if( dist > 1 )
+          for (auto succ : succs)
           {
-            auto nx = vertex_xy[node].first;
-            auto& px = vertex_xy[pred].first;
-            if( px > nx )
+            if( auto dist{f_dist_2(node,succ)}; dist > 1 )
             {
-              px = nx+1;
-            }
-            else
+              auto nx = vertex_xy[node].first;
+              auto& sx = vertex_xy[succ].first;
+              if( sx > nx )
+              {
+                sx = nx+1;
+              }
+              else
+              {
+                sx = nx-1;
+              }
+            } // if
+          } // for
+        } // if
+      } // if bs
+      else
+      {
+        auto preds{f_pred(node)};
+        if (preds.size() >= 1)
+        {
+          for (auto pred : preds)
+          {
+            auto dist{f_dist_2(pred,node)};
+            if( dist > 1 )
             {
-              px = nx-1;
-            }
-          }
-        } // for
-      } // if
-    } // for
+              auto nx = vertex_xy[node].first;
+              auto& px = vertex_xy[pred].first;
+              if( px > nx )
+              {
+                px = nx+1;
+              }
+              else
+              {
+                px = nx-1;
+              }
+            } // if
+          } // for
+        } // if
+      } // else
+      return false;
+    });
+  }; // lamb: second_pass
+
+  // for (i64 i{}; i < 100; ++i)
+  // {
+  //   (i%2 == 0)? second_pass(true) : second_pass(false);
+  // } // for
+
+  for (i64 i{}; i < 1000; ++i)
+  {
+    (i%200 == 0)? second_pass(true) : second_pass(false);
+  } // for
+
+  for (i64 i{}; i < 1000; ++i)
+  {
+    (i%200 == 0)? second_pass(false) : second_pass(true);
+  } // for
+
+  for (i64 i{}; i < 1000; ++i)
+  {
+    (i%200 == 0)? second_pass(true) : second_pass(false);
+  } // for
+
+  for (i64 i{}; i < 1000; ++i)
+  {
+    (i%200 == 0)? second_pass(false) : second_pass(true);
   } // for
 
 
