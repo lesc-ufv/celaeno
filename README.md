@@ -9,7 +9,7 @@ Table of Contents:
 [[_TOC_]]
 
 
-## Implemented Algorithms:
+## Implemented Algorithms
 
 - Reader
   - [x] Verilog
@@ -25,9 +25,9 @@ Table of Contents:
   - [x] Incidence
 - Operations
   - Count
-    - [x] Crossings
+    - [x] [Crossings](https://link.springer.com/chapter/10.1007/3-540-36151-0_13)
   - Minimize
-    - [x] Crossings
+    - [x] [Crossings](https://ieeexplore.ieee.org/document/4308636)
     - [x] Edge Length
     - [x] Dummy Nodes
 - Draw
