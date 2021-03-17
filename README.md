@@ -1,28 +1,70 @@
-# Celaeno - A Graph Algorithms Library Written in C++20
+# Celaeno - A Modern Graph Algorithms Library
 
-<table>
-  <tr>
-    <td style="text-align: center" width="9999">
-      <img width="200px" src="doc/character/celaeno.png">
-    </td>
-    <td style="text-align: justify" width="9999">
-      Hi! My name is celæno, and I'm here to provide several algorithms to use with your data structures!
-      Each algorithm is designed to work perfectly with behaviors passed as lambda expressions, complicated?
-      Not at all! Check out all examples in the official documentation, and also, see the remainder of this document
-      for a preview of the provided functionalities. But...  "What if I do not want to implement a data structure?".
-      Celæno has your back! There is a very efficient graph class already implemented with the library!
-      If you find an issue, no need for a tissue, open an issue! Thus, helping make this library better!
-      Issues of algorithm requests are also most welcome!
-    </td>
-  </tr>
-</table>
 
+
+<!-- <img width="100px" src="doc/character/celaeno.png"> -->
+
+Table of Contents:
 
 [[_TOC_]]
 
+
+## Implemented Algorithms:
+
+- Reader
+  - [x] Verilog
+- Search
+  - [x] Breadth-First Search
+  - [x] Depth-First Search
+  - [x] Topological Search
+  - [x] A*
+- Views
+  - [x] Topological
+- Representations
+  - [x] Grid
+  - [x] Incidence
+- Operations
+  - Count
+    - [x] Crossings
+  - Minimize
+    - [x] Crossings
+    - [x] Edge Length
+    - [x] Dummy Nodes
+- Draw
+  - [x] SVG
+
+## Integration
+
+### Conan
+
+To integrate celæno to a conan project, add the bintray remote with the command:
+
+```sh
+conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
+```
+
+In `conanfile.txt`, include the following:
+
+```txt
+[requires]
+celaeno/0.1@ruanformigoni/testing
+
+[generators]
+cmake_find_package
+cmake_paths
+
+```
+
+And in `CMakeLists.txt` include this line right after the project name:
+
+```cmake
+include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
+```
+
 ## Examples
 
-### Breadth-First Search
+<details>
+<summary>Breadth-First Search</summary>
 
 ```cpp
 #include <fmt/ranges.h>
@@ -66,17 +108,20 @@ Result:
 
 `1,5,7,8,9,12,4,10,11,6,2,3,`
 
-The drawing of the example graph already used an algorithm for edge crossing minimization, that is why it has no crossings.
+</details>
 
-### Graph SVG Writer
+<details>
+<summary>Graph SVG Writer</summary>
 
 **TODO**
 
+</details>
+
 ## Documentation
 
-You can read the full API documentation in my  [gitlab pages](https://formigoni.gitlab.io/celaeno/).
+:speech_balloon: You can read the full library documentation [here](https://formigoni.gitlab.io/celaeno/).
 
-For a quick summary, here's my list of implemented algorithms:
+Algorithms information:
 
 | Class                  | Algorithm | Execution |
 |:----------------------:|:-----:|:---------:|
@@ -94,52 +139,66 @@ For a quick summary, here's my list of implemented algorithms:
 
 ## Benchmarks
 
-
 <table>
   <tr>
     <td style="text-align: center" width="9999">
-      <h3>Breadth-First Search</h3>
+      Breadth-First Search
       <img width="800px" src="doc/benchmarks/benchmark-bfs.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h3>Depth-First Search</h3>
+      Depth-First Search
       <img width="800px" src="doc/benchmarks/benchmark-dfs.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h3>Topological Search</h3>
+      Topological Search
       <img width="800px" src="doc/benchmarks/benchmark-kahn.png">
     </td>
   </tr>
   <tr>
     <td style="text-align: center" width="9999">
-      <h3>Balance Paths</h3>
+      Balance Paths
       <img width="800px" src="doc/benchmarks/benchmark-balance-paths.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h3>Count Edge Crossings</h3>
+      Count Edge Crossings
       <img width="800px" src="doc/benchmarks/benchmark-count-crossings.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h3>Minimize Edge Crossings</h3>
+      Minimize Edge Crossings
       <img width="800px" src="doc/benchmarks/benchmark-minimize-crossings.png">
     </td>
   </tr>
   <tr>
     <td style="text-align: center" width="9999">
-      <h3>Topological (Depth) View</h3>
+      Topological (Depth) View
       <img width="800px" src="doc/benchmarks/benchmark-depth.png">
     </td>
     <td style="text-align: justify" width="9999">
-      <h3>Proximity View</h3>
+      Proximity View
       <img width="800px" src="doc/benchmarks/benchmark-proximity.png">
     </td>
   </tr>
 </table>
 
+
 ## Made Possible With
 
-<img width="200px" src="https://raw.githubusercontent.com/onqtam/doctest/master/scripts/data/logo/logo_1.svg">
-<img width="200px" src="doc/libraries-artwork/range-v3.png">
-<img width="200px" src="doc/libraries-artwork/fmt.png">
-<img width="200px" src="http://www.editgym.com/fplus-api-search/fplus.png">
-<img width="200px" src="doc/libraries-artwork/spdlog.png">
+<table>
+<tr>
+<td style="text-align: center" width="9999">
+[doctest](https://github.com/onqtam/doctest)
+</td>
+<td style="text-align: center" width="9999">
+[range-v3](https://github.com/ericniebler/range-v3)
+</td>
+<td style="text-align: center" width="9999">
+[functionalplus](https://github.com/Dobiasd/FunctionalPlus/)
+</td>
+<td style="text-align: center" width="9999">
+[fmtlib](https://github.com/fmtlib/fmt)
+</td>
+<td style="text-align: center" width="9999">
+[spdlog](https://github.com/gabime/spdlog)
+</td>
+</tr>
+</table>
