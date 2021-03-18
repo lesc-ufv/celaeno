@@ -33,14 +33,11 @@
 #pragma once
 
 #include <utility>
-#include <celaeno/test/graph/data/synth-91.hpp>
 
 namespace celaeno::graph::test
 {
 
-// namespaces {{{
-namespace circ = celaeno::test::graph::data;
-// }}}
+// fn: run {{{
 
 template<typename T>
 void run(T&& test)
@@ -51,32 +48,14 @@ void run(T&& test)
 
   // LGSynth 91 tests {{{
   tests(
-    circ::synth_91::alu2,
-    circ::synth_91::alu4,
-    circ::synth_91::dalu,
-    circ::synth_91::apex6,
-    circ::synth_91::apex7,
-    circ::synth_91::b1,
-    circ::synth_91::c8,
-    circ::synth_91::cc,
-    circ::synth_91::cht,
-    circ::synth_91::cm138a,
-    circ::synth_91::cm150a,
-    circ::synth_91::cm151a,
-    circ::synth_91::cm162a,
-    circ::synth_91::cm163a,
-    circ::synth_91::cm42a,
-    circ::synth_91::cm82a,
-    circ::synth_91::cm85a,
-    circ::synth_91::cmb,
-    circ::synth_91::comp,
-    circ::synth_91::cordic,
-    circ::synth_91::cu,
-    circ::synth_91::count,
-    circ::synth_91::decod,
-    circ::synth_91::my_adder
-  );
-} // function: run
+    "test/data/synth-91/C17.v",
+    "test/data/synth-91/b1.v",
+    "test/data/synth-91/cm42a.v",
+    "test/data/synth-91/cm82a.v",
+    "test/data/synth-91/cm138a.v",
+    "test/data/synth-91/cc.v"
+  ); // }}}
 
-  // }}}
+} // function: run // }}}
+
 } // namespace celaeno::graph::test

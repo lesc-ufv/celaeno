@@ -1,8 +1,8 @@
-// Benchmark "CM138" written by ABC on Wed Mar 10 23:12:52 2021
+// Benchmark "CM138" written by ABC on Sat Mar 13 19:49:43 2021
 
-module CM138  
+module CM138 ( 
     a, b, c, d, e, f,
-    g, h, i, j, k, l, m, n  ;
+    g, h, i, j, k, l, m, n  );
   input  a, b, c, d, e, f;
   output g, h, i, j, k, l, m, n;
   wire new_n15_, new_n16_, new_n17_, new_n18_, new_n20_, new_n22_, new_n24_,
