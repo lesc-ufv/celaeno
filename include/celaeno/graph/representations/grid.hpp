@@ -83,7 +83,7 @@ decltype(auto) place(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&
   auto const it_base {rg::max_element(layers, {}, [](auto e){ return e.size(); })};
 
   // Place vertex u in coordinate {x,y}
-  auto f_place = [&](auto x, auto y, auto u) { vertex_xy.insert({u, {x,y}}); };
+  auto f_place = [&](auto x, auto y, auto u) { vertex_xy[u] = std::make_pair(x,y); };
 
   // Index of it_base in layers container
   u64 idx_base{static_cast<u64>(std::distance(layers.begin(),it_base))};
@@ -131,8 +131,6 @@ decltype(auto) place(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&
       auto x { (y > idx_base)? mean_of_pos(f_pred(u),u) : mean_of_pos(f_succ(u),u) };
       // Check if position is valid
       if( !x ){ continue; }
-      // Save the position
-      vertex_xy.insert({u,{*x,y}});
       // Mark position as used
       occupation.emplace(*x);
       // Position the vertex
