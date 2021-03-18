@@ -68,21 +68,10 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  // Read input file
-  std::string filename{argv[1]};
-  spdlog::info("Reading input file {}", filename);
-  std::ifstream file{filename};
-  if( ! file.good() )
-  {
-    spdlog::error("Error to read input file");
-    exit(1);
-  } // if
-  std::stringstream ss; ss << file.rdbuf();
-
   // Read graph
   graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  auto metadata {reader::Reader{ss.str(),emplace}};
+  auto metadata {reader::Reader{argv[1],emplace}};
 
   // Helpers
   auto f_p = [&g](auto&& v){ return g.predecessors(v); };
