@@ -33,6 +33,8 @@
 #pragma once
 
 #include <map>
+#include <queue>
+#include <set>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
@@ -41,6 +43,7 @@
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/minimize/edge-length.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
@@ -62,13 +65,13 @@ namespace ns_minimize = celaeno::graph::operations::minimize;
 namespace ns_search = celaeno::graph::search;
 // }}}
 
-// fn: phase_2 {{{
+// fn: place {{{
 
 //
 // Crossing minimization oriented coordinates
 //
 template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
-decltype(auto) phase_2(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+decltype(auto) place(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
 {
   // Get layers
   auto layers {ns_minimize::crossings::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
@@ -139,19 +142,97 @@ decltype(auto) phase_2(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, 
   } // for
 
   return std::make_pair(layers,vertex_xy);
-} // function: phase_2 }}}
+} // function: place }}}
 
-// fn: phase_3 {{{
+// fn: minimize_edge_distance {{{
+
+//
+// Shifts nodes in layer to minimize long edges
+//
 template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
-decltype(auto) phase_3(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+decltype(auto) minimize_edge_distance(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
 {
-  auto grid {phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink)};
+  auto grid {place(root, f_pred, f_succ, f_adj, f_link, f_unlink)};
+  auto& layers{grid.first};
+  auto& vertex_xy{grid.second};
+
+  auto f_dist = [&](auto u, auto v)
+  {
+    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
+  };
+
+  //
+  // Queue to keep elements with nodes that have incoming or outgoing edges with
+  // distance greater than 1
+  //
+
+  std::queue<std::decay_t<T>> q;
+
+  //
+  // Use a topo search to find edges with dist greater than 1, and populate the queue
+  //
+
+  ns_search::kahn::run(root, f_pred, f_succ,
+  [&](auto u)
+  {
+    for (auto v : f_succ(u))
+    {
+      auto ux{vertex_xy.at(u).first};
+      auto& vx{vertex_xy.at(v).first};
+      if( f_dist(u,v) > 1 )
+      {
+        q.push(v);
+        vx = (vx > ux)? ux+1 : ux-1;
+      }
+    } // for
+    return false;
+  });
+
+  //
+  // Keep processing until all nodes of the graph have an edge distance of 1
+  //
+
+  while( ! q.empty() )
+  {
+    auto u{q.front()}; q.pop();
+
+    for (auto v : f_succ(u))
+    {
+      auto ux{vertex_xy.at(u).first};
+      auto& vx{vertex_xy.at(v).first};
+      if ( f_dist(u,v) > 1 )
+      {
+        vx = ( vx > ux )? ( q.push(v), ux+1) : ( q.push(v), ux-1);
+      } // if
+    } // for
+
+    for (auto v : f_pred(u))
+    {
+      auto ux{vertex_xy.at(u).first};
+      auto& vx{vertex_xy.at(v).first};
+      if ( f_dist(u,v) > 1 )
+      {
+        vx = ( vx > ux )? (q.push(v), ux+1) : (q.push(v), ux-1);
+      } // if
+    } // for
+
+  } // while
+
+  return grid;
+
+} // function: minimize_edge_distance }}}
+
+// fn: fill_paths_with_nodes {{{
+
+//
+// Inserts intra layer pseudo nodes for binary tree-like drawing
+//
+template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
+void fill_paths_with_nodes(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
+{
+  auto grid {place(root, f_pred, f_succ, f_adj, f_link, f_unlink)};
   auto layers{grid.first};
   auto vertex_xy{grid.second};
-
-  //
-  // Insert intra layer pseudo nodes for binary tree-like drawing
-  //
 
   auto f_dist = [&](auto u, auto v)
   {
@@ -221,40 +302,7 @@ decltype(auto) phase_3(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, 
     } // if x_max > 1
     ++i;
   } // for
-
-  return phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink);
-} // function: phase_3 }}}
-
-// fn: phase_1 {{{
-
-//
-// Minimize edge length by pseudo-node relinking
-//
-template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
-decltype(auto) phase_1(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
-{
-
-  //
-  // Minimize edge length by pseudo-node relinking
-  //
-
-  auto grid {phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink)};
-
-  auto f_dist = [&](auto u, auto v)
-  {
-    grid = phase_2(root, f_pred, f_succ, f_adj, f_link, f_unlink);
-    auto layers = grid.first;
-    auto vertex_xy = grid.second;
-    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
-  };
-
-  ns_minimize::edge_length::run(root,f_pred,f_succ,f_link,f_unlink,f_dist);
-
-  grid = phase_3(root, f_pred, f_succ, f_adj, f_link, f_unlink);
-
-  return grid;
-
-} // function: phase_1 }}}
+} // function: fill_paths_with_nodes }}}
 
 // fn: run {{{
 template<SignedIntegral T, typename P, typename S, typename A, typename L, typename U>
@@ -265,7 +313,25 @@ auto run(T&& root, P&& f_pred, S&& f_succ, A&& f_adj, L&& f_link, U&& f_unlink)
   spdlog::debug("Algorithm: celaeno::graph::representations::grid");
 #endif
 
-  return phase_1(root, f_pred, f_succ, f_adj, f_link, f_unlink);
+  //
+  // Minimize edge length by pseudo-node relinking
+  //
+
+  auto grid {place(root, f_pred, f_succ, f_adj, f_link, f_unlink)};
+
+  auto f_dist = [&](auto u, auto v)
+  {
+    grid = place(root, f_pred, f_succ, f_adj, f_link, f_unlink);
+    auto layers = grid.first;
+    auto vertex_xy = grid.second;
+    return std::abs(vertex_xy[u].first-vertex_xy[v].first);
+  };
+
+  ns_minimize::edge_length::run(root,f_pred,f_succ,f_link,f_unlink,f_dist);
+
+  fill_paths_with_nodes(root, f_pred, f_succ, f_adj, f_link, f_unlink);
+
+  return minimize_edge_distance(root, f_pred, f_succ, f_adj, f_link, f_unlink);
 }
 // }}}
 
