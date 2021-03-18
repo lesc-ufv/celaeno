@@ -4,5 +4,5 @@ artifacts/
 scripts/
 build/
 logs/
-/.gtm/
-Session.vim
+session.vim
+compile_commands.json
