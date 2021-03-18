@@ -65,7 +65,6 @@ namespace celaeno::graph::draw::svg
 
 // namespaces {{{
 namespace rg = ranges;
-namespace fp = fplus;
 
 namespace ns_balance = celaeno::graph::operations::balance;
 namespace ns_minimize = celaeno::graph::operations::minimize;
@@ -109,6 +108,176 @@ constexpr std::string_view const e_template
 
 constexpr std::string_view const footer{"</svg>\n"};
 // }}}
+
+// Settings {{{
+
+// Radius
+constexpr i32 const vertex_radius{50};
+// Horizontal space between vertices
+constexpr i32 const vertex_hspacing{vertex_radius*3};
+// Vertical space between vertices
+constexpr i32 const vertex_vspacing{vertex_radius*3};
+// Offset of circles from the edges
+constexpr i32 const circle_offset{vertex_radius};
+
+// }}}
+
+// fn: black_white {{{
+template<String S, typename Map, typename F1, typename F2>
+void black_white(S&& filename, Map&& vertex_xy, F1&& f_succ, F2&& f_label)
+{
+  // Adjust positions for drawing
+  for (auto& e : vertex_xy)
+  {
+    auto& pos = e.second;
+    auto& [x,y] = pos;
+    x = x*vertex_hspacing+circle_offset;
+    y = y*vertex_vspacing+circle_offset;
+  } // for
+
+  // Output file
+  std::ofstream of{filename};
+
+  // Streams
+  std::stringstream header;
+  std::stringstream vertices;
+  std::stringstream edges;
+
+  // Edge Routing
+  rg::for_each(vertex_xy, [&](auto&& e)
+  {
+    auto succ { f_succ(e.first) };
+
+    rg::for_each(succ, [&](auto&& v)
+    {
+      auto [ux,uy] = e.second;
+      auto [vx,vy] = vertex_xy[v];
+      edges << fmt::format(e_template, ux, uy, vx, vy);
+    });
+  });
+
+  //Get farthest vertices to build viewport
+  auto view_box_x {rg::max_element(vertex_xy,{},
+  [](auto e) { return e.second.first; })->second.first+circle_offset};
+
+  auto view_box_y {rg::max_element(vertex_xy,{},
+  [](auto e) { return e.second.second; })->second.second+circle_offset};
+
+  // @ Stream/File writting
+  header << fmt::format(h_template,view_box_x,view_box_y);
+
+  // Vertices and labels
+  for (auto [v,pos] : vertex_xy)
+  {
+    auto [x,y] = pos;
+    // Draw pseudo-nodes with black filling
+    if (v < 0)
+    {
+      vertices << fmt::format(v_template, vertex_radius, x, y, "black");
+      vertices << fmt::format(v_label_template, x, y, 40, "white", f_label(v));
+    } // if
+    else
+    {
+      vertices << fmt::format(v_template, vertex_radius, x, y, "white");
+      vertices << fmt::format(v_label_template, x, y, 40, "black", f_label(v));
+    } // else
+  } // for
+
+  // File writting
+  of << fmt::format("{}\n", header.str());
+  of << fmt::format("{}\n", edges.str());
+  of << fmt::format("{}\n", vertices.str());
+  of << fmt::format("{}\n", footer);
+  of.close();
+} // function: black_white }}}
+
+// fn: occupation_map {{{
+template<String S, typename Map, typename F1, typename F2>
+void occupation_map(S&& filename, Map&& vertex_xy, F1&& f_succ, F2&& f_label)
+{
+  // Adjust positions for drawing
+  for (auto& e : vertex_xy)
+  {
+    auto& pos = e.second;
+    auto& [x,y] = pos;
+    x = x*vertex_hspacing+circle_offset;
+    y = y*vertex_vspacing+circle_offset;
+  } // for
+
+  // Output file
+  std::ofstream of{filename};
+
+  // Streams
+  std::stringstream header;
+  std::stringstream vertices;
+  std::stringstream edges;
+
+  // Edge Routing
+  rg::for_each(vertex_xy, [&](auto&& e)
+  {
+    auto succ { f_succ(e.first) };
+
+    rg::for_each(succ, [&](auto&& v)
+    {
+      auto [ux,uy] = e.second;
+      auto [vx,vy] = vertex_xy[v];
+      edges << fmt::format(e_template, ux, uy, vx, vy);
+    });
+  });
+
+  //Get farthest vertices to build viewport
+  auto view_box_x {rg::max_element(vertex_xy,{},
+  [](auto e) { return e.second.first; })->second.first+circle_offset};
+
+  auto view_box_y {rg::max_element(vertex_xy,{},
+  [](auto e) { return e.second.second; })->second.second+circle_offset};
+
+  // @ Stream/File writting
+  header << fmt::format(h_template,view_box_x,view_box_y);
+
+  // Vertices and labels
+  for (auto [v,pos] : vertex_xy)
+  {
+    // Decompose position
+    auto [x,y] = pos;
+    // Check how many nodes are in [x,y]
+    auto count{rg::count_if(vertex_xy,[&,pos=pos](auto e){ return e.second == pos; })};
+    // Draw pseudo-nodes with occupation coloring
+    switch (count)
+    {
+      case 1:
+      {
+        vertices << fmt::format(v_template, vertex_radius, x, y, "forestgreen");
+        break;
+      }
+      case 2:
+      {
+        vertices << fmt::format(v_template, vertex_radius, x, y, "orangered");
+        break;
+      }
+      case 3:
+      {
+        vertices << fmt::format(v_template, vertex_radius, x, y, "darkred");
+        break;
+      }
+      case 4:
+      {
+        vertices << fmt::format(v_template, vertex_radius, x, y, "darkmagenta");
+        break;
+      }
+      default:
+        vertices << fmt::format(v_template, vertex_radius, x, y, "black");
+    } // switch
+  } // for
+
+  // File writting
+  of << fmt::format("{}\n", header.str());
+  of << fmt::format("{}\n", edges.str());
+  of << fmt::format("{}\n", vertices.str());
+  of << fmt::format("{}\n", footer);
+  of.close();
+
+} // function: occupation_map }}}
 
 // fn: run {{{
 template<SignedIntegral S,
@@ -178,16 +347,12 @@ decltype(auto) run(
   // }}}
 
 
-  // @ Vertex Placement {{{
+  // @ Vertex Placement
   auto grid{ns_representations::grid::run(root,f_pred,f_succ,f_adj,f_link,f_unlink)};
-  auto layers = grid.first;
-  auto vertex_xy = grid.second;
+  auto& layers = grid.first;
+  auto& vertex_xy = grid.second;
 
-  //
-  // Make a second pass, adjust vertex_xy according to successors and
-  // predecessors
-  //
-  auto second_pass =
+  auto intra_layers =
   [&]
   {
     auto f_dist = [&](auto u, auto v)
@@ -195,119 +360,113 @@ decltype(auto) run(
       return std::abs(vertex_xy[u].first-vertex_xy[v].first);
     };
 
-    ns_search::bfs::run(root, f_pred, f_succ,
-    [&](auto node)
+    // Pseudo number index
+    i64 counter{};
+
+    // Define function to compare values lt 0
+    auto f_lowest = [&](auto e)
     {
-      for (auto succs{f_succ(node)}; auto succ : succs)
+      if(e < counter){ counter=e; } return false;
+    };
+
+    // Get the dummy vertex with the lowest value
+    ns_search::bfs::run(root,f_pred,f_succ,f_lowest);
+
+    // A struct to control the value of pseudo nodes
+    auto make_pseudo = [counter]
+    {
+      struct Pseudo
       {
-        if( auto dist{f_dist(node,succ)}; dist > 1 )
-        {
-          auto nx = vertex_xy[node].first;
-          auto& sx = vertex_xy[succ].first;
-          sx = (sx > nx)? nx+1 : nx-1;
-        } // if
+        private:
+          i64 c;
+        public:
+          Pseudo(i64 c) : c(c) {}
+          i64 next(){ return --c; }
+          i64 curr(){ return c; }
+      };
+      return Pseudo{counter};
+    }();
+
+    //
+    // Insert N layers, n/2-1 before i, and n/2 after i, where i is a layer that
+    // contains a region with a maximum number N of overlapping nodes
+    //
+    for (i64 i{}; auto const& layer : layers)
+    {
+
+      // Check the maximum number of nodes in the same region
+      i64 max_count{};
+      for (auto node : layer)
+      {
+        auto pos{vertex_xy.at(node)};
+        auto curr_count{rg::count_if(vertex_xy,[&,pos=pos](auto e){ return e.second == pos; })};
+        if( curr_count > max_count ){ max_count = curr_count; }
       } // for
 
-      for (auto preds{f_pred(node)}; auto pred : preds)
+      if (max_count > 2)
       {
-        if( auto dist{f_dist(pred,node)}; dist > 1 )
+        // for (auto node : layers.at(i))
+        // {
+        //   for (auto succ : f_succ(node))
+        //   {
+        //     auto curr{node};
+        //     // for (i64 j{}; j < max_count; ++j)
+        //     // {
+        //       auto new_node{make_pseudo.next()};
+        //       f_link(std::make_pair(curr,new_node));
+        //       f_link(std::make_pair(new_node,succ));
+        //       f_unlink(std::make_pair(curr,succ));
+        //       curr=new_node;
+        //     // } // for
+        //   } // for
+        // } // for
+
+        for (auto node : layer)
         {
-          auto nx = vertex_xy[node].first;
-          auto& px = vertex_xy[pred].first;
-          px = (px > nx)? nx+1 : nx-1;
-        } // if
-      } // for
+          if ( auto succs{f_succ(node)}; ! succs.empty() )
+          {
+            for (auto succ : succs)
+            {
+              auto curr{node};
+              for (i64 j{}; j < max_count/2+1; ++j)
+              {
+                auto new_node{make_pseudo.next()};
+                f_link(std::make_pair(curr,new_node));
+                f_link(std::make_pair(new_node,succ));
+                f_unlink(std::make_pair(curr,succ));
+                curr=new_node;
+              } // for
+            } // for
+          } // if
+          else
+          {
+            for (auto pred : f_pred(node))
+            {
+              auto curr{node};
+              for (i64 j{}; j < max_count/2-1; ++j)
+              {
+                auto new_node{make_pseudo.next()};
+                f_link(std::make_pair(pred,new_node));
+                f_link(std::make_pair(new_node,curr));
+                f_unlink(std::make_pair(pred,curr));
+                curr=new_node;
+              } // for
+            } // for
+          } // else
+        } // for
+      } // if
+      ++i;
+    } // for
+  };
 
-      return false;
-    });
-
-  }; // lamb: second_pass
-
-  second_pass();
-
-  // @ Vertices settings {{{
-  // Radius
-  constexpr i32 const vertex_radius{50};
-  // Horizontal space between vertices
-  constexpr i32 const vertex_hspacing{vertex_radius*3};
-  // Vertical space between vertices
-  constexpr i32 const vertex_vspacing{vertex_radius*3};
-  // Offset of circles from the edges
-  constexpr i32 const circle_offset{vertex_radius};
-  // }}}
-
-  // Adjust positions for drawing
-  for (auto& e : vertex_xy)
+  for (i64 i{}; i < 5; ++i)
   {
-    auto& pos = e.second;
-    auto& [x,y] = pos;
-    x = x*vertex_hspacing+circle_offset;
-    y = y*vertex_vspacing+circle_offset;
-  } // for
+    intra_layers();
+    grid = ns_representations::grid::place(root,f_pred,f_succ,f_adj,f_link,f_unlink);
+    grid = ns_representations::grid::minimize_edge_distance(root,f_pred,f_succ,f_adj,f_link,f_unlink);
+  } // for: i
 
-  // }}}
-
-  // @ Output streams {{{
-
-  // Output file
-  std::ofstream of{fn};
-
-  // Streams
-  std::stringstream header;
-  std::stringstream vertices;
-  std::stringstream edges;
-
-  // }}}
-
-  // @ Edge Routing {{{
-  rg::for_each(vertex_xy, [&](auto&& e)
-  {
-    auto succ { f_succ(e.first) };
-
-    rg::for_each(succ, [&](auto&& v)
-    {
-      auto [ux,uy] = e.second;
-      auto [vx,vy] = vertex_xy[v];
-      edges << fmt::format(e_template, ux, uy, vx, vy);
-    });
-  }); // }}}
-
-  // @ Get farthest vertices to build viewport {{{
-  auto view_box_x {rg::max_element(vertex_xy,{},
-  [](auto e) { return e.second.first; })->second.first+circle_offset};
-
-  auto view_box_y {rg::max_element(vertex_xy,{},
-  [](auto e) { return e.second.second; })->second.second+circle_offset};
-  // }}}
-
-  // @ Stream/File writting {{{
-  header << fmt::format(h_template,view_box_x,view_box_y);
-
-  // Vertices and labels
-  for (auto [v,pos] : vertex_xy)
-  {
-    auto [x,y] = pos;
-    // Draw pseudo-nodes with black filling
-    if (v < 0)
-    {
-      vertices << fmt::format(v_template, vertex_radius, x, y, "black");
-      vertices << fmt::format(v_label_template, x, y, 40, "white", f_label(v));
-    } // if v < 0
-    else
-    {
-      vertices << fmt::format(v_template, vertex_radius, x, y, "white");
-      vertices << fmt::format(v_label_template, x, y, 40, "black", f_label(v));
-    } // else
-  } // for
-
-  // File writting
-  of << fmt::format("{}\n", header.str());
-  of << fmt::format("{}\n", edges.str());
-  of << fmt::format("{}\n", vertices.str());
-  of << fmt::format("{}\n", footer);
-  of.close();
-  // }}}
-
+  occupation_map(fn, vertex_xy, f_succ, f_label);
 } // function: run }}}
 
 } // namespace celaeno::graph::draw::svg }}}
