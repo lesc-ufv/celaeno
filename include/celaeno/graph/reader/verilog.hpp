@@ -37,6 +37,7 @@
 #include <sstream>
 #include <type_traits>
 #include <regex>
+#include <fstream>
 
 #include <spdlog/spdlog.h>
 #include <range/v3/all.hpp>
@@ -131,7 +132,7 @@ std::string_view const Reader<T>::expr_or = "assign({0})=~?({0}){1}~?({0})";
 // Constructors {{{
 template<typename T>
 template<typename S>
-Reader<T>::Reader(S&& input, T callback)
+Reader<T>::Reader(S&& filename, T callback)
   : callback(callback)
   , id_counter(0)
 {
@@ -139,6 +140,18 @@ Reader<T>::Reader(S&& input, T callback)
 #ifndef NDEBUG
   spdlog::set_level(spdlog::level::debug);
 #endif
+
+  std::ifstream ifile{filename};
+
+  if (! ifile.good())
+  {
+    spdlog::error("Invalid input file {}", filename);
+    exit(1);
+  } // if ! ifile.good()
+
+  std::string input;
+
+  { std::stringstream ss; ss << ifile.rdbuf(); input = ss.str(); }
 
   auto eval_regex = [&](auto&& line, auto&& pattern, auto&& msg)
   {
