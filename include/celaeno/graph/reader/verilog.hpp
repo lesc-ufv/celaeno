@@ -284,8 +284,9 @@ void Reader<T>::update(auto&& lhs, GateType const& type, auto&&... ops) const
   // Insert gate type for lhs
   if( ! this->ids.contains(lhs) )
   {
-    this->ids[lhs] = this->id_counter++;
+    this->ids[lhs] = this->id_counter;
     this->gate_type[this->id_counter] = type;
+    ++this->id_counter;
   }
 
   // Perform insertion callback
