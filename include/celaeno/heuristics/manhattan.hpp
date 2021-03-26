@@ -51,7 +51,7 @@ using Coord = std::pair<T,T>;
 template<SignedIntegral T>
 constexpr auto run(Coord<T> p1, Coord<T> p2)
 {
-  return std::abs(p1.first - p2.first) + (p1.second - p2.second);
+  return std::abs(p1.first - p2.first) + std::abs(p1.second - p2.second);
 } // function: run }}}
 
 } // namespace celaeno::heuristics::manhattan
