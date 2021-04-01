@@ -651,7 +651,7 @@ std::optional<G> fine(T&& root,
       if( f_dist(u,v) > 1 )
       {
         q.push(u);
-        vx = (ux > vx)? vx+1 : vx-1;
+        vx = (ux > vx)? ux-1 : ux+1;
       }
     } // for
     return false;
