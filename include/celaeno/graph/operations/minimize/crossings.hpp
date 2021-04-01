@@ -82,7 +82,7 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
   //
   // @ Perform crossing minimization
   //
-  return impl::phase_1(root,
+  return impl::run(root,
     std::forward<N1>(f_p),
     std::forward<N2>(f_s),
     std::forward<N3>(f_a)

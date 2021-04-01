@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : impl
@@ -35,6 +35,8 @@
 
 #include <vector>
 #include <execution>
+#include <utility>
+
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 #include <fplus/fplus.hpp>
@@ -60,6 +62,7 @@ using namespace celaeno::aliases;
 
 // namespaces {{{
 namespace rg = ranges;
+namespace ra = ranges::actions;
 namespace rv = ranges::views;
 namespace fp = fplus;
 namespace depth = celaeno::graph::views::depth;
@@ -89,7 +92,7 @@ template<Matrix M>
 
 // fn: bor {{{
 template<typename C, typename L>
-[[nodiscard]] decltype(auto) bor(C const& c, L const& l)
+[[nodiscard]] decltype(auto) bor(C c, L l)
 {
   assertm(c.size() > 0, "Empty matrix");
 
@@ -97,7 +100,7 @@ template<typename C, typename L>
   {
     auto zipped_values{fp::zip(_c,_l)};
 
-    std::sort(std::execution::par_unseq, zipped_values.begin(),zipped_values.end(),
+    std::sort(zipped_values.begin(),zipped_values.end(),
     [&](auto&& lhs, auto&& rhs)
     {
       return barycenter::run(lhs.first) < barycenter::run(rhs.first);
@@ -109,23 +112,66 @@ template<typename C, typename L>
   return sort(c,l);
 } // function: bor }}}
 
-// fn: ror TODO {{{
-template<Matrix M>
-decltype(auto) ror(M&& m)
+// fn: ror {{{
+template<Matrix M, Range L>
+std::optional<std::pair<std::decay_t<M>,std::decay_t<L>>> ror(M m, L col_layer)
 {
-  return m;
+  // Get column matrix
+  auto _m {reverse(m)};
+
+  // Check if any swap occurred
+  bool b_swap{false};
+
+  // Swap adjacent columns/nodes if they have the same barycenter
+  for (i64 i{}; i < _m.size()-1; ++i)
+  {
+    if(  barycenter::run(_m.at(i)) == barycenter::run(_m.at(i+1)) )
+    {
+      b_swap = true;
+      _m.at(i+1) = std::exchange(_m.at(i),_m.at(i+1));
+      col_layer.at(i+1) = std::exchange(col_layer.at(i),col_layer.at(i+1));
+    }
+  } // for
+
+  // Return values if at least one swap took place
+  if( b_swap )
+  {
+    return std::make_pair(reverse(_m),col_layer);
+  } // if
+
+  return std::nullopt;
 } // function: ror }}}
 
-// fn: roc TODO {{{
-template<typename M>
-decltype(auto) roc(M&& m)
+// fn: roc {{{
+template<Matrix M, Range L>
+std::optional<std::pair<std::decay_t<M>,std::decay_t<L>>> roc(M m, L row_layer)
 {
-  return m;
+  // Check if any swap occurred
+  bool b_swap{false};
+
+  // Swap adjacent columns/nodes if they have the same barycenter
+  for (i64 i{}; i < m.size()-1; ++i)
+  {
+    if(  barycenter::run(m.at(i)) == barycenter::run(m.at(i+1)) )
+    {
+      b_swap = true;
+      m.at(i+1) = std::exchange(m.at(i),m.at(i+1));
+      row_layer.at(i+1) = std::exchange(row_layer.at(i),row_layer.at(i+1));
+    }
+  } // for
+
+  // Return values if at least one swap took place
+  if( b_swap )
+  {
+    return std::make_pair(m,row_layer);
+  } // if
+
+  return std::nullopt;
 } // function: roc }}}
 
-// fn: phase_1 {{{
+// fn: run {{{
 template<SignedIntegral S, typename N1, typename N2, typename N3>
-[[nodiscard]] decltype(auto) phase_1(S root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
+[[nodiscard]] decltype(auto) run(S root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
   requires CallableWith<N1,i64>
   && CallableWith<N2,i64>
   && CallableWith<N3,i64,i64>
@@ -143,63 +189,131 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
   assertm(layer_count != 0, "Layer count equals zero");
   auto layers = fp::overlapping_pairs(fp::numbers({},layer_count));
 
-  auto sort_by_barycenter = [&]
+  auto impl_phase_1 =
+  [&]<Matrix M>(M m0, auto& l1, auto &l2)
   {
-    // Compute overlapping and non overlapping pairs separately
-    auto non_overlapping{fp::keep_if([i=0](auto&&) mutable { return (i++%2 == 0); },layers)};
-    auto overlapping{fp::keep_if([i=0](auto&&) mutable { return (i++%2 != 0); },layers)};
-
-    auto process = [&](auto il1, auto il2) -> void
+    while(true)
     {
+      //
+      // Step 2: Calculate row barycenter
+      //
+      auto [m1,new_l1] {bor(m0,l1)};
 
-      // Create matrix for layers l1 and l2 {{{
+      //
+      // Step 3: Evaluate solution
+      //
+      if ( ccrossings::run(new_l1,l2,f_succ) < ccrossings::run(l1,l2,f_succ) )
+      {
+        l1 = std::move(new_l1);
+      } // if
+
+      //
+      // Step 4: Calculate col barycenter
+      //
+      auto [m2,new_l2] {bor(reverse(m1),l2)};
+
+      //
+      // Step 5: Evaluate Solution
+      //
+      if (ccrossings::run(l1,new_l2,f_succ) < ccrossings::run(l1,l2,f_succ))
+      {
+        l2 = std::move(new_l2);
+      } // if
+
+      //
+      // Step 6: Stop if M0 and M2 are equal
+      //
+      if( auto rev_m2{reverse(m2)}; rev_m2 == m0 ){ return rev_m2; } // if
+      else { m0 = rev_m2; } // else
+    } // while
+  }; // lamb: impl_phase_1
+
+  auto phase_1 =
+  [&]<Matrix M>(M m0, auto& l1, auto &l2)
+  {
+    // Compute best number of crossings
+    i64 best_crossings{};
+
+    rg::for_each(layers,[&](auto e)
+    {
+      best_crossings += ccrossings::run(depth_view.at(e.first),depth_view.at(e.second),f_succ);
+    });
+
+    // Save best node arrangements
+    auto best_arrangement{depth_view};
+
+    // Iterate while solutions keeps improving
+    while( true )
+    {
+      i64 curr_crossings{};
+
+      for( auto [il1,il2] : layers )
+      {
+        auto& l1{depth_view.at(il1)};
+        auto& l2{depth_view.at(il2)};
+        auto m2{impl_phase_1(incidence::run(l1,l2,f_adj),l1,l2)};
+      } // for
+
+      rg::for_each(layers,[&](auto e)
+      {
+        curr_crossings += ccrossings::run(depth_view.at(e.first),depth_view.at(e.second),f_succ);
+      });
+
+      if( curr_crossings >= best_crossings )
+      {
+        break;
+      }
+      else if (curr_crossings < best_crossings)
+      {
+        best_arrangement = depth_view;
+        best_crossings = curr_crossings;
+      } // else
+
+      layers = ra::reverse(layers);
+    } // while
+
+    depth_view = best_arrangement;
+  }; // lamb: phase_1
+
+  //
+  // Execute ror and roc until both fail
+  //
+  for ( bool stop{false}; stop != true; )
+  {
+    for( auto [il1,il2] : layers )
+    {
       auto& l1{depth_view.at(il1)};
       auto& l2{depth_view.at(il2)};
-      auto m0 {incidence::run(l1,l2,f_adj)};
-      // }}}
 
-      // Step 2: Br {{{
-      auto r1{bor(m0,l1)};
-      auto& m1{r1.first};
-      if ( ccrossings::run(r1.second,l2,f_succ) < ccrossings::run(l1,l2,f_succ) )
+      //
+      // Step 7
+      //
+      auto opt_ror{ror(incidence::run(l1,l2,f_adj),l2)};
+
+      if( opt_ror )
       {
-        l1 = std::move(r1.second);
-      } // if
-      // }}}
+        // spdlog::info("opt_ror");
+        l2 = opt_ror->second;
+        phase_1(incidence::run(l1,l2,f_adj),l1,l2);
+      }
 
-      // Step 4: Bc {{{
-      auto r2{bor(reverse(m1),l2)};
-
-      if (ccrossings::run(l1,r2.second,f_succ) < ccrossings::run(l1,l2,f_succ))
+      //
+      // Step 8
+      //
+      auto opt_roc{roc(incidence::run(l1,l2,f_adj),l1)};
+      if( opt_roc )
       {
-        l2 = std::move(r2.second);
-      } // if
-      // }}}
+        // spdlog::info("opt_roc");
+        l1 = opt_roc->second;
+        phase_1(incidence::run(l1,l2,f_adj),l1,l2);
+      }
 
-    };
+      if( ! opt_ror && ! opt_roc ){ stop = true; }
 
-    //
-    // @ Enqueue and execute threads with non-overlapping pairs
-    //
-    std::vector<std::thread> thread_no;
-    for (auto il : non_overlapping)
-    {
-      thread_no.emplace_back([=]{ process(il.first,il.second); });
     } // for
-    for (auto& t : thread_no) { t.join(); }
 
-    //
-    // @ Enqueue and execute threads with overlapping pairs
-    //
-    std::vector<std::thread> thread_ov;
-    for (auto il : overlapping)
-    {
-      thread_ov.emplace_back([=]{ process(il.first,il.second); });
-    } // for
-    for (auto& t : thread_ov) { t.join(); }
-  };
-
-  rg::for_each(rv::iota(0,11),[&](auto){ sort_by_barycenter(); });
+    layers = ra::reverse(layers);
+  } // while
 
   return depth_view
     | rv::transform([](auto&& e){ return e.second; })
