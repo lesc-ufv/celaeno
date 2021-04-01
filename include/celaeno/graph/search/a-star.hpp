@@ -41,7 +41,7 @@
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
-namespace celaeno::graph::a_star
+namespace celaeno::graph::search::a_star
 {
 
 // Using Namespaces {{{
@@ -163,7 +163,7 @@ decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_distance, F3&& f_heu
       if( closed.contains(n) ) continue;
 
       // Analyse the cost to goal
-      auto ng {g_score.at(id)+f_distance(n)};
+      auto ng {g_score.at(id)+f_distance(id,n)};
 
       // If the cost is infinite (there is not other path) or
       // If the cost is better than an existing one
@@ -181,4 +181,4 @@ decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_distance, F3&& f_heu
   return std::deque<Base>{};
 } // function: run
 
-} // namespace celaeno::graph::a_star
+} // namespace celaeno::graph::search::a_star
