@@ -37,11 +37,16 @@
 
 #include <celaeno/concepts.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
 namespace celaeno::graph::operations::minimize::pseudo
 {
+
+// Using declarations {{{
+using Ops = celaeno::graph::Ops;
+// }}}
 
 // Namespaces {{{
 namespace rg = ranges;
@@ -49,7 +54,7 @@ namespace ns_views = celaeno::graph::views;
 namespace ns_search = celaeno::graph::search;
 // }}}
 
-// Using declarations {{{
+// Using namespaces {{{
 using namespace celaeno::aliases;
 using namespace celaeno::concepts;
 // }}}
@@ -164,6 +169,14 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink)
 
   } // for
 
-} // function: run }}}
+} // }}}
+
+// fn: run {{{
+template<SignedIntegral T>
+void run(T root, Ops ops)
+{
+  run(root, ops.preds, ops.succs, ops.link, ops.unlink);
+}
+// }}}
 
 } // namespace celaeno::graph::operations::minimize::pseudo

@@ -32,19 +32,19 @@ RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clan
 RUN cp build/compile_commands.json .
 RUN cmake --build build
 
-# Perform tests
-## Search
-RUN ./build/test/g_search_bfs
-RUN ./build/test/g_search_dfs
-RUN ./build/test/g_search_kahn
-## Views
-RUN ./build/test/g_views_depth
-RUN ./build/test/g_views_proximity
-## Operations
-### Query
-RUN ./build/test/g_operations_balance_paths
-RUN ./build/test/g_operations_count_crossings
-RUN ./build/test/g_operations_minimize_crossings
-### Representations
-RUN ./build/test/g_operations_incidence_barycenter
-RUN ./build/test/g_representations_incidence
+# # Perform tests
+# ## Search
+# RUN ./build/test/g_search_bfs
+# RUN ./build/test/g_search_dfs
+# RUN ./build/test/g_search_kahn
+# ## Views
+# RUN ./build/test/g_views_depth
+# RUN ./build/test/g_views_proximity
+# ## Operations
+# ### Query
+# RUN ./build/test/g_operations_balance_paths
+# RUN ./build/test/g_operations_count_crossings
+# RUN ./build/test/g_operations_minimize_crossings
+# ### Representations
+# RUN ./build/test/g_operations_incidence_barycenter
+# RUN ./build/test/g_representations_incidence

@@ -66,6 +66,33 @@ template<typename T>
 using Storage = std::unique_ptr<Vertices<T>>;
 // }}}
 
+// Graph ops {{{
+class Ops
+{
+  using Preds = std::function<std::vector<i64>(i64)>;
+  using Succs = std::function<std::vector<i64>(i64)>;
+  using Adj = std::function<bool(i64,i64)>;
+  using Link = std::function<void(std::pair<i64,i64>)>;
+  using Unlink = std::function<void(std::pair<i64,i64>)>;
+
+  public:
+    Preds preds;
+    Succs succs;
+    Adj adj;
+    Link link;
+    Unlink unlink;
+
+  public:
+    Ops(Preds&& p, Succs&& s, Adj&& a, Link&& l, Unlink&& u)
+      : preds(std::forward<Preds>(p))
+      , succs(std::forward<Succs>(s))
+      , adj(std::forward<Adj>(a))
+      , link(std::forward<Link>(l))
+      , unlink(std::forward<Unlink>(u))
+    {}
+};
+// }}}
+
 // Graph {{{
 
 template<Arithmetic T>

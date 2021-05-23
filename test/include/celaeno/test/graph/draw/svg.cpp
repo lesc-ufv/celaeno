@@ -80,10 +80,12 @@ int main(int argc, char* argv[])
   auto f_l = [&g](auto&& e){ g.emplace(e); };
   auto f_u = [&g](auto&& e){ g.erase(e); };
 
+  graph::Ops ops(f_p, f_s, f_a, f_l, f_u);
+
   // Gate label
-  auto f_label = [&](auto)
+  auto f_label = [&](auto id)
   {
-    return " ";
+    return id;
     // using Type = celaeno::graph::reader::verilog::GateType;
     // auto data{metadata.data()};
     // if( ! data.contains(id) )  { return " "; }
@@ -100,6 +102,6 @@ int main(int argc, char* argv[])
   };
 
   // Test drawing
-  svg::run(1,f_p,f_s,f_a,f_l,f_u,f_label,"artifacts/graph-drawing.svg");
+  svg::run(1, ops, f_label, "artifacts/graph-drawing");
 
 } // main

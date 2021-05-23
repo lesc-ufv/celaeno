@@ -39,12 +39,17 @@
 #endif
 
 #include <celaeno/concepts.hpp>
+#include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
 // namespace celaeno::graph::operations::balance::outgoing {{{
 namespace celaeno::graph::operations::balance::outgoing
 {
+
+// Using declarations {{{
+using Ops = celaeno::graph::Ops;
+// }}}
 
 // namespaces {{{
 namespace fp = fplus;
@@ -142,6 +147,14 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
     rg::for_each(successors, [&](auto s) { f_link(std::make_pair(n,s)); });
   } // for
 
-} // function: run }}}
+} // }}}
+
+// fn: run {{{
+template<SignedIntegral T>
+void run(T root, Ops ops)
+{
+  run(root, ops.preds, ops.succs, ops.link, ops.unlink);
+}
+// }}}
 
 } // namespace celaeno::graph::operations::balance::outgoing }}}

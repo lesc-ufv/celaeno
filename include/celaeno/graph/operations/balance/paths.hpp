@@ -38,6 +38,7 @@
   #include <spdlog/spdlog.h>
 #endif
 
+#include <celaeno/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -59,9 +60,10 @@ using namespace celaeno::aliases;
 
 // Using declarations {{{
 using std::ranges::transform;
+using Ops = celaeno::graph::Ops;
 // }}}
 
-// Algorithm {{{
+// fn: run {{{
 template<SignedIntegral T, typename P, typename S, typename L, typename U>
 void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   requires CallableWith<P,i64>
@@ -155,6 +157,14 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
     } // for
   } // for: i
 
-} // function: run }}}
+} // }}}
+
+// fn: run {{{
+template<SignedIntegral T>
+void run(T root, Ops ops)
+{
+  run(root, ops.preds, ops.succs, ops.link, ops.unlink);
+}
+// }}}
 
 } // namespace celaeno::graph::operations::balance::paths }}}

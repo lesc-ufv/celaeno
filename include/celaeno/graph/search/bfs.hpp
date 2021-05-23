@@ -44,12 +44,17 @@
   #include <spdlog/spdlog.h>
 #endif
 
+#include <celaeno/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 
 // namespace celaeno::graph::search::bfs {{{
 namespace celaeno::graph::search::bfs
 {
+
+// Using declarations {{{
+using Ops = celaeno::graph::Ops;
+// }}}
 
 // Namespaces {{{
 namespace fp = fplus;
@@ -117,5 +122,12 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return 
   }
   return result;
 } // function: run }}}
+
+// function: run {{{
+template<SignedIntegral T, typename C = std::function<bool(i64)>>
+std::vector<T> run(T root, Ops const& ops, C&& f_cb = [](auto&&){return false;})
+{
+  return run(root, ops.preds, ops.succs, f_cb);
+} // }}}
 
 } // namespace celaeno::graph::search::bfs }}}
