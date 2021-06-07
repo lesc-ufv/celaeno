@@ -125,7 +125,7 @@ constexpr i32 const circle_offset{tile_size/2};
 
 // fn: svg {{{
 template<String S, typename Map, typename F1, typename F2>
-void svg(S&& filename, Map&& vertex_xy, F1&& f_succ, F2&& f_label)
+void svg(S&& filename, Map&& vertex_tile, F1&& f_succ, F2&& f_label)
 {
   // Output file
   std::ofstream of{filename};
@@ -136,42 +136,40 @@ void svg(S&& filename, Map&& vertex_xy, F1&& f_succ, F2&& f_label)
   std::stringstream edges;
 
   //Get farthest vertices to build viewport
-  auto view_box_x {rg::max_element(vertex_xy,{},
-  [](auto e) { return e.second.first; })->second.first};
+  auto view_box_x {rg::max_element(vertex_tile,{},
+  [](auto e) { return e.second.x; })->second.x};
 
-  auto view_box_y {rg::max_element(vertex_xy,{},
-  [](auto e) { return e.second.second; })->second.second};
+  auto view_box_y {rg::max_element(vertex_tile,{},
+  [](auto e) { return e.second.y; })->second.y};
 
   // Adjust positions for drawing
-  for (auto& e : vertex_xy)
+  for (auto& [_,tile] : vertex_tile)
   {
-    auto& pos = e.second;
-    auto& [x,y] = pos;
-    x = x*tile_size+circle_offset;
-    y = y*tile_size+circle_offset;
+    tile.x = tile.x*tile_size+circle_offset;
+    tile.y = tile.y*tile_size+circle_offset;
   } // for
 
-  // Edge Routing
-  rg::for_each(vertex_xy, [&](auto&& e)
-  {
-    auto succ { f_succ(e.first) };
-
-    rg::for_each(succ, [&](auto&& v)
-    {
-      auto [ux,uy] = e.second;
-      auto [vx,vy] = vertex_xy[v];
-      edges << fmt::format(e_template, ux, uy, vx, vy);
-    });
-  });
+  // // Edge Routing
+  // rg::for_each(vertex_tile, [&](auto&& e)
+  // {
+  //   auto succs { f_succ(e.first) };
+  //
+  //   rg::for_each(succs, [&](auto&& v)
+  //   {
+  //     auto [ux,uy] = std::make_pair(e.second.x,e.second.y);
+  //     auto [vx,vy] = std::make_pair(vertex_tile[v].x,vertex_tile[v].y);
+  //     edges << fmt::format(e_template, ux, uy, vx, vy);
+  //   });
+  // });
 
   // @ Stream/File writting
   header << fmt::format(h_template,view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);
 
 
   // Vertices and labels
-  for (auto [v,pos] : vertex_xy)
+  for (auto [v,tile] : vertex_tile)
   {
-    auto [x,y] = pos;
+    auto [x,y] = std::make_pair(tile.x,tile.y);
     // Draw pseudo-nodes with black filling
     if (v < 0)
     {
@@ -229,16 +227,14 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
   // Edge minimization Oriented Drawing
   ns_balance::paths::run(root,ops);
   ns_balance::outgoing::run(root,ops);
-  ns_minimize::pseudo::run(root,ops);
+  ns_balance::paths::run(root,ops);
+  // ns_minimize::pseudo::run(root,ops);
 
   // Vertex Placement
-  auto grids{ns_representations::grid::run(root, ops)};
+  auto grid{ns_representations::grid::run(root, ops)};
 
-  for (i64 i{}; auto& grid : grids)
-  {
-    auto& vertex_xy = grid.second;
-    svg(fmt::format("{}-{}.svg", fn, std::to_string(i++)), vertex_xy, ops.succs, f_label);
-  } // for
+  svg(fmt::format("{}.svg", fn), grid, ops.succs, f_label);
+
 } // function: run }}}
 
 } // namespace celaeno::graph::draw::svg }}}

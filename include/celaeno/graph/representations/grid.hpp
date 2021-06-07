@@ -53,10 +53,23 @@
 namespace celaeno::graph::representations::grid
 {
 
+// struct: Tile {{{
+struct Tile
+{
+  i32 x, y;
+  Tile() = default;
+  Tile(i32 x,i32 y) : x(x), y(y) {}
+}; // }}}
+
 // Using declarations {{{
+using Ops = celaeno::graph::Ops;
+using MapVertexTile = std::map<i64,Tile>;
+using VertexPoint = std::pair<i64,Tile>;
+// }}}
+
+// Using namespaces {{{
 using namespace celaeno::aliases;
 using namespace celaeno::concepts;
-using Ops = celaeno::graph::Ops;
 // }}}
 
 // namespaces {{{
@@ -70,18 +83,14 @@ namespace ns_search = celaeno::graph::search;
 namespace ns_views = celaeno::graph::views;
 // }}}
 
-// fn: tree_like {{{
-
-//
-// Tree like placement, given a root node
-//
+// function: root_reachable {{{
 template<SignedIntegral T>
-decltype(auto) tree_like(T root, size_t slots, i64 curr_slot, Ops const& ops)
+auto filter_not_reachable(T root, Ops const& ops)
 {
   auto f_nop = [](auto){ return std::vector<T>{}; };
 
   // Collect all nodes reachable from root
-  auto root_reachable{search::bfs::run(root, f_nop, ops.succs)};
+  auto successors{search::bfs::run(root, f_nop, ops.succs)};
 
   // Get layers
   // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
@@ -93,38 +102,61 @@ decltype(auto) tree_like(T root, size_t slots, i64 curr_slot, Ops const& ops)
   // Remove non-reachable from root of each layer
   for (size_t i{}; i < layers.size(); ++i)
   {
-    layers[i] = fw::apply(layers[i], fw::keep_if([&](auto e){ return fp::is_elem_of(e,root_reachable); }));
+    layers[i] = fw::apply(layers[i], fw::keep_if([&](auto e){ return fp::is_elem_of(e,successors); }));
   } // for
 
+  return std::make_pair(layers,successors);
+} // }}}
+
+// fn: tree_like {{{
+
+//
+// Tree like placement, given a root node
+//
+template<SignedIntegral T>
+decltype(auto) tree_like(T root, size_t slots, Ops const& ops)
+{
+  auto [layers,root_reachable] {filter_not_reachable(root,ops)};
+
   // Save vertices positions
-  std::map<i64,std::pair<i64,i64>> vertex_xy;
+  MapVertexTile m_vertex_tile;
 
   // Find level with highest number of vertices
   auto const it_base {rg::max_element(layers, {}, [](auto e){ return e.size(); })};
 
   // Place vertex u in coordinate {x,y}
-  auto f_place = [&](auto x, auto y, auto u) { vertex_xy[u] = std::make_pair(x,y); };
+  auto f_place = [&](auto x, auto y, auto u) { m_vertex_tile.emplace(u,Tile(x,y)); };
 
   // Index of it_base in layers container
   u64 idx_base{static_cast<u64>(std::distance(layers.begin(),it_base))};
 
+  // Extra y-spacing between layers
+  i64 y_extra{1};
+
   // Place level with higher number of vertices
-  rg::for_each(*it_base, [&,x=0,y=idx_base](auto u) mutable { f_place(x++,y,u); });
+  rg::for_each(*it_base, [&,x=0,y=idx_base](auto u) mutable { f_place(x*slots,y*(slots+y_extra),u); ++x; });
 
   // Save occupation of x positions for each layer
   std::set<i64> occupation;
 
   // Calculate the mean of the predecessors/successors positions
-  auto mean_of_pos = [&]<Range R>(R const& vs, auto node) -> std::optional<u64>
+  auto leftmost_pos = [&]<Range R>(R const& vs, auto node) -> std::optional<u64>
   {
     if (vs.empty())
     {
       spdlog::warn("Dangling node {} will be ignored!", node);
       return std::nullopt;
     } // if
-    auto pos {rg::accumulate(vs,0,{},[&](auto u){return vertex_xy[u].first;}) / vs.size()};
-    while( occupation.contains(pos) ) { ++pos; }
-    return pos;
+
+    auto it_min_element{rg::min_element(vs,{},[&](auto u){return m_vertex_tile.at(u).x;})};
+
+    if( it_min_element == rg::end(vs) )
+    {
+      spdlog::warn("Unknown error in leftmost_pos");
+      return std::nullopt;
+    } // if
+
+    return m_vertex_tile[*it_min_element].x;
   };
 
   //
@@ -135,24 +167,22 @@ decltype(auto) tree_like(T root, size_t slots, i64 curr_slot, Ops const& ops)
   //
 
   // First half of positions for placement
-  auto first_half {fp::numbers(u64{},idx_base)};
-
   // Reverse container and elements
-  first_half = ra::reverse(first_half);
+  auto first_half {ra::reverse(fp::numbers(u64{},idx_base))};
 
   // Second half of positions for placement
   auto second_half {fp::numbers(idx_base+1,layers.size())};
 
-  for (auto y : fp::append(first_half,second_half))
+  for (auto y : fp::append(second_half,first_half))
   {
     for (auto u : layers.at(y))
     {
       // Get preds and succs and Keep only root reachable elements
-      auto preds {fp::keep_if([&](auto e){ return fp::is_elem_of(e,root_reachable); },ops.preds(u))};
-      auto succs {fp::keep_if([&](auto e){ return fp::is_elem_of(e,root_reachable); },ops.succs(u))};
+      auto preds {fp::keep_if([&,root_reachable=root_reachable](auto e){ return fp::is_elem_of(e,root_reachable); },ops.preds(u))};
+      auto succs {fp::keep_if([&,root_reachable=root_reachable](auto e){ return fp::is_elem_of(e,root_reachable); },ops.succs(u))};
 
-      // Set the x position to a mean of the predecessors positions
-      auto x { (y > idx_base)? mean_of_pos(preds,u) : mean_of_pos(succs,u) };
+      // Set the x position to leftmost the predecessors positions
+      auto x { (y > idx_base)? leftmost_pos(preds,u) : leftmost_pos(succs,u) };
 
       // Check if position is valid
       if( !x ){ continue; }
@@ -161,12 +191,12 @@ decltype(auto) tree_like(T root, size_t slots, i64 curr_slot, Ops const& ops)
       occupation.emplace(*x);
 
       // Position the vertex
-      f_place(*x,y,u);
+      f_place(*x,y*(slots+y_extra),u);
     } // for
     occupation.clear();
   } // for
 
-  return std::make_pair(layers,vertex_xy);
+  return m_vertex_tile;
 } // function: tree_like }}}
 
 // fn: overlap_nodes {{{
@@ -186,21 +216,49 @@ auto run(T root, Ops const& ops)
 
   auto slots{root_nodes.size()};
 
-  auto sol_0{tree_like(root_nodes.at(0), slots, 0, ops)};
+  MapVertexTile solution;
 
-  std::vector<decltype(sol_0)> solutions;
-
-  solutions.push_back(std::move(sol_0));
-
-  root_nodes.erase(root_nodes.begin());
-
-  for (i64 i{1}; auto root_node : root_nodes)
+  for (auto it{root_nodes.begin()}; it != root_nodes.end(); ++it)
   {
-    solutions.push_back(tree_like(root_node, slots, i++, ops));
+    if( it == root_nodes.begin() ){ solution = tree_like(*it, slots, ops); continue; }
+
+    // Get iterator to previous solution
+    auto curr_solution{tree_like(*it, slots, ops)};
+
+    // Find intersecting nodes between current and previous solution
+    std::vector<VertexPoint> intersection;
+    rg::set_intersection(solution,curr_solution,std::back_inserter(intersection),[](auto u, auto v){ return u.first < v.first; });
+
+    // Transform intersection in absolute x-pos differences
+    auto differences{ fp::transform([&](auto u){ return std::abs(solution[u.first].x-curr_solution[u.first].x); },intersection) };
+
+    // Get the most repeated difference value
+    auto difference{fp::maximum_by([](auto u, auto v){ return u.second < v.second; }, fp::count_occurrences(differences)).first};
+
+    // Get index of curr_slot, which is the index of the current root element
+    auto curr_slot{std::distance(root_nodes.begin(),it)};
+
+    // Sum the diff with x-val of all elements of current solution
+    rg::for_each(curr_solution, [&](auto& e){ e.second.x += difference+curr_slot; });
+
+    // Merge curr_solution with solution
+    for (auto [vertex,tile] : curr_solution)
+    {
+      if( ! solution.contains(vertex) ){ solution.emplace(vertex,tile); }
+    } // for
   } // for
 
-  return solutions;
-}
-// }}}
+  return solution;
+} // }}}
+
+// function: route {{{
+template<SignedIntegral T>
+decltype(auto) route(T root, Ops const& ops, MapVertexTile const& m_vertex_tile)
+{
+  // // Find root nodes
+  // auto root_nodes{fp::keep_if([&](auto e){ return ops.preds(e).empty(); },ns_search::bfs::run(root,ops))};
+  //
+  // auto [layers,root_reachable] {filter_not_reachable(root,ops)};
+} // }}}
 
 } // namespace celaeno::graph::representations::grid }}}
