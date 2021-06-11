@@ -93,4 +93,4 @@ endfunction(add_test)
 
 add_test(g_draw "include/celaeno/test/graph/draw/svg.cpp")
 
-#add_test(test_a_star "include/celaeno/graph/a-star.cpp")
+# add_test(test_a_star "include/celaeno/test/graph/a-star.cpp")

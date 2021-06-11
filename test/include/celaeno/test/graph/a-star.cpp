@@ -33,8 +33,10 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
-#include <celaeno/graph/a-star.hpp>
+#include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
 #include <celaeno/graph/graph.hpp>
+#include <celaeno/graph/search/a-star.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
 
 #include <vector>
@@ -42,135 +44,59 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
+// TODO REMOVE
+#include <fmt/core.h>
+#include <fmt/ranges.h>
+
 //  namespace celaeno::graph::a_star::test {{{
 
 namespace celaeno::graph::a_star::test
 {
 
 // Namespaces {{{
-namespace a_star = celaeno::graph::a_star;
+namespace ns_search = celaeno::graph::search;
 namespace rg = ranges;
 namespace fp = fplus;
 // }}}
 
-// Aliases {{{
-using float64_t = double;
+// Using namespaces {{{
+using namespace celaeno::aliases;
+using namespace celaeno::concepts;
 // }}}
 
-// Helpers {{{
-template<typename T1, typename T2>
-decltype(auto) constexpr manhattan(T1&& p1, T2&& p2) noexcept
-{
-  return std::abs(p1.first - p2.first) + std::abs(p1.second - p2.second);
-}
+// // struct: Tile {{{
+// struct Tile
+// {
+//   i32 x, y;
+//   Tile() = default;
+//   Tile(i32 x,i32 y) : x(x), y(y) {}
+// }; // }}}
 
-template<typename T1, typename T2>
-decltype(auto) path(T1&& p1, T2&& p2) noexcept
-{
-  auto neighbors = [](auto&& pair) constexpr
-    -> std::array<std::pair<int64_t,int64_t>,6>
-  {
-    return
-      {{
-        {pair.first+1,pair.second},
-        {pair.first-1,pair.second},
-        {pair.first,pair.second+1},
-        {pair.first,pair.second-1},
-        {pair.first-1,pair.second-1},
-        {pair.first+1,pair.second+1},
-      }};
-  };
-
-  return a_star::run(
-      std::forward<T1>(p1),
-      std::forward<T2>(p2),
-      neighbors,
-      [](auto&&) -> int32_t { return 0; },
-      [&](auto&& p) -> float64_t
-      {
-        auto m {manhattan(p, p2)};
-        return m;
-      }
-    );
-}
-
-// }}}
-
-// testcase: celaeno::graph::a_star {{{
 
 TEST_CASE("celaeno::graph::a_star")
 {
-  // Generate coordinates for tests
-  // // Positive only range
-  auto pxy {fp::zip(
-      fp::zip(fp::numbers(0,101),fp::reverse(fp::numbers(0,101))),
-      fp::zip(fp::reverse(fp::numbers(0,101)),fp::numbers(0,101))
-  )};
-  // // Negative only range
-  auto nxy {fp::zip(
-      fp::zip(fp::numbers(-100,0),fp::reverse(fp::numbers(-100,0))),
-      fp::zip(fp::reverse(fp::numbers(-100,0)),fp::numbers(-100,0))
-  )};
-  // // Mixed range
-  auto mxy {fp::zip(
-      fp::zip(fp::numbers(-100,101),fp::reverse(fp::numbers(-100,101))),
-      fp::zip(fp::reverse(fp::numbers(-100,101)),fp::numbers(-100,101))
-  )};
-
-  SUBCASE("Initialization with lvalues and rvalues")
-  {
-    // Rvalue search
-    auto rsearch {path(std::make_pair(2,0),std::make_pair(5,4))};
-
-    // Lvalue search
-    std::pair<int64_t,int64_t> const constexpr p1{2,0}, p2{5,4};
-    auto vsearch {path(p1,p2)};
-
-    // Create a combined view
-    auto combined_view {fp::zip(rsearch,vsearch)};
-
-    // Check if paths are the same
-    rg::for_each(combined_view,[](auto&& v) { REQUIRE(v.first == v.second); });
-
-  } // SUB_CASE: Initialization with lvalues and rvalues
-
-  SUBCASE("Heterogeneous pair types")
-  {
-    // Rvalue search
-    auto rsearch {path(
-        std::make_pair<int64_t,int32_t>(2,0),
-        std::make_pair<int64_t,int32_t>(5,4)
-    )};
-
-    // Lvalue search
-    std::pair<int32_t,int64_t> const constexpr p1{2,0};
-    std::pair<int32_t,int64_t> const constexpr p2{5,4};
-    auto vsearch {path(p1,p2)};
-
-    // Create a combined view
-    auto combined_view {fp::zip(rsearch,vsearch)};
-
-    // Check if paths are the same
-    rg::for_each(combined_view,[](auto&& v) { REQUIRE(v.first == v.second); });
-  } // SUB_CASE: Heterogeneous pair types
-
-  SUBCASE("Path size checks")
-  {
-    auto check = [](auto&& p1, auto&& p2) -> void
+  auto [x,y] = std::make_pair(std::pair<i64,i64>(0,0), std::pair<i64,i64>(10,0));
+  auto result = ns_search::a_star::run(
+    x,
+    y,
+    [](auto k)
     {
-      auto res {path(p1,p2)};
-      auto sz_limit {manhattan(p1,p2)};
-      // +2, excluding beg and end
-      CHECK(res.size() <= sz_limit+2);
-    };
+      return std::vector<std::pair<i64,i64>>
+      {
+          std::make_pair(k.first+1,k.second)
+        , std::make_pair(k.first,k.second+1)
+        , std::make_pair(k.first,k.second-1)
+      };
+    },
+    [](auto k){ return (k.second == 0) && (k.first > 0) && (k.first < 10) && (k != std::pair<i64,i64>(0,4)) && (k != std::pair<i64,i64>(0,0)); }
+  );
 
-    for (auto&& [x,y] : pxy) { check(x,y); } // for xy
-    for (auto&& [x,y] : nxy) { check(x,y); } // for xy
-    for (auto&& [x,y] : mxy) { check(x,y); } // for xy
-
-  } // SUB_CASE: Path size checks
-
-} // TEST_CASE: celaeno::graph::a_star }}}
-
+  fmt::print("Path : ");
+  for (auto&& i : result)
+  {
+    fmt::print("{},", i);
+  } // for
+  fmt::print("\n");
+} // testcase
 
 } // namespace celaeno::graph::bfs::test }}}

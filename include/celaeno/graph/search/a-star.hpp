@@ -34,15 +34,25 @@
 #pragma once
 
 #include <concepts>
+#include <numeric>
 #include <queue>
 #include <set>
 #include <vector>
 #include <celaeno/aliases.hpp>
+#include <celaeno/heuristics/manhattan.hpp>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 
+// TODO Remove
+#include <fmt/core.h>
+#include <fmt/ranges.h>
+
 namespace celaeno::graph::search::a_star
 {
+
+// Namespaces {{{
+namespace ns_heuristics = celaeno::heuristics;
+// }}}
 
 // Using Namespaces {{{
 using namespace celaeno::aliases;
@@ -112,10 +122,12 @@ auto rebuild_path(Map& m, T curr)
   return final_path;
 }
 
-template<BaseType T, typename F1, typename F2, typename F3>
-decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_distance, F3&& f_heuristic)
+template<BaseType T, typename F1, typename F2>
+decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_constraints)
 {
   using Base = std::conditional_t<std::is_integral_v<T>, i64, std::pair<i64,i64> >;
+
+  auto f_heuristic = [&](std::pair<i64,i64> n){ return ns_heuristics::manhattan::run(n,end); };
 
   // Open set in ascending order
   std::multimap<f64,Base> open;
@@ -123,15 +135,18 @@ decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_distance, F3&& f_heu
   // Closed set
   std::set<Base> closed;
 
-  // G-Score
-  std::map<Base,f64> g_score;
+  // Heuristic cost
+  std::map<Base,f64> h_cost;
+
+  // Distance cost
+  std::map<Base,f64> d_cost;
 
   // Paths memory
   std::map<Base,Base> mem;
 
-  // Insert initial vertex
+  // Initialize open set and costs
   open.emplace(f_heuristic(start), start);
-  g_score.emplace(start, 0.);
+  d_cost.emplace(start, 0);
 
   // keep the previous vertex for final path
   Base prev{start};
@@ -140,42 +155,48 @@ decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_distance, F3&& f_heu
   while( ! open.empty() )
   {
 
-    // h == heuristic cost value
-    // id = vertex id
-    auto [h, id]  { *open.cbegin()  }; open.erase(open.cbegin());
+    // cost == combined heuristic and distance costs
+    // c = current
+    auto [cost, c]  { *open.cbegin()  }; open.erase(open.cbegin());
+
+    // fmt::print("Combined cost of {}: {}\n", c, cost);
 
     // Update memory
-    if( id != start ) mem.emplace(prev,id);
+    if( c != start ) mem.emplace(prev,c);
 
     // If it is the goal, rebuild the path and return
-    if ( id == end ) return rebuild_path(mem,end);
+    if ( c == end ) return rebuild_path(mem,end);
 
     // Insert the vertex into the closed set
-    closed.insert(id);
+    closed.insert(c);
 
     // Update previous vertex
-    prev = id;
+    prev = c;
 
     // For each neighbor of current vertex
-    for (auto&& n : f_neighbors(id))
+    for (auto&& n : f_neighbors(c))
     {
+      // Ignore constrained elements
+      if( f_constraints(n) ){ continue; }
+
       // Do not explore vertices in the closed set
       if( closed.contains(n) ) continue;
 
       // Analyse the cost to goal
-      auto ng {g_score.at(id)+f_distance(id,n)};
+      auto n_cost {d_cost.at(c)+0};
 
       // If the cost is infinite (there is not other path) or
       // If the cost is better than an existing one
       // Update the score
-      if ( ! g_score.contains(n) || ng < g_score.at(n) )
+      if ( ! d_cost.contains(n) || n_cost < d_cost.at(n) )
       {
-        // Update g_score
-        g_score.emplace(n,ng);
-        // Update f_score
-        open.emplace(ng+f_heuristic(n),n);
+        // Update cost
+        d_cost.emplace(n,n_cost);
+        // Update combined cost
+        // fmt::print("Cost of {} to {}: {} + {}\n", n, end, n_cost, f_heuristic(n));
+        open.emplace(n_cost+f_heuristic(n),n);
       } // if
-    } // for f_neighbors(id)
+    } // for f_neighbors(c)
   } // while ! open.empty()
 
   return std::deque<Base>{};

@@ -37,6 +37,7 @@
 #include <set>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
+#include <compare>
 
 #include <spdlog/spdlog.h>
 
@@ -44,6 +45,7 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/graph/search/a-star.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/minimize/edge-length.hpp>
@@ -56,9 +58,15 @@ namespace celaeno::graph::representations::grid
 // struct: Tile {{{
 struct Tile
 {
-  i32 x, y;
+  i64 x, y;
   Tile() = default;
   Tile(i32 x,i32 y) : x(x), y(y) {}
+
+  auto operator<=>(Tile const& rhs) const = default;
+  std::pair<i64,i64> to_pair()
+  {
+    return std::pair<i64,i64>(x,y);
+  }
 }; // }}}
 
 // Using declarations {{{
@@ -84,20 +92,13 @@ namespace ns_views = celaeno::graph::views;
 // }}}
 
 // function: root_reachable {{{
-template<SignedIntegral T>
-auto filter_not_reachable(T root, Ops const& ops)
+template<SignedIntegral T, typename L>
+auto filter_not_reachable(T root, Ops const& ops, L layers)
 {
   auto f_nop = [](auto){ return std::vector<T>{}; };
 
   // Collect all nodes reachable from root
   auto successors{search::bfs::run(root, f_nop, ops.succs)};
-
-  // Get layers
-  // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
-  auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).first};
-  auto layers = depth_view
-    | rv::transform([](auto&& e){ return e.second; })
-    | rg::to<std::vector<std::vector<i64>>>;
 
   // Remove non-reachable from root of each layer
   for (size_t i{}; i < layers.size(); ++i)
@@ -113,22 +114,22 @@ auto filter_not_reachable(T root, Ops const& ops)
 //
 // Tree like placement, given a root node
 //
-template<SignedIntegral T>
-decltype(auto) tree_like(T root, size_t slots, Ops const& ops)
+template<SignedIntegral T, typename L>
+decltype(auto) tree_like(T root, size_t slots, Ops const& ops, L layers)
 {
-  auto [layers,root_reachable] {filter_not_reachable(root,ops)};
+  auto [filtered_layers,root_reachable] {filter_not_reachable(root,ops,layers)};
 
   // Save vertices positions
   MapVertexTile m_vertex_tile;
 
   // Find level with highest number of vertices
-  auto const it_base {rg::max_element(layers, {}, [](auto e){ return e.size(); })};
+  auto const it_base {rg::max_element(filtered_layers, {}, [](auto e){ return e.size(); })};
 
   // Place vertex u in coordinate {x,y}
   auto f_place = [&](auto x, auto y, auto u) { m_vertex_tile.emplace(u,Tile(x,y)); };
 
   // Index of it_base in layers container
-  u64 idx_base{static_cast<u64>(std::distance(layers.begin(),it_base))};
+  u64 idx_base{static_cast<u64>(std::distance(filtered_layers.begin(),it_base))};
 
   // Extra y-spacing between layers
   i64 y_extra{1};
@@ -144,7 +145,7 @@ decltype(auto) tree_like(T root, size_t slots, Ops const& ops)
   {
     if (vs.empty())
     {
-      spdlog::warn("Dangling node {} will be ignored!", node);
+      // spdlog::warn("Dangling node {} will be ignored!", node);
       return std::nullopt;
     } // if
 
@@ -171,11 +172,11 @@ decltype(auto) tree_like(T root, size_t slots, Ops const& ops)
   auto first_half {ra::reverse(fp::numbers(u64{},idx_base))};
 
   // Second half of positions for placement
-  auto second_half {fp::numbers(idx_base+1,layers.size())};
+  auto second_half {fp::numbers(idx_base+1,filtered_layers.size())};
 
   for (auto y : fp::append(second_half,first_half))
   {
-    for (auto u : layers.at(y))
+    for (auto u : filtered_layers.at(y))
     {
       // Get preds and succs and Keep only root reachable elements
       auto preds {fp::keep_if([&,root_reachable=root_reachable](auto e){ return fp::is_elem_of(e,root_reachable); },ops.preds(u))};
@@ -203,8 +204,8 @@ decltype(auto) tree_like(T root, size_t slots, Ops const& ops)
 
 
 // fn: run {{{
-template<SignedIntegral T>
-auto run(T root, Ops const& ops)
+template<SignedIntegral T, typename L>
+auto run(T root, Ops const& ops, L const& layers)
 {
 #ifndef NDEBUG
   spdlog::set_level(spdlog::level::debug);
@@ -220,10 +221,10 @@ auto run(T root, Ops const& ops)
 
   for (auto it{root_nodes.begin()}; it != root_nodes.end(); ++it)
   {
-    if( it == root_nodes.begin() ){ solution = tree_like(*it, slots, ops); continue; }
+    if( it == root_nodes.begin() ){ solution = tree_like(*it, slots, ops, layers); continue; }
 
     // Get iterator to previous solution
-    auto curr_solution{tree_like(*it, slots, ops)};
+    auto curr_solution{tree_like(*it, slots, ops, layers)};
 
     // Find intersecting nodes between current and previous solution
     std::vector<VertexPoint> intersection;
@@ -252,13 +253,72 @@ auto run(T root, Ops const& ops)
 } // }}}
 
 // function: route {{{
-template<SignedIntegral T>
-decltype(auto) route(T root, Ops const& ops, MapVertexTile const& m_vertex_tile)
+template<SignedIntegral T, typename L>
+decltype(auto) route(T root, Ops const& ops, MapVertexTile const& m_vertex_tile, L layers)
 {
-  // // Find root nodes
-  // auto root_nodes{fp::keep_if([&](auto e){ return ops.preds(e).empty(); },ns_search::bfs::run(root,ops))};
-  //
-  // auto [layers,root_reachable] {filter_not_reachable(root,ops)};
+  std::map< std::pair<Tile,Tile>, std::deque<std::pair<i64,i64>> > paths;
+
+  // Find root nodes
+
+  auto root_nodes{fp::keep_if([&](auto e){ return ops.preds(e).empty(); },ns_search::bfs::run(root,ops))};
+
+  // For each root node, route edges reachable from it
+
+  for (i64 idx_root_node{1}; T root_node : root_nodes)
+  {
+    auto [filtered_layers,root_reachable] {filter_not_reachable(root_node,ops,layers)};
+
+    for (auto const& layer : filtered_layers)
+    {
+      for (auto const& node : layer)
+      {
+        for (auto const& succ : ops.succs(node))
+        {
+          // Create begin/end pair
+          auto tiles {std::make_pair(m_vertex_tile.at(node),m_vertex_tile.at(succ))};
+
+          // Check if tiles were already processed
+          if( paths.contains(tiles) ) { continue; }
+
+          auto [t1,t2] = std::make_pair(tiles.first.to_pair(),tiles.second.to_pair());
+
+          // spdlog::info("idx: {} Source: {} Dest: {}\n", idx_root_node, t1, t2);
+
+          // Route new path
+          paths.emplace(
+            tiles
+            , ns_search::a_star::run(
+                  t1
+                , t2
+                , [](auto k)
+                {
+                  return std::vector<std::pair<i64,i64>>
+                  {
+                      std::make_pair(k.first+1,k.second)
+                    , std::make_pair(k.first-1,k.second)
+                    , std::make_pair(k.first,k.second+1)
+                    , std::make_pair(k.first,k.second-1)
+                  };
+                }
+                , [&,t1=t1,t2=t2](auto t)
+                {
+                  return (
+                    (t.second != t1.second+idx_root_node)
+                    && ( t.first != t1.first )
+                    && ( t.first != t2.first )
+                    );
+                }
+              )
+          );
+        } // for
+      } // for
+    } // for
+    ++idx_root_node;
+  } // for
+
+  return paths;
+
+
 } // }}}
 
 } // namespace celaeno::graph::representations::grid }}}

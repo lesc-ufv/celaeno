@@ -73,6 +73,7 @@ using Ops = celaeno::graph::Ops;
 
 // namespaces {{{
 namespace rg = ranges;
+namespace rv = ranges::views;
 namespace fp = fplus;
 
 namespace ns_balance = celaeno::graph::operations::balance;
@@ -124,8 +125,8 @@ constexpr i32 const circle_offset{tile_size/2};
 // }}}
 
 // fn: svg {{{
-template<String S, typename Map, typename F1, typename F2>
-void svg(S&& filename, Map&& vertex_tile, F1&& f_succ, F2&& f_label)
+template<String S, typename Map, typename Paths, typename F1, typename F2>
+void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F1&& f_succ, F2&& f_label)
 {
   // Output file
   std::ofstream of{filename};
@@ -149,18 +150,24 @@ void svg(S&& filename, Map&& vertex_tile, F1&& f_succ, F2&& f_label)
     tile.y = tile.y*tile_size+circle_offset;
   } // for
 
-  // // Edge Routing
-  // rg::for_each(vertex_tile, [&](auto&& e)
-  // {
-  //   auto succs { f_succ(e.first) };
-  //
-  //   rg::for_each(succs, [&](auto&& v)
-  //   {
-  //     auto [ux,uy] = std::make_pair(e.second.x,e.second.y);
-  //     auto [vx,vy] = std::make_pair(vertex_tile[v].x,vertex_tile[v].y);
-  //     edges << fmt::format(e_template, ux, uy, vx, vy);
-  //   });
-  // });
+  // Edge Routing
+  rg::for_each(paths, [&](auto&& e)
+  {
+    auto route{e.second};
+
+    for (auto it{route.begin()}; it != std::prev(route.end()); ++it)
+    {
+      auto [ux,uy] = *it;
+      auto [vx,vy] = *std::next(it);
+
+      ux = ux*tile_size+circle_offset;
+      uy = uy*tile_size+circle_offset;
+      vx = vx*tile_size+circle_offset;
+      vy = vy*tile_size+circle_offset;
+
+      edges << fmt::format(e_template, ux, uy, vx, vy);
+    } // for
+  });
 
   // @ Stream/File writting
   header << fmt::format(h_template,view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);
@@ -230,10 +237,32 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
   ns_balance::paths::run(root,ops);
   // ns_minimize::pseudo::run(root,ops);
 
-  // Vertex Placement
-  auto grid{ns_representations::grid::run(root, ops)};
+  // Get layers
+  // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
+  auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).first};
+  auto layers = depth_view
+    | rv::transform([](auto&& e){ return e.second; })
+    | rg::to<std::vector<std::vector<i64>>>;
 
-  svg(fmt::format("{}.svg", fn), grid, ops.succs, f_label);
+
+  // Vertex Placement
+  auto start {std::chrono::system_clock::now()};
+  auto vertex_tile{ns_representations::grid::run(root, ops, layers)};
+  auto end {std::chrono::system_clock::now()};
+  std::chrono::duration<f64> dur {end-start};
+  std::stringstream ss; ss << dur.count();
+  auto [x,y] = std::make_pair(
+    rg::max_element(vertex_tile, {}, [](auto e){ return e.second.x; })->second.x
+    , rg::max_element(vertex_tile, {},[](auto e){ return e.second.y; })->second.y
+  );
+  fmt::print("{}\t", ss.str());
+  fmt::print("{}x{}\n", x,y);
+
+  auto paths{route(root, ops, vertex_tile, layers)};
+
+  spdlog::info(fmt::format("Output File: {}.svg", fn));
+
+  svg(fmt::format("{}.svg", fn), vertex_tile, paths, ops.succs, f_label);
 
 } // function: run }}}
 

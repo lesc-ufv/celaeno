@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 #endif
 
   // Check input arguments
-  if( argc != 2 )
+  if( argc != 3 )
   {
     spdlog::error("No input file given");
     exit(1);
@@ -102,6 +102,6 @@ int main(int argc, char* argv[])
   };
 
   // Test drawing
-  svg::run(1, ops, f_label, "artifacts/graph-drawing");
+  svg::run(1, ops, f_label, fmt::format("artifacts/{}",argv[2]) );
 
 } // main
