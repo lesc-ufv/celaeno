@@ -35,11 +35,13 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <mutex>
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 #include <compare>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -109,13 +111,19 @@ auto filter_not_reachable(T root, Ops const& ops, L layers)
   return std::make_pair(layers,successors);
 } // }}}
 
-// fn: tree_like {{{
+// function: area {{{
+template<Map M>
+decltype(auto) area(M const& m)
+{
+  return std::make_pair(
+    rg::max_element(m, {}, [](auto e){ return e.second.x; })->second.x
+    , rg::max_element(m, {},[](auto e){ return e.second.y; })->second.y
+  );
+} // }}}
 
-//
-// Tree like placement, given a root node
-//
+// fn: subgraph {{{
 template<SignedIntegral T, typename L>
-decltype(auto) tree_like(T root, size_t slots, Ops const& ops, L layers)
+decltype(auto) subgraph(T root, size_t slots, Ops const& ops, L layers)
 {
   auto [filtered_layers,root_reachable] {filter_not_reachable(root,ops,layers)};
 
@@ -145,7 +153,7 @@ decltype(auto) tree_like(T root, size_t slots, Ops const& ops, L layers)
   {
     if (vs.empty())
     {
-      // spdlog::warn("Dangling node {} will be ignored!", node);
+      spdlog::warn("Dangling node {} will be ignored!", node);
       return std::nullopt;
     } // if
 
@@ -168,9 +176,7 @@ decltype(auto) tree_like(T root, size_t slots, Ops const& ops, L layers)
   //
 
   // First half of positions for placement
-  // Reverse container and elements
   auto first_half {ra::reverse(fp::numbers(u64{},idx_base))};
-
   // Second half of positions for placement
   auto second_half {fp::numbers(idx_base+1,filtered_layers.size())};
 
@@ -198,7 +204,7 @@ decltype(auto) tree_like(T root, size_t slots, Ops const& ops, L layers)
   } // for
 
   return m_vertex_tile;
-} // function: tree_like }}}
+} // function: subgraph }}}
 
 // fn: overlap_nodes {{{
 
@@ -212,19 +218,53 @@ auto run(T root, Ops const& ops, L const& layers)
   spdlog::debug("Algorithm: celaeno::graph::representations::grid");
 #endif
 
+  //
   // Find root nodes
+  //
   auto root_nodes{fp::keep_if([&](auto e){ return ops.preds(e).empty(); },ns_search::bfs::run(root,ops))};
 
+  //
+  // Determined number of slots on each node
+  //
   auto slots{root_nodes.size()};
 
+  //
+  // Process each subgraph concurrently
+  //
+  std::vector<MapVertexTile> solutions;
+
+  // Keep a mutex to control insertions in solutions vector
+  std::mutex mutex_solutions;
+
+  // Solution insertion lambda
+  auto add_to_solutions = [&]<typename S>(S&& solution)
+  {
+    std::lock_guard<std::mutex> guard(mutex_solutions);
+    solutions.emplace_back(std::forward<S>(solution));
+  };
+
+  std::vector<std::thread> jobs;
+
+  for (auto root_node : root_nodes)
+  {
+    jobs.emplace_back([=] { add_to_solutions(subgraph(root_node, slots, ops, layers)); } );
+  } // for
+
+  for (auto& job : jobs) { job.join(); } // for
+
+  //
+  // Merge solutions
+  //
+
+  // Final merged solution
   MapVertexTile solution;
 
-  for (auto it{root_nodes.begin()}; it != root_nodes.end(); ++it)
+  for (auto it{solutions.begin()}; it != solutions.end(); ++it)
   {
-    if( it == root_nodes.begin() ){ solution = tree_like(*it, slots, ops, layers); continue; }
+    if( it == solutions.begin()) { solution = *it; continue; }
 
     // Get iterator to previous solution
-    auto curr_solution{tree_like(*it, slots, ops, layers)};
+    auto curr_solution{*it};
 
     // Find intersecting nodes between current and previous solution
     std::vector<VertexPoint> intersection;
@@ -237,13 +277,13 @@ auto run(T root, Ops const& ops, L const& layers)
     auto difference{fp::maximum_by([](auto u, auto v){ return u.second < v.second; }, fp::count_occurrences(differences)).first};
 
     // Get index of curr_slot, which is the index of the current root element
-    auto curr_slot{std::distance(root_nodes.begin(),it)};
+    auto curr_slot{std::distance(solutions.begin(),it)};
 
     // Sum the diff with x-val of all elements of current solution
     rg::for_each(curr_solution, [&](auto& e){ e.second.x += difference+curr_slot; });
 
     // Merge curr_solution with solution
-    for (auto [vertex,tile] : curr_solution)
+    for (auto const& [vertex,tile] : curr_solution)
     {
       if( ! solution.contains(vertex) ){ solution.emplace(vertex,tile); }
     } // for

@@ -36,9 +36,13 @@ if(NOT Threads_FOUND)
   find_package(Threads REQUIRED)
 endif()
 
+# Options
+option(DEBUG_SVG_HPP "Enables logging for svg.hpp" OFF)
+
 # Test generator
 function(add_test target)
   add_executable(${target} ${ARGN})
+
   target_compile_options(${target}
     PRIVATE
       -std=c++2a
@@ -53,6 +57,12 @@ function(add_test target)
         -DNDEBUG
       >
   )
+
+  target_compile_definitions(${target}
+    PRIVATE
+      $<$<BOOL:${DEBUG_SVG_HPP}>:DEBUG_SVG_HPP>
+  )
+
   target_link_libraries(${target}
     PRIVATE
       celaeno
@@ -61,19 +71,21 @@ function(add_test target)
       functionalplus::functionalplus
       Threads::Threads
   )
+
   target_include_directories(${target}
     PRIVATE
       $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/test/include>
   )
+
 endfunction(add_test)
 
 # Tests
 
 # ## Search
-# add_test(g_search_bfs "include/celaeno/test/graph/search/bfs.cpp")
-# add_test(g_search_dfs "include/celaeno/test/graph/search/dfs.cpp")
-# add_test(g_search_kahn "include/celaeno/test/graph/search/kahn.cpp")
-#
+add_test(g_search_bfs "include/celaeno/test/graph/search/bfs.cpp")
+add_test(g_search_dfs "include/celaeno/test/graph/search/dfs.cpp")
+add_test(g_search_kahn "include/celaeno/test/graph/search/kahn.cpp")
+
 # ## Views
 # add_test(g_views_depth "include/celaeno/test/graph/views/depth.cpp")
 # add_test(g_views_proximity "include/celaeno/test/graph/views/proximity.cpp")
@@ -90,7 +102,6 @@ endfunction(add_test)
 # add_test(g_representations_incidence "include/celaeno/test/graph/representations/incidence.cpp")
 
 ## Drawing
-
 add_test(g_draw "include/celaeno/test/graph/draw/svg.cpp")
 
 # add_test(test_a_star "include/celaeno/test/graph/a-star.cpp")

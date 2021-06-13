@@ -88,6 +88,18 @@ using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
+// function: runtime {{{
+template<typename F>
+decltype(auto) runtime(F&& f_test)
+{
+  auto start {std::chrono::system_clock::now()};
+  auto result{f_test()};
+  auto end {std::chrono::system_clock::now()};
+  std::chrono::duration<f64> dur {end-start};
+  std::stringstream ss; ss << dur.count();
+  return std::make_pair(result,ss.str());
+} // function: runtime }}}
+
 // Shapes {{{
 constexpr std::string_view const h_template
 {
@@ -125,8 +137,8 @@ constexpr i32 const circle_offset{tile_size/2};
 // }}}
 
 // fn: svg {{{
-template<String S, typename Map, typename Paths, typename F1, typename F2>
-void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F1&& f_succ, F2&& f_label)
+template<String S, typename Map, typename Paths, typename F>
+void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
 {
   // Output file
   std::ofstream of{filename};
@@ -231,38 +243,56 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
   spdlog::debug("Algorithm: celaeno::graph::draw::svg");
 #endif
 
-  // Edge minimization Oriented Drawing
+#ifdef DEBUG_SVG_HPP
+  // Create logging sink
+  auto logger{spdlog::basic_logger_mt("celaeno::graph::draw::svg", "logs.txt")};
+#endif
+
+  //
+  // Pre-processing
+  //
   ns_balance::paths::run(root,ops);
   ns_balance::outgoing::run(root,ops);
   ns_balance::paths::run(root,ops);
   // ns_minimize::pseudo::run(root,ops);
 
-  // Get layers
+  //
+  // Layer ordering
+  //
   // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
   auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).first};
   auto layers = depth_view
     | rv::transform([](auto&& e){ return e.second; })
     | rg::to<std::vector<std::vector<i64>>>;
 
+  //
+  // Tile Placement and Edge Routing
+  //
+#ifdef DEBUG_SVG_HPP
+  // Placement
+  auto [vertex_tile,time_placement]{runtime(
+    [&]{ return ns_representations::grid::run(root, ops, layers);
+  })};
 
-  // Vertex Placement
-  auto start {std::chrono::system_clock::now()};
-  auto vertex_tile{ns_representations::grid::run(root, ops, layers)};
-  auto end {std::chrono::system_clock::now()};
-  std::chrono::duration<f64> dur {end-start};
-  std::stringstream ss; ss << dur.count();
-  auto [x,y] = std::make_pair(
-    rg::max_element(vertex_tile, {}, [](auto e){ return e.second.x; })->second.x
-    , rg::max_element(vertex_tile, {},[](auto e){ return e.second.y; })->second.y
-  );
-  fmt::print("{}\t", ss.str());
-  fmt::print("{}x{}\n", x,y);
+  // Routing
+  auto [paths,time_routing]{runtime(
+    [&,vertex_tile=vertex_tile]{return route(root, ops, vertex_tile, layers);}
+  )};
 
+  // Area
+  auto [x,y] = ns_representations::grid::area(vertex_tile);
+
+  // Logging
+  logger->info("Placement Time: {}", time_placement);
+  logger->info("Routing Time: {}", time_routing);
+  logger->info("Area: {}x{}", x,y);
+#else
+  auto vertex_tile {ns_representations::grid::run(root, ops, layers)};
   auto paths{route(root, ops, vertex_tile, layers)};
+#endif
 
-  spdlog::info(fmt::format("Output File: {}.svg", fn));
-
-  svg(fmt::format("{}.svg", fn), vertex_tile, paths, ops.succs, f_label);
+  // Write output .svg file
+  svg(fmt::format("{}.svg", fn), vertex_tile, paths, f_label);
 
 } // function: run }}}
 

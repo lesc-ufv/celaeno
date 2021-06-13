@@ -56,11 +56,6 @@
 int main(int argc, char* argv[])
 {
 
-#ifndef NDEBUG
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::representations::grid");
-#endif
-
   // Check input arguments
   if( argc != 3 )
   {
@@ -74,34 +69,17 @@ int main(int argc, char* argv[])
   auto metadata {reader::Reader{argv[1],emplace}};
 
   // Helpers
-  auto f_p = [&g](auto&& v){ return g.predecessors(v); };
-  auto f_s = [&g](auto&& v){ return g.successors(v); };
-  auto f_a = [&g](auto&& u, auto&& v){ return g.adjacent(u,v); };
-  auto f_l = [&g](auto&& e){ g.emplace(e); };
-  auto f_u = [&g](auto&& e){ g.erase(e); };
+  auto f_p = [&g](auto v){ return g.predecessors(v); };
+  auto f_s = [&g](auto v){ return g.successors(v); };
+  auto f_a = [&g](auto u, auto v){ return g.adjacent(u,v); };
+  auto f_l = [&g](auto e){ g.emplace(e); };
+  auto f_u = [&g](auto e){ g.erase(e); };
 
   graph::Ops ops(f_p, f_s, f_a, f_l, f_u);
 
   // Gate label
-  auto f_label = [&](auto id)
-  {
-    return id;
-    // using Type = celaeno::graph::reader::verilog::GateType;
-    // auto data{metadata.data()};
-    // if( ! data.contains(id) )  { return " "; }
-    // switch (data.at(id))
-    // {
-    //   case Type::AND: return "∧";
-    //   case Type::OR: return "∨";
-    //   case Type::NAND: return "~∧";
-    //   case Type::NOR: return "~∨";
-    //   case Type::XOR: return "⊕";
-    //   case Type::XNOR: return "~⊕";
-    //   case Type::MAJ3: return "M";
-    // } // switch
-  };
+  auto f_label = [&](auto id) { return id; };
 
   // Test drawing
   svg::run(1, ops, f_label, fmt::format("artifacts/{}",argv[2]) );
-
 } // main
