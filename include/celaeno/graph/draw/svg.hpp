@@ -265,6 +265,12 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
     | rv::transform([](auto&& e){ return e.second; })
     | rg::to<std::vector<std::vector<i64>>>;
 
+  // TODO Remove
+  for (auto& layer : layers)
+  {
+    layer = fp::sort(layer);
+  } // for
+
   //
   // Tile Placement and Edge Routing
   //
@@ -276,7 +282,7 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
 
   // Routing
   auto [paths,time_routing]{runtime(
-    [&,vertex_tile=vertex_tile]{return route(root, ops, vertex_tile, layers);}
+    [&,vertex_tile=vertex_tile]{return route(ops, vertex_tile, layers);}
   )};
 
   // Area
