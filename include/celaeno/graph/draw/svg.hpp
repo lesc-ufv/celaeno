@@ -238,7 +238,7 @@ template<SignedIntegral S, typename L, String Str>
 decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
 {
 
-#ifndef NDEBUG
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
   spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::draw::svg");
 #endif

@@ -65,7 +65,7 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
   && CallableWith<E2,std::pair<i64,i64>>
 {
 
-#ifndef NDEBUG
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
   spdlog::debug("Algorithm: celaeno::graph::operations::minimize::crossings");
   spdlog::set_level(spdlog::level::debug);
 #endif

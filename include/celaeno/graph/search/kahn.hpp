@@ -67,7 +67,7 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return fa
   && CallableWith<C,i64>
 {
 
-#ifndef NDEBUG
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
   spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::search::kahn");
 #endif

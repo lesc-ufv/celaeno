@@ -64,7 +64,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, D&& f_dist)
   && CallableWith<U,std::pair<i64,i64>>
 {
 
-#ifndef NDEBUG
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
   spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::operations::minimize::edge_length");
 #endif

@@ -68,7 +68,7 @@ T run(R&& l1, R&& l2, S&& f_succ)
   requires CallableWith<S,i64>
 {
 
-#ifndef NDEBUG
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
   spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::operations::count::crossings");
 #endif

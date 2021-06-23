@@ -161,7 +161,9 @@ Reader<T>::Reader(S&& filename, T callback)
 
     if( std::regex_match(line,m,r) )
     {
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
       spdlog::debug(msg);
+#endif
       return true;
     }
     return false;
@@ -224,8 +226,10 @@ bool Reader<T>::on_assign( std::string const& line ) const
   std::smatch m;
   if( std::regex_match(line,m,r) )
   {
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Assign: ({}) Input: ({})",
       std::string(m[1]), std::string(m[2])));
+#endif
     return true;
   }
   return false;
@@ -239,8 +243,10 @@ bool Reader<T>::on_and( std::string const& line ) const
   std::smatch m;
   if( std::regex_match(line,m,r) )
   {
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Gate: ({}) Inputs: ({}) & ({})",
       std::string(m[1]), std::string(m[2]), std::string(m[3])));
+#endif
     this->update(m[1], GateType::AND, m[2], m[3]);
     return true;
   }
@@ -255,8 +261,10 @@ bool Reader<T>::on_or( std::string const& line ) const
   std::smatch m;
   if( std::regex_match(line,m,r) )
   {
+#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Gate: ({}) Inputs: ({}) | ({})",
       std::string(m[1]), std::string(m[2]), std::string(m[3])));
+#endif
     this->update(m[1], GateType::OR, m[2], m[3]);
     return true;
   }
