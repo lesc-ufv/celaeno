@@ -38,6 +38,7 @@ endif()
 
 # Options
 option(DEBUG_SVG_HPP "Enables logging for svg.hpp" OFF)
+option(OPT_SEQ "Single threaded mode" OFF)
 
 # Test generator
 function(add_test target)
@@ -61,6 +62,7 @@ function(add_test target)
   target_compile_definitions(${target}
     PRIVATE
       $<$<BOOL:${DEBUG_SVG_HPP}>:DEBUG_SVG_HPP>
+      $<$<BOOL:${OPT_SEQ}>:OPT_SEQ>
   )
 
   target_link_libraries(${target}
@@ -82,10 +84,10 @@ endfunction(add_test)
 # Tests
 
 # ## Search
-add_test(g_search_bfs "include/celaeno/test/graph/search/bfs.cpp")
-add_test(g_search_dfs "include/celaeno/test/graph/search/dfs.cpp")
-add_test(g_search_kahn "include/celaeno/test/graph/search/kahn.cpp")
-
+# add_test(g_search_bfs "include/celaeno/test/graph/search/bfs.cpp")
+# add_test(g_search_dfs "include/celaeno/test/graph/search/dfs.cpp")
+# add_test(g_search_kahn "include/celaeno/test/graph/search/kahn.cpp")
+#
 # ## Views
 # add_test(g_views_depth "include/celaeno/test/graph/views/depth.cpp")
 # add_test(g_views_proximity "include/celaeno/test/graph/views/proximity.cpp")

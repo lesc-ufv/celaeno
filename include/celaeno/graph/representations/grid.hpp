@@ -59,6 +59,9 @@ namespace celaeno::graph::representations::grid
 {
 
 // struct: Tile {{{
+//
+// Represents a unit of area in the positions grid
+//
 struct Tile
 {
   i64 x, y;
@@ -96,15 +99,19 @@ namespace ns_heuristics = celaeno::heuristics;
 // }}}
 
 // function: root_reachable {{{
+//
+// @ Returns all nodes reachable from node t and filtered layers
+//
 template<SignedIntegral T, typename L>
-auto filter_not_reachable(T root, Ops const& ops, L layers)
+auto filter_not_reachable(T t, Ops const& ops, L layers)
 {
+  // Ignore preceding nodes
   auto f_nop = [](auto){ return std::vector<T>{}; };
 
-  // Collect all nodes reachable from root
-  auto successors{search::bfs::run(root, f_nop, ops.succs)};
+  // Collect all nodes reachable from t
+  auto successors{search::bfs::run(t, f_nop, ops.succs)};
 
-  // Remove non-reachable from root of each layer
+  // Remove non-reachable from t of each layer
   for (size_t i{}; i < layers.size(); ++i)
   {
     layers[i] = fw::apply(layers[i], fw::keep_if([&](auto e){ return fp::is_elem_of(e,successors); }));
@@ -114,6 +121,9 @@ auto filter_not_reachable(T root, Ops const& ops, L layers)
 } // }}}
 
 // function: area {{{
+//
+// Returns the total grid area as a horizontal x vertical pair
+//
 template<Map M>
 decltype(auto) area(M const& m)
 {
@@ -124,8 +134,17 @@ decltype(auto) area(M const& m)
 } // }}}
 
 // fn: subgraph {{{
+//
+// Positions nodes of a subgraph based on root
+// @root: root base of subgraph
+// @slots: number of root nodes in the graph
+// @ops: Graph operations
+// @layers: Layered graph view
+// @idx_base: Initial layer index to start placement, must be the same for all
+// subgraphs
+//
 template<SignedIntegral T, typename L>
-decltype(auto) subgraph(T root, size_t slots, Ops const& ops, L layers, u64 idx_base)
+decltype(auto) subgraph(T root, Ops const& ops, L layers, u64 idx_base, size_t slots)
 {
   auto [filtered_layers,root_reachable] {filter_not_reachable(root,ops,layers)};
 
@@ -144,7 +163,7 @@ decltype(auto) subgraph(T root, size_t slots, Ops const& ops, L layers, u64 idx_
     rg::for_each(fp::numbers(u64{},y), [&](auto _y)
     {
       // new_y += layers.at(_y).size();
-      new_y += fp::reduce([&](auto acc, auto u){ return acc+ops.succs(u).size(); },0,layers.at(_y));
+      new_y += fp::reduce([&](auto acc, auto u){ return acc+ops.succs(u).size(); },2,layers.at(_y));
     });
     return new_y+1;
   };
@@ -220,9 +239,6 @@ decltype(auto) subgraph(T root, size_t slots, Ops const& ops, L layers, u64 idx_
   return m_vertex_tile;
 } // function: subgraph }}}
 
-// fn: overlap_nodes {{{
-
-
 // fn: run {{{
 template<SignedIntegral T, typename L>
 auto run(T root, Ops const& ops, L const& layers)
@@ -232,30 +248,35 @@ auto run(T root, Ops const& ops, L const& layers)
   spdlog::debug("Algorithm: celaeno::graph::representations::grid");
 #endif
 
-  for (auto const& layer : layers)
-  {
-    fmt::print("{}\n", layer);
-  } // for
-
   //
   // Find root nodes
   //
   auto root_nodes{fp::keep_if([&](auto e){ return ops.preds(e).empty(); },ns_search::bfs::run(root,ops))};
 
+  // Find starting point for placement, which is the largest layer
   auto const it_base {rg::max_element(layers, {}, [](auto e){ return e.size(); })};
 
+  // Keep the index of it_base for subgraphs
   auto i_base{std::distance(layers.begin(),it_base)};
 
   //
-  // Determined number of slots on each node
+  // Determine the number of slots on each node
   //
   auto slots{root_nodes.size()};
-  fmt::print("root_nodes: {}\n", root_nodes);
 
   //
-  // Process each subgraph concurrently
+  // Process each subgraph sequentially or concurrently
   //
   std::vector<MapVertexTile> solutions;
+
+#ifdef OPT_SEQ
+
+  for (auto root_node : root_nodes)
+  {
+    solutions.emplace_back(subgraph(root_node, ops, layers, i_base, slots));
+  } // for
+
+#else
 
   // Keep a mutex to control insertions in solutions vector
   std::mutex mutex_solutions;
@@ -267,30 +288,21 @@ auto run(T root, Ops const& ops, L const& layers)
     solutions.emplace_back(std::forward<S>(solution));
   };
 
-  std::map<u64,Tile> map_root_pos;
-  for (u64 slot_offset{}; auto root_node : root_nodes)
+  std::vector<std::thread> jobs;
+
+  for (auto root_node : root_nodes)
   {
-    auto solution{subgraph(root_node, slots, ops, layers, i_base)};
-    add_to_solutions(solution);
-    map_root_pos[root_node] = solution.at(root_node);
-    ++slot_offset;
+    jobs.emplace_back([=] { add_to_solutions(subgraph(root_node, ops, layers, i_base, slots)); } );
   } // for
 
-  // std::vector<std::thread> jobs;
-  //
-  // for (u64 slot_offset{}; auto root_node : root_nodes)
-  // {
-  //   jobs.emplace_back([=] { add_to_solutions(subgraph(root_node, slots, slot_offset, ops, layers, i_base)); } );
-  //   ++slot_offset;
-  // } // for
-  //
-  // for (auto& job : jobs) { job.join(); } // for
+  for (auto& job : jobs) { job.join(); } // for
+
+#endif // OPT_SEQ
+
 
   //
   // Merge solutions
   //
-
-  rg::sort(root_nodes,{},[&](auto u) { return map_root_pos.at(u).x; });
 
   // Final merged solution
   MapVertexTile solution;
@@ -321,16 +333,8 @@ auto run(T root, Ops const& ops, L const& layers)
       // Adjust subgraph x-values to avoid node overlaps
       auto offset = -(e.second.x % root_nodes.size()) + std::distance(solutions.begin(),it);
 
-      if ( rg::find(root_nodes, e.first) != rg::end(root_nodes) )
-      {
-        fmt::print("Node: {} pos: {} i: {} offset:{} \n", e.first, e.second.x, std::distance(solutions.begin(),it), offset);
-      } // if
-
+      // Update x-pos
       e.second.x += offset;
-      if ( rg::find(root_nodes, e.first) != rg::end(root_nodes) )
-      {
-        fmt::print("Node: {} pos: {} i: {}\n", e.first, e.second.x, std::distance(solutions.begin(),it));
-      } // if
     });
 
     // Merge curr_solution with solution
@@ -342,31 +346,58 @@ auto run(T root, Ops const& ops, L const& layers)
       {
         solution.at(vertex) = tile;
       } // else if
-      // solution.emplace(vertex,tile);
     } // for
   } // for
 
-  // //
-  // // Include outgoing edge offset
-  // //
-  // for (i64 i{}; auto layer : layers)
-  // {
-  //   layer = fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; },layer);
   //
-  //   fmt::print("Layer {}: {}\n", i++, layer);
+  // Include outgoing edge offset
   //
-  //   // fmt::print("Layer: {}\n", layer);
-  //   // fmt::print("Offsets: ");
-  //   for (i64 x_offset{}; auto u : layer)
-  //   {
-  //     solution.at(u).x += x_offset;
-  //     // fmt::print("{} ", x_offset);
+  // TODO FIX overlaps
+  for (auto layer : layers)
+  {
+    layer = fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; },layer);
+
+    for (i64 x_offset{}; auto u : layer) { solution.at(u).x += x_offset; x_offset += 2; } // for
+  } // for
+
   //
-  //     x_offset += (ops.succs(u).size() > 1)? 1 : 0;
-  //   } // for
+  // Set nodes to always be in the same/previous rows of successors
   //
-  //   // fmt::print("\n");
-  // } // for
+  i64 x_layer{};
+  for (auto it{layers.begin()}; it != layers.end(); ++it)
+  {
+    x_layer = 0;
+
+    auto layer {fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; },*it)};
+
+    // Get max x-dist of a node to its successor
+    for (auto u : layer)
+    {
+      auto f_x_dist = [&]( auto v ){ return std::abs(solution.at(u).x - solution.at(v).x); };
+
+      auto succs{ops.succs(u)};
+
+      if( succs.empty() ){ continue; }
+
+      auto x_dists = fp::transform(f_x_dist,succs);
+
+      auto max_x_dist = fp::maximum(x_dists);
+
+      x_layer = (max_x_dist > x_layer)? max_x_dist : x_layer;
+    } //
+
+    ++x_layer;
+
+    if( std::next(it) != layers.end() )
+    {
+      for (auto u : *std::next(it))
+      {
+        solution.at(u).x += x_layer;
+      } // for
+    } // if
+
+    fmt::print("Max x_layer: {}\n", x_layer);
+  } // for
 
   return solution;
 } // }}}
@@ -377,49 +408,62 @@ decltype(auto) route(Ops const& ops, MapVertexTile const& m_vertex_tile, L layer
 {
   std::map< std::pair<Tile,Tile>, std::deque<std::pair<i64,i64>> > paths;
 
-  for (auto layer : layers)
+  auto f_x_dist = [&](auto u, auto v){ return std::abs(m_vertex_tile.at(u).x - m_vertex_tile.at(v).x); };
+
+  for (auto it{layers.begin()}; it != layers.end(); ++it)
   {
-    layer = fp::sort_by([&](auto u, auto v){ return m_vertex_tile.at(u).x < m_vertex_tile.at(v).x; },layer);
+    if( std::next(it) == layers.end() ){ continue; }
 
-    for (i64 idx_node{1}; auto const& node : layer)
+    // Sort next layer by x-pos
+    auto layer {fp::sort_by([&](auto u, auto v){ return m_vertex_tile.at(u).x < m_vertex_tile.at(v).x; },*std::next(it))};
+
+    // Start from last to first node
+    layer = ra::reverse(layer);
+
+    // Keep track of visited preds
+    std::set<i64> visited;
+
+    // For each node u on layer
+    for (i64 u_idx{1}; auto u : layer)
     {
-      auto succs{ops.succs(node)};
+      // For each node v, pred of u
+      auto preds{ops.preds(u)};
 
-      // Sort successors by closest manhattan distance
-      rg::sort(succs,{},[&](auto u){ return ns_heuristics::manhattan::run(m_vertex_tile.at(node).to_pair(), m_vertex_tile.at(u).to_pair()); });
+      // Sort preds by x proximity of u
+      preds = fp::sort_by([&](auto u, auto v){ return m_vertex_tile.at(u).x < m_vertex_tile.at(v).x; },preds);
 
-      for (i64 i_succ{}; auto const& succ : succs)
+      for (i64 v_idx{}; auto v : preds)
       {
         // Create begin/end pair
-        auto tiles {std::make_pair(m_vertex_tile.at(node),m_vertex_tile.at(succ))};
+        auto tiles {std::make_pair(m_vertex_tile.at(v),m_vertex_tile.at(u))};
 
-        // Check if tiles were already processed
-        if( paths.contains(tiles) ) { continue; }
-
+        // Use std::pair
         auto [t1,t2] = std::make_pair(tiles.first.to_pair(),tiles.second.to_pair());
-
-        spdlog::info("Nodes: {},{} idx: {} Source: {} Dest: {}\n", node, succ, idx_node, t1, t2);
 
         // Create path
         std::deque<std::pair<i64,i64>> path;
 
         auto y_i{t1.second};
-        auto y_m{t1.second+idx_node};
+        auto y_m{t1.second+u_idx};
         auto y_f{t2.second};
         auto x_i{t1.first};
         auto x_f{t2.first};
 
-        // Adjust y-col for next successor
-        if(i_succ != 0)
+        // Adjust starting x-pos if predecessor was already visited
+        if (visited.contains(v))
         {
-          // Include left-right adjustment
           path.emplace_back(x_i,y_i);
-          // Update new x-pos
-          x_i += 1;
-          // Update idx_node
-          ++idx_node;
-          // Update y_m
-          y_m = t1.second+idx_node;
+          ++x_i;
+        } // if
+        else
+        {
+          visited.insert(v);
+        } // else
+
+        // Adjust y-col for next predecessor
+        if(v_idx != 0)
+        {
+          --x_f;
         } // if
 
         // Vert. in source col
@@ -429,10 +473,8 @@ decltype(auto) route(Ops const& ops, MapVertexTile const& m_vertex_tile, L layer
         } // for
 
         // Hor. to dest. col
-        for (i64 i{}; auto x : fp::numbers(x_i,x_f+1))
+        for (auto x : fp::numbers(x_i,x_f+1))
         {
-          if( i++ == 0 ){ continue; }
-
           path.emplace_back(x,y_m);
         } // for
 
@@ -442,15 +484,97 @@ decltype(auto) route(Ops const& ops, MapVertexTile const& m_vertex_tile, L layer
           path.emplace_back(x_f,y);
         } // for
 
+        // Include last tile for solution in successor != first
+        if(v_idx != 0)
+        {
+          path.emplace_back(x_f+1,y_f);
+        } // if
+
         path = fp::unique(path);
 
         paths.emplace(tiles, path);
 
-        ++i_succ;
+        ++u_idx;
+
+        ++v_idx;
       } // for
-      ++idx_node;
+
     } // for
+
   } // for
+
+  // for (auto layer : layers)
+  // {
+  //   layer = fp::sort_by([&](auto u, auto v){ return m_vertex_tile.at(u).x < m_vertex_tile.at(v).x; },layer);
+  //
+  //   for (i64 idx_node{1}; auto const& node : layer)
+  //   {
+  //     auto succs{ops.succs(node)};
+  //
+  //     // Sort successors by closest x-distance
+  //     rg::sort(succs,{},[&](auto v){ return f_x_dist(node,v); });
+  //
+  //     for (i64 i_succ{}; auto const& succ : succs)
+  //     {
+  //       // Create begin/end pair
+  //       auto tiles {std::make_pair(m_vertex_tile.at(node),m_vertex_tile.at(succ))};
+  //
+  //       // Check if tiles were already processed
+  //       if( paths.contains(tiles) ) { continue; }
+  //
+  //       auto [t1,t2] = std::make_pair(tiles.first.to_pair(),tiles.second.to_pair());
+  //
+  //       // Create path
+  //       std::deque<std::pair<i64,i64>> path;
+  //
+  //       auto y_i{t1.second};
+  //       auto y_m{t1.second+idx_node};
+  //       auto y_f{t2.second};
+  //       auto x_i{t1.first};
+  //       auto x_f{t2.first};
+  //
+  //       // Adjust y-col for next successor
+  //       if(i_succ != 0)
+  //       {
+  //         // Include left-right adjustment
+  //         path.emplace_back(x_i,y_i);
+  //         // Update new x-pos
+  //         ++x_i;
+  //         // Update idx_node
+  //         ++idx_node;
+  //         // Update y_m
+  //         y_m = t1.second+idx_node;
+  //       } // if
+  //
+  //       // Vert. in source col
+  //       for (auto y : fp::numbers(y_i,y_m+1))
+  //       {
+  //         path.emplace_back(x_i,y);
+  //       } // for
+  //
+  //       // Hor. to dest. col
+  //       for (i64 i{}; auto x : fp::numbers(x_i,x_f+1))
+  //       {
+  //         if( i++ == 0 ){ continue; }
+  //
+  //         path.emplace_back(x,y_m);
+  //       } // for
+  //
+  //       // Vert. in dest. col
+  //       for (auto y : fp::numbers(y_m,y_f+1))
+  //       {
+  //         path.emplace_back(x_f,y);
+  //       } // for
+  //
+  //       path = fp::unique(path);
+  //
+  //       paths.emplace(tiles, path);
+  //
+  //       ++i_succ;
+  //     } // for
+  //     ++idx_node;
+  //   } // for
+  // } // for
 
   // // Find root nodes
   //
