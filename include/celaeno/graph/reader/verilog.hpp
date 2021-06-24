@@ -50,6 +50,7 @@ namespace celaeno::graph::reader::verilog
 {
 
 // Namespaces {{{
+namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::actions;
 // }}}
@@ -60,7 +61,7 @@ using namespace celaeno::aliases;
 // }}}
 
 // Enum Type {{{
-enum class GateType{AND,NAND,OR,NOR,XOR,XNOR,MAJ3,};
+enum class GateType{INPUT,AND,NAND,OR,NOR,XOR,XNOR,MAJ3,};
 // }}}
 
 // Parsing error exception {{{
@@ -206,6 +207,17 @@ Reader<T>::Reader(S&& filename, T callback)
       throw ParseError(fmt::format("Error on parsing expression: {}", line));
     }
   }
+
+  // Set non-gate ids as inputs
+  rg::for_each(this->ids, [this](auto e)
+  {
+    auto id {e.second};
+
+    if( ! this->gate_type.contains(id) )
+    {
+      this->gate_type.emplace(id,GateType::INPUT);
+    } // if
+  });
 }
 // }}}
 
