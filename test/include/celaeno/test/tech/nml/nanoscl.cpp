@@ -1,8 +1,8 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : svg
-// @created     : monday set 14, 2020 21:21:02 -03
+// @file        : nanoscl
+// @created     : Thursday Jun 24, 2021 00:12:47 UTC
 //
 // BSD 2-Clause License
 
@@ -30,32 +30,24 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Includes {{{
-#include <iostream>
-#include <cstdint>
-#include <fstream>
-#include <sstream>
-
-#include <spdlog/spdlog.h>
-
+#include <celaeno/aliases.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
-#include <celaeno/graph/draw/svg.hpp>
+#include <celaeno/tech/nml/nanoscl.hpp>
+
+// Using namespace {{{
+using namespace celaeno::aliases;
 // }}}
 
-  // Using namespace {{{
-  using namespace celaeno::aliases;
-  // }}}
+// namespace aliases {{{
+namespace ns_tech = celaeno::tech;
+namespace ns_graph = celaeno::graph;
+namespace ns_reader = celaeno::graph::reader::verilog;
+// }}}
 
-  // namespaces {{{
-  namespace ns_graph = celaeno::graph;
-  namespace ns_reader = celaeno::graph::reader::verilog;
-  namespace ns_svg = celaeno::graph::draw::svg;
-  // }}}
-
-int main(int argc, char* argv[])
+// fn: main  {{{
+int main(int argc, char const* argv[])
 {
-
   // Check input arguments
   if( argc != 3 )
   {
@@ -80,6 +72,7 @@ int main(int argc, char* argv[])
   // Gate label
   auto f_label = [&](auto id) { return id; };
 
-  // Test drawing
-  ns_svg::run(1, ops, f_label, fmt::format("artifacts/{}",argv[2]) );
-} // main
+  ns_tech::nml::nanoscl::run(1, ops, f_label, fmt::format("artifacts/{}",argv[2]) );
+
+  return 0;
+} // main }}}

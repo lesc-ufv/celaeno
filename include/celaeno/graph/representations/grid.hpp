@@ -58,22 +58,50 @@
 namespace celaeno::graph::representations::grid
 {
 
+// enum class: TileType {{{
+//
+// @Type 1 : Node                   : ND
+// @Type 2 : Tile Left → Right      : LR
+// @Type 3 : Tile Left → Down       : LD
+// @Type 4 : Tile Up → Down         : UD
+// @Type 5 : Tile Up → Right        : UR
+// @Type 6 : Tile Up → Right & Down : URD
+//
+enum class TileType
+{
+  ND,
+  LR,
+  LD,
+  UD,
+  UR,
+  URD,
+};
+// }}}
+
 // struct: Tile {{{
 //
 // Represents a unit of area in the positions grid
 //
 struct Tile
 {
+  // Public Members
+  public:
   i64 x, y;
+  TileType type;
+  // Constructors
+  public:
   Tile() = default;
-  Tile(i32 x,i32 y) : x(x), y(y) {}
-
+  Tile(i32 x, i32 y, TileType type) : x(x), y(y), type(type) {}
+  // Public Methods
+  // // Operations
+  std::pair<i64,i64> to_pair() const;
+  // // Operators
   auto operator<=>(Tile const& rhs) const = default;
-  std::pair<i64,i64> to_pair() const
-  {
-    return std::pair<i64,i64>(x,y);
-  }
-}; // }}}
+};
+
+std::pair<i64,i64> Tile::to_pair() const { return std::pair<i64,i64>(x,y); }
+
+// }}}
 
 // Using declarations {{{
 using Ops = celaeno::graph::Ops;
@@ -178,7 +206,23 @@ decltype(auto) subgraph(T root, Ops const& ops, L layers, u64 idx_base, size_t s
   };
 
   // Place vertex u in coordinate {x,y}
-  auto f_place = [&](auto x, auto y, auto u) { m_vertex_tile.emplace(u,Tile(x,y)); };
+  auto f_place = [&](auto x, auto y, auto u) -> void
+  {
+    if( u > 0 )
+    {
+      m_vertex_tile.emplace(u,Tile(x,y,TileType::ND));
+      return;
+    }
+
+    if( ops.succs(u).size() > 1 )
+    {
+      m_vertex_tile.emplace(u,Tile(x,y,TileType::URD));
+    }
+    else
+    {
+      m_vertex_tile.emplace(u,Tile(x,y,TileType::UD));
+    } // else
+  };
 
   // Place level with higher number of vertices
   rg::for_each(*it_base, [&,x=0,y=idx_base](auto u) mutable { f_place(x*slots,f_offset_y(y),u); ++x; });
