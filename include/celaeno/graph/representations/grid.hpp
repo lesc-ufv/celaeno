@@ -69,6 +69,8 @@ namespace celaeno::graph::representations::grid
 //
 enum class TileType
 {
+  ID,
+  IDR,
   ND,
   LR,
   LD,
@@ -208,12 +210,33 @@ decltype(auto) subgraph(T root, Ops const& ops, L layers, u64 idx_base, size_t s
   // Place vertex u in coordinate {x,y}
   auto f_place = [&](auto x, auto y, auto u) -> void
   {
+    // Is root node
+    if (ops.preds(u).size() == 0)
+    {
+      if(auto succs {ops.succs(u).size()}; succs == 1 )
+      {
+        m_vertex_tile.emplace(u,Tile(x,y,TileType::ID));
+      }
+      else if( succs == 2 )
+      {
+        m_vertex_tile.emplace(u,Tile(x,y,TileType::IDR));
+      } // else
+      else
+      {
+        spdlog::error("{}@{} Dangling node {}", __FILE__, __LINE__, u);
+        exit(1);
+      } // else
+      return;
+    } // if
+
+    // Is node
     if( u > 0 )
     {
       m_vertex_tile.emplace(u,Tile(x,y,TileType::ND));
       return;
     }
 
+    // Is Edge
     if( ops.succs(u).size() > 1 )
     {
       m_vertex_tile.emplace(u,Tile(x,y,TileType::URD));

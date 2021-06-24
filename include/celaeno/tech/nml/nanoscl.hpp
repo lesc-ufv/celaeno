@@ -44,6 +44,9 @@
 #include <celaeno/graph/operations/balance/outgoing.hpp>
 #include <celaeno/graph/representations/grid.hpp>
 
+// TODO REMOVE
+#include <celaeno/graph/draw/svg.hpp>
+
 namespace celaeno::tech::nml::nanoscl
 {
 
@@ -76,6 +79,70 @@ using MapVertexTile = celaeno::graph::representations::grid::MapVertexTile;
 // namespace: cells {{{
 namespace cells
 {
+  // fn: i_d {{{
+  auto i_d(f64 x, f64 y)
+  {
+    return fmt::format(
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"I\",\n"
+      "        \"type\": \"input\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }}\n"
+      , x+1, y+1, x+1, y+2);
+  } // }}}
+
+  // fn: i_rd {{{
+  auto i_rd(f64 x, f64 y)
+  {
+    return fmt::format(
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"I\",\n"
+      "        \"type\": \"input\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }}\n"
+    , x+1, y+1, x+2, y+1, x+1, y+2);
+  } // }}}
+
   // fn: g_and {{{
   auto g_and(f64 x, f64 y)
   {
@@ -190,8 +257,8 @@ namespace cells
       , x+2, y+2, x, y, x+2, y, x+1, y+1, x, y+2);
   } // }}}
 
-  // fn: wld {{{
-  auto wld(f64 x, f64 y)
+  // fn: w_ld {{{
+  auto w_ld(f64 x, f64 y)
   {
     return fmt::format(
       "    {{\n"
@@ -227,8 +294,8 @@ namespace cells
       , x, y, x+1, y, x+1, y+1);
   } // }}}
 
-  // fn: wlr {{{
-  auto wlr(f64 x, f64 y)
+  // fn: w_lr {{{
+  auto w_lr(f64 x, f64 y)
   {
     return fmt::format(
       "    {{\n"
@@ -264,8 +331,8 @@ namespace cells
       , x, y, x+1, y, x+2, y);
   } // }}}
 
-  // fn: wud {{{
-  auto wud(f64 x, f64 y)
+  // fn: w_ud {{{
+  auto w_ud(f64 x, f64 y)
   {
     return fmt::format(
         "    {{\n"
@@ -301,8 +368,8 @@ namespace cells
     , x+1, y, x+1, y+1, x+1, y+2);
   } // }}}
 
-  // fn: wur {{{
-  auto wur(f64 x, f64 y)
+  // fn: w_ur {{{
+  auto w_ur(f64 x, f64 y)
   {
     return fmt::format(
       "    {{\n"
@@ -338,8 +405,8 @@ namespace cells
     , x+1, y, x+1, y+1, x+2, y+1);
   } // }}}
 
-  // fn: wurd {{{
-  auto wurd(f64 x, f64 y)
+  // fn: w_urd {{{
+  auto w_urd(f64 x, f64 y)
   {
     return fmt::format(
       "    {{\n"
@@ -419,11 +486,27 @@ NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
     {
       switch (f_gate_type(u))
       {
-        case GateType::INPUT: break;
+        case GateType::INPUT:
+          if( tile.type == TileType::ID )
+          {
+            this->buf << cells::i_d(x,y);
+          } // if
+          else if( tile.type == TileType::IDR )
+          {
+            this->buf << cells::i_rd(x,y);
+          } // else
+          else
+          {
+            spdlog::error("{}@{}: Invalid tile type for node {}\n", __FILE__, __LINE__, u);
+            exit(1);
+          } // else
+          break;
         case GateType::AND:
           this->buf << cells::g_and(x,y);
+          break;
         case GateType::OR:
           this->buf << cells::g_or(x,y);
+          break;
         case GateType::NAND:
         case GateType::NOR:
         case GateType::XOR:
@@ -438,21 +521,25 @@ NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
       switch (tile.type)
       {
         case TileType::LD:
-          this->buf << cells::wld(x,y);
+          this->buf << cells::w_ld(x,y);
           break;
         case TileType::LR:
-          this->buf << cells::wlr(x,y);
+          this->buf << cells::w_lr(x,y);
           break;
         case TileType::UD:
-          this->buf << cells::wud(x,y);
+          this->buf << cells::w_ud(x,y);
           break;
         case TileType::UR:
-          this->buf << cells::wur(x,y);
+          this->buf << cells::w_ur(x,y);
           break;
         case TileType::URD:
-          this->buf << cells::wurd(x,y);
+          this->buf << cells::w_urd(x,y);
           break;
-        case TileType::ND: break;
+        case TileType::ND:
+        case TileType::ID:
+        case TileType::IDR:
+          spdlog::error("{}@{}: Network nodes must not have a negative id", __FILE__, __LINE__);
+          exit(1);
       } // switch
     } // else
   } // for
@@ -504,6 +591,14 @@ decltype(auto) run(S root, Ops ops, L&& f_gate_type, Str&& fn)
   // Tile Mapping
   //
   NanoScl mapping(vertex_tile,f_gate_type);
+
+  // TODO Remove
+  auto routes {ns_representations::grid::route(ops, vertex_tile, layers)};
+  celaeno::graph::draw::svg::svg(fmt::format("{}.svg", fn),
+      vertex_tile,
+      routes,
+      [](auto){ return " "; }
+  );
 
 } // function: run }}}
 
