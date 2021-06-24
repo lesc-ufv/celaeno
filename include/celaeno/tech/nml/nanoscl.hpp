@@ -38,6 +38,7 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/graph/reader/verilog.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/balance/outgoing.hpp>
@@ -48,6 +49,7 @@ namespace celaeno::tech::nml::nanoscl
 
 // Using declarations {{{
 using Ops = celaeno::graph::Ops;
+using GateType = celaeno::graph::reader::verilog::GateType;
 // }}}
 
 // using namespaces {{{
@@ -74,6 +76,120 @@ using MapVertexTile = celaeno::graph::representations::grid::MapVertexTile;
 // namespace: cells {{{
 namespace cells
 {
+  // fn: g_and {{{
+  auto g_and(f64 x, f64 y)
+  {
+    return fmt::format(
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"O\",\n"
+      "        \"type\": \"output\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": -1.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": true,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      , x+2, y+2, x, y, x+2, y, x+1, y+1, x, y+2);
+  } // }}}
+
+  // fn: g_or {{{
+  auto g_or(f64 x, f64 y)
+  {
+    return fmt::format(
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"O\",\n"
+      "        \"type\": \"output\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 1.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": true,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      "    {{\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"x\": {},\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"y\": {},\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"id\": \"\",\n"
+      "        \"type\": \"regular\"\n"
+      "    }},\n"
+      , x+2, y+2, x, y, x+2, y, x+1, y+1, x, y+2);
+  } // }}}
+
   // fn: wld {{{
   auto wld(f64 x, f64 y)
   {
@@ -298,10 +414,23 @@ NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
   {
     auto [x,y] = std::make_pair(tile.x*3,tile.y*3);
 
-    // Is node
+    // Is gate
     if( u >= 0 )
     {
-
+      switch (f_gate_type(u))
+      {
+        case GateType::INPUT: break;
+        case GateType::AND:
+          this->buf << cells::g_and(x,y);
+        case GateType::OR:
+          this->buf << cells::g_or(x,y);
+        case GateType::NAND:
+        case GateType::NOR:
+        case GateType::XOR:
+        case GateType::XNOR:
+        case GateType::MAJ3:
+          break;
+      } // switch
     } // if
     // Is wire
     else
@@ -314,9 +443,6 @@ NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
         case TileType::LR:
           this->buf << cells::wlr(x,y);
           break;
-        case TileType::ND:
-          // this->buf << cells::nd(x,y);
-          break;
         case TileType::UD:
           this->buf << cells::wud(x,y);
           break;
@@ -326,6 +452,7 @@ NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
         case TileType::URD:
           this->buf << cells::wurd(x,y);
           break;
+        case TileType::ND: break;
       } // switch
     } // else
   } // for

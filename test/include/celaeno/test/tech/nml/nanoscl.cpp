@@ -35,6 +35,10 @@
 #include <celaeno/graph/reader/verilog.hpp>
 #include <celaeno/tech/nml/nanoscl.hpp>
 
+// Using declarations {{{
+using GateType = celaeno::graph::reader::verilog::GateType;
+// }}}
+
 // Using namespace {{{
 using namespace celaeno::aliases;
 // }}}
@@ -67,12 +71,28 @@ int main(int argc, char const* argv[])
   auto f_l = [&g](auto e){ g.emplace(e); };
   auto f_u = [&g](auto e){ g.erase(e); };
 
+  // Graph operations
   ns_graph::Ops ops(f_p, f_s, f_a, f_l, f_u);
 
-  // Gate label
-  auto f_label = [&](auto id) { return id; };
+  // Get Gate id → Gate type map
+  auto const& m_id_type{metadata.data()};
 
-  ns_tech::nml::nanoscl::run(1, ops, f_label, fmt::format("artifacts/{}",argv[2]) );
+  // Gate type
+  auto f_gate_type = [&](auto id)
+  {
+    if (m_id_type.contains(id))
+    {
+      return m_id_type.at(id);
+    } // if
+    else
+    {
+      spdlog::error("Node {} is of unknown type", id);
+      exit(1);
+    } // else
+  };
+
+  // Generate layout for nmlsim-1
+  ns_tech::nml::nanoscl::run(1, ops, f_gate_type, fmt::format("artifacts/{}",argv[2]) );
 
   return 0;
 } // main }}}
