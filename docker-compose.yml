@@ -7,9 +7,4 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockertests
-    image: celaeno-tests
-  examples:
-    build:
-      context: .
-      dockerfile: ./docker/Dockerexamples
-    image: celaeno-examples
+    image: celaeno:lastest

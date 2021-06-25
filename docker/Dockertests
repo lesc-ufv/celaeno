@@ -1,10 +1,29 @@
 # vim: set expandtab syntax=dockerfile fdm=marker ts=2 sw=2 tw=100 et :
 
-FROM formigoni/alpine-gcc-10:latest
+FROM alpine:latest
+
+# Arguments
+ARG vim
 
 # Install packages
-RUN apk add build-base ninja make cmake clang git py3-pip neovim clang-extra-tools nodejs npm nnn
+RUN apk add --no-cache build-base ninja make cmake \
+  clang git py3-pip  clang-extra-tools nnn fish sudo
+
+# Opt vim install
+RUN if [[ ! -z "$vim" ]] ; then apk add neovim nodejs npm; fi
+
+# Install conan with pip3
 RUN pip3 install -I conan
+
+# Configure user
+ARG USER=user
+ENV HOME /home/$USER
+RUN addgroup -g 1000 $USER
+RUN adduser -u 1000 -G $USER -s /bin/fish -D $USER
+RUN echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER && chmod 0440 /etc/sudoers.d/$USER
+## Change to new user
+USER $USER
+WORKDIR $HOME
 
 # Configure conan
 RUN conan profile new default --detect
@@ -12,39 +31,20 @@ RUN conan profile update settings.compiler.libcxx=libstdc++11 default
 RUN conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
 
 # Configure project
-ADD ./ /celaeno/
-RUN rm -rf /celaeno/build
-WORKDIR /celaeno/build
-
-# Configure Neovim
-RUN git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
-RUN mkdir -p /root/.config/nvim
-RUN cp -r /celaeno/doc/nvim/* /root/.config/nvim/
-RUN mv /root/.config/nvim/vimrc /root/.config/nvim/init.vim
-RUN nvim -c "PluginInstall" -c "qa!"
+RUN git clone https://gitlab.com/formigoni/celaeno.git celaeno
+WORKDIR $HOME/celaeno
 
 # Install dependencies
-RUN conan install .. --build missing
+RUN mkdir build && cd build && conan install .. --build missing && cd ..
 
-# Build the project
-WORKDIR /celaeno
-RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1
-RUN cp build/compile_commands.json .
-RUN cmake --build build
+# Configure Neovim
+RUN if [[ ! -z "$vim" ]] ; then \
+  git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim \
+  && mkdir -p $HOME/.config/nvim \
+  && cp -r $HOME/celaeno/doc/nvim/* $HOME/.config/nvim/ \
+  && mv $HOME/.config/nvim/vimrc $HOME/.config/nvim/init.vim \
+  && nvim -c "PluginInstall" -c "qa!" \
+  ; fi
 
-# # Perform tests
-# ## Search
-# RUN ./build/test/g_search_bfs
-# RUN ./build/test/g_search_dfs
-# RUN ./build/test/g_search_kahn
-# ## Views
-# RUN ./build/test/g_views_depth
-# RUN ./build/test/g_views_proximity
-# ## Operations
-# ### Query
-# RUN ./build/test/g_operations_balance_paths
-# RUN ./build/test/g_operations_count_crossings
-# RUN ./build/test/g_operations_minimize_crossings
-# ### Representations
-# RUN ./build/test/g_operations_incidence_barycenter
-# RUN ./build/test/g_representations_incidence
+# Start shell
+CMD ["fish"]

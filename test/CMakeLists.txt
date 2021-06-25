@@ -107,9 +107,9 @@ endfunction(add_test)
 #
 # ## Representations
 # add_test(g_representations_incidence "include/celaeno/test/graph/representations/incidence.cpp")
-#
+
 ## Drawing
-# add_test(g_draw "include/celaeno/test/graph/draw/svg.cpp")
+add_test(svg "include/celaeno/test/graph/draw/svg.cpp")
 
 ## HDL
 add_test(nanoscl "include/celaeno/test/tech/nml/nanoscl.cpp")
