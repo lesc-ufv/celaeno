@@ -55,6 +55,14 @@ Table of Contents:
 docker build -t celaeno:latest -f docker/Dockertests .
 ```
 
+`Optional: Include pre-configured neovim`
+
+```sh
+docker build -t celaeno:vim --build-arg vim=true -f docker/Dockertests .
+```
+
+To enable clangd inside vim, use `:CocInstall coc-clangd`
+
 **Step 2: Run the docker image**
 
 ```sh
