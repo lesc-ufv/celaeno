@@ -75,7 +75,8 @@ Inside the running container, to configure the project use:
 
 ```sh
 cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1
+  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
+  && cp ./build/compile_commands.json .
 ```
 
 Here, the options in [CMake Flags](#cmake-flags) may be used, e.g.:
@@ -83,7 +84,7 @@ Here, the options in [CMake Flags](#cmake-flags) may be used, e.g.:
 ```sh
 cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
-  -DDEBUG_SHOW_HDL=ON
+  -DDEBUG_SHOW_HDL=ON && cp ./build/compile_commands.json .
 ```
 
 `Note`: DEBUG_* flags only work if `CMAKE_BUILD_TYPE` is set to `Debug`.
