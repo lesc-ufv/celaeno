@@ -32,90 +32,63 @@ Table of Contents:
     - [x] Dummy Nodes
 - Draw
   - [x] SVG
+- Tech
+  - NML
+    - [x] NanoSCL
 
-## Integration
+## CMake Flags
 
-### Conan
+| CMake Flag       | Description                              | Default|
+| :----:           | :----:                                   | :----: |
+| `DEBUG_SVG_HPP`  | " Enables logging for svg.hpp          " | OFF    |
+| `DEBUG_SHOW_ALG` | " Displays executed algorithms orderly " | OFF    |
+| `DEBUG_SHOW_HDL` | " Displays read HDL expressions        " | OFF    |
+| `OPT_SEQ`        | " Single threaded mode                 " | OFF    |
 
-To integrate celæno to a conan project, add the bintray remote with the command:
+## Compiling
+
+### Docker (Recommended)
+
+**Step 1: Build the docker image**
 
 ```sh
-conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
+docker build -t celaeno:latest -f docker/Dockertests .
 ```
 
-In `conanfile.txt`, include the following:
+**Step 2: Run the docker image**
 
-```txt
-[requires]
-celaeno/0.1@ruanformigoni/testing
-
-[generators]
-cmake_find_package
-cmake_paths
-
+```sh
+docker container run -it --rm celaeno:latest
 ```
 
-And in `CMakeLists.txt` include this line right after the project name:
+**Step 3: Configure the project**
 
-```cmake
-include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
+Inside the running container, to configure the project use:
+
+```sh
+cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1
 ```
 
-## Examples
+Here, the options in [CMake Flags](#cmake-flags) may be used, e.g.:
 
-<details>
-<summary>Breadth-First Search</summary>
-
-```cpp
-#include <fmt/ranges.h>
-
-#include <celaeno/aliases.hpp>
-#include <celaeno/graph/graph.hpp>
-#include <celaeno/graph/search/bfs.hpp>
-
-// Using declarations
-using namespace celaeno::aliases;
-
-// namespaces
-namespace graph = celaeno::graph;
-namespace bfs = celaeno::graph::search::bfs;
-
-i32 main()
-{
-  // Graph
-  graph::Graph<i64> g
-  {
-    {1,5},{2,4},{3,4},{6,9},
-    {4,7},{5,7},{5,8},{5,9},
-    {7,12},{8,10},{8,11},
-  };
-
-  // Required behaviors
-  auto f_pred = [&g](auto&& u){ return g.predecessors(u); };
-  auto f_succ = [&g](auto&& u){ return g.successors(u); };
-
-  // Run algorithm
-  auto search {bfs::run(1,f_pred,f_succ)};
-
-  // Print Result
-  fmt::print("Bfs ordering: {}\n", search);
-
-  return 0;
-} // main
+```sh
+cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
+  -DDEBUG_SHOW_HDL=ON
 ```
 
-Result:
+`Note`: DEBUG_* flags only work if `CMAKE_BUILD_TYPE` is set to `Debug`.
 
-`1,5,7,8,9,12,4,10,11,6,2,3,`
+**Step 4: Compile the project**
 
-</details>
+```sh
+cmake --build build
+```
 
-<details>
-<summary>Graph SVG Writer</summary>
 
-**TODO**
+## Usage
 
-</details>
 
 ## Documentation
 
