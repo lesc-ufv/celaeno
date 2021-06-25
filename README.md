@@ -1,4 +1,4 @@
-# Celaeno - A Modern Graph Algorithms Library
+# Celaeno - Research in Field-Coupled Nanocomputing
 
 
 
