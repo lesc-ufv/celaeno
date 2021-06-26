@@ -41,8 +41,7 @@ Plugin 'tpope/vim-repeat'
 source $HOME/.config/nvim/modules/goyo.vim          " Zen mode
 
 " Language support
-Plugin 'sheerun/vim-polyglot'                       " Highlight for various languages
-Plugin 'ap/vim-css-color'                           " Show hex colors
+" Plugin 'sheerun/vim-polyglot'                       " Highlight for various languages
 Plugin 'neomake/neomake'                            " Syntax checks
 Plugin 'vhda/verilog_systemverilog.vim'
 
