@@ -143,6 +143,13 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
   // Output file
   std::ofstream of{filename};
 
+  // Check output file state
+  if ( ! of.good())
+  {
+    spdlog::error("{}@{} Not possible to open file {} for writting", __FILE__,__LINE__,filename);
+    exit(1);
+  } // if
+
   // Streams
   std::stringstream header;
   std::stringstream vertices;
@@ -294,7 +301,7 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
   logger->info("Area: {}x{}", x,y);
 #else
   auto vertex_tile {ns_representations::grid::run(root, ops, layers)};
-  auto paths{route(root, ops, vertex_tile, layers)};
+  auto paths{route(ops, vertex_tile, layers)};
 #endif
 
   // Write output .svg file

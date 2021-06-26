@@ -36,37 +36,52 @@
 #include <fstream>
 #include <sstream>
 
+#include <range/v3/all.hpp>
 #include <spdlog/spdlog.h>
+#include <fmt/core.h>
 
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
 #include <celaeno/graph/draw/svg.hpp>
 // }}}
 
-  // Using namespace {{{
-  using namespace celaeno::aliases;
-  // }}}
+// Using namespace {{{
+using namespace celaeno::aliases;
+// }}}
 
-  // namespaces {{{
-  namespace ns_graph = celaeno::graph;
-  namespace ns_reader = celaeno::graph::reader::verilog;
-  namespace ns_svg = celaeno::graph::draw::svg;
-  // }}}
+// namespaces {{{
+namespace rg = ranges;
+
+namespace ns_graph = celaeno::graph;
+namespace ns_reader = celaeno::graph::reader::verilog;
+namespace ns_svg = celaeno::graph::draw::svg;
+// }}}
 
 int main(int argc, char* argv[])
 {
+  char const* help_msg =
+    "Usage:\n"
+    "./svg -i input-file.v -o output-file.svg\n\n"
+    "Options:\n"
+    "  -h|--help: Show this message\n"
+    "  -i: Input file\n"
+    "  -o: Output file\n"
+  ;
 
   // Check input arguments
-  if( argc != 3 )
+  if( argc != 5 )
   {
-    spdlog::error("No input file given");
-    exit(1);
+    fmt::print(help_msg);
+    exit(0);
   }
+
+  spdlog::info("Input file {}", argv[2]);
+  spdlog::info("Output file {}", argv[4]);
 
   // Read graph
   ns_graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  auto metadata {ns_reader::Reader{argv[1],emplace}};
+  auto metadata {ns_reader::Reader{argv[2],emplace}};
 
   // Helpers
   auto f_p = [&g](auto v){ return g.predecessors(v); };
@@ -81,5 +96,5 @@ int main(int argc, char* argv[])
   auto f_label = [&](auto id) { return id; };
 
   // Test drawing
-  ns_svg::run(1, ops, f_label, fmt::format("artifacts/{}",argv[2]) );
+  ns_svg::run(1, ops, f_label, fmt::format("{}",argv[4]) );
 } // main

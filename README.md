@@ -98,6 +98,15 @@ cmake --build build
 
 ## Usage
 
+### HDL to SVG
+
+To use the svg drawing algorithm:
+
+```sh
+./build/test/svg -i test/data/synth-91/b1.v -o b1
+```
+
+Several sample circuits are available under the `data` directory.
 
 ## Documentation
 

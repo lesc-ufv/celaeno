@@ -146,7 +146,7 @@ Reader<T>::Reader(S&& filename, T callback)
 
   if (! ifile.good())
   {
-    spdlog::error("Invalid input file {}", filename);
+    spdlog::error("{}@{} Invalid input file {}", __FILE__, __LINE__,filename);
     exit(1);
   } // if ! ifile.good()
 
@@ -203,7 +203,7 @@ Reader<T>::Reader(S&& filename, T callback)
     || this->on_or(line))
     // Error on parsing
     ){
-      spdlog::error(fmt::format("Did not match: {}\n",line));
+      spdlog::error("{}@{}: Did not match: {}\n",__FILE__,__LINE__,line);
       throw ParseError(fmt::format("Error on parsing expression: {}", line));
     }
   }
