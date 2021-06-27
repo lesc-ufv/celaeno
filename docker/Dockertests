@@ -53,6 +53,9 @@ RUN  if [[ ! -z $DEBUG_SHOW_ALG ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_ALG; fi
 RUN  if [[ ! -z $DEBUG_SHOW_HDL ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_HDL; fi
 RUN  if [[ ! -z $OPT_SEQ ]]; then cmake -H. -Bbuild -DOPT_SEQ; fi
 
+# Build project
+RUN cmake --build build
+
 # Configure Neovim
 RUN if [[ ! -z "$VIM" ]] ; then \
   git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim \
