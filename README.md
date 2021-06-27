@@ -78,7 +78,7 @@ docker container run -it --rm celaeno:latest
 ```
 
 
-## Usage
+## How to Use Examples
 
 ### HDL to SVG
 
@@ -86,6 +86,14 @@ To use the svg drawing algorithm:
 
 ```sh
 ./build/test/svg -i test/data/synth-91/b1.v -o b1
+```
+
+### HDL to Nanomagnetic Logic Simulator (NMLSIM) 1.0
+
+To use the svg drawing algorithm:
+
+```sh
+./build/test/nanoscl -i test/data/synth-91/b1.v -o ./shared/b1
 ```
 
 Several sample circuits are available under the `data` directory.
