@@ -55,44 +55,26 @@ Table of Contents:
 docker build -t celaeno:latest -f docker/Dockertests .
 ```
 
+`Optional: Enable CMake flags`
+
+To enable any of the [CMake flags](cmake-flags), use them as a build argument, e.g.:
+
+```sh
+docker build -t celaeno:latest --build-arg OPT_SEQ=true -f docker/Dockertests .
+```
+
 `Optional: Include pre-configured neovim`
 
 ```sh
-docker build -t celaeno:vim --build-arg vim=true -f docker/Dockertests .
+docker build -t celaeno:latest --build-arg VIM=true -f docker/Dockertests .
 ```
 
-To enable clangd inside vim, use `:CocInstall coc-clangd`
+To enable clangd inside vim, use `:PluginInstall` and `:CocInstall coc-clangd`
 
 **Step 2: Run the docker image**
 
 ```sh
 docker container run -it --rm celaeno:latest
-```
-
-**Step 3: Configure the project**
-
-Inside the running container, to configure the project use:
-
-```sh
-cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
-  && cp ./build/compile_commands.json .
-```
-
-Here, the options in [CMake Flags](#cmake-flags) may be used, e.g.:
-
-```sh
-cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
-  -DDEBUG_SHOW_HDL=ON && cp ./build/compile_commands.json .
-```
-
-`Note`: DEBUG_* flags only work if `CMAKE_BUILD_TYPE` is set to `Debug`.
-
-**Step 4: Compile the project**
-
-```sh
-cmake --build build
 ```
 
 
