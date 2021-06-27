@@ -73,6 +73,10 @@ namespace ns_balance = celaeno::graph::operations::balance;
 namespace ns_representations = celaeno::graph::representations;
 // }}}
 
+// Constants {{{
+i32 const TILE_SIZE{3};
+// }}}
+
 // Using declarations {{{
 using TileType = celaeno::graph::representations::grid::TileType;
 using MapVertexTile = celaeno::graph::representations::grid::MapVertexTile;
@@ -469,19 +473,20 @@ class NanoScl
 template<typename F>
 NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
 {
+  auto [area_x,area_y] = ns_grid::area(m_vertex_tile);
 
   this->buf <<
-    R"(
-      [
-          {
-              "numberY": 300,
-              "numberX": 1000
-          },
-    )";
+    fmt::format(
+    "[\n"
+    "    {{\n"
+    "        \"numberY\": {},\n"
+    "        \"numberX\": {}\n"
+    "    }},\n"
+    , area_x*TILE_SIZE*2, area_y*TILE_SIZE*2);
 
   for (auto const& [u,tile] : m_vertex_tile)
   {
-    auto [x,y] = std::make_pair(tile.x*3,tile.y*3);
+    auto [x,y] = std::make_pair(tile.x*TILE_SIZE,tile.y*TILE_SIZE);
 
     // Is gate
     if( u >= 0 )
