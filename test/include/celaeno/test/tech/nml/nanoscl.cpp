@@ -92,7 +92,7 @@ int main(int argc, char const* argv[])
   };
 
   // Generate layout for nmlsim-1
-  ns_tech::nml::nanoscl::run(1, ops, f_gate_type, fmt::format("artifacts/{}",argv[2]) );
+  ns_tech::nml::nanoscl::run(1, ops, f_gate_type, fmt::format("{}",argv[2]) );
 
   return 0;
 } // main }}}

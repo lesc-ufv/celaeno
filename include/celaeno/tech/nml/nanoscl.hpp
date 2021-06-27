@@ -46,6 +46,7 @@
 
 // TODO REMOVE
 #include <celaeno/graph/draw/svg.hpp>
+#include <celaeno/graph/search/bfs.hpp>
 
 namespace celaeno::tech::nml::nanoscl
 {
@@ -65,6 +66,7 @@ namespace rg = ranges;
 namespace rv = ranges::views;
 namespace fp = fplus;
 
+namespace ns_search = celaeno::graph::search;
 namespace ns_views = celaeno::graph::views;
 namespace ns_grid = celaeno::graph::representations::grid;
 namespace ns_balance = celaeno::graph::operations::balance;
@@ -291,7 +293,17 @@ namespace cells
       "        \"id\": \"\",\n"
       "        \"type\": \"regular\"\n"
       "    }},\n"
-      , x, y, x+1, y, x+1, y+1);
+      "    {{\n"
+      "        \"clock_zone\": 0,\n"
+      "        \"fixed_magnetization\": false,\n"
+      "        \"id\": \"\",\n"
+      "        \"logic\": \"normal\",\n"
+      "        \"magnetization\": 0.0,\n"
+      "        \"type\": \"regular\",\n"
+      "        \"x\": {},\n"
+      "        \"y\": {}\n"
+      "    }},\n"
+      , x, y, x+1, y, x+1, y+1, x+1, y+2);
   } // }}}
 
   // fn: w_lr {{{
@@ -372,37 +384,27 @@ namespace cells
   auto w_ur(f64 x, f64 y)
   {
     return fmt::format(
-      "    {{\n"
-      "        \"magnetization\": 0.0,\n"
-      "        \"clock_zone\": 0,\n"
-      "        \"x\": {},\n"
-      "        \"fixed_magnetization\": false,\n"
-      "        \"y\": {},\n"
-      "        \"logic\": \"normal\",\n"
-      "        \"id\": \"\",\n"
-      "        \"type\": \"regular\"\n"
-      "    }},\n"
-      "    {{\n"
-      "        \"magnetization\": 0.0,\n"
-      "        \"clock_zone\": 0,\n"
-      "        \"x\": {},\n"
-      "        \"fixed_magnetization\": false,\n"
-      "        \"y\": {},\n"
-      "        \"logic\": \"normal\",\n"
-      "        \"id\": \"\",\n"
-      "        \"type\": \"regular\"\n"
-      "    }},\n"
-      "    {{\n"
-      "        \"magnetization\": 0.0,\n"
-      "        \"clock_zone\": 0,\n"
-      "        \"x\": {},\n"
-      "        \"fixed_magnetization\": false,\n"
-      "        \"y\": {},\n"
-      "        \"logic\": \"normal\",\n"
-      "        \"id\": \"\",\n"
-      "        \"type\": \"regular\"\n"
-      "    }},\n"
-    , x+1, y, x+1, y+1, x+2, y+1);
+    "{{\n"
+    "    \"clock_zone\": 0,\n"
+    "    \"fixed_magnetization\": false,\n"
+    "    \"id\": \"\",\n"
+    "    \"logic\": \"normal\",\n"
+    "    \"magnetization\": 0.0,\n"
+    "    \"type\": \"regular\",\n"
+    "    \"x\": {},\n"
+    "    \"y\": {}\n"
+    "}},\n"
+    "{{\n"
+    "    \"clock_zone\": 0,\n"
+    "    \"fixed_magnetization\": false,\n"
+    "    \"id\": \"\",\n"
+    "    \"logic\": \"normal\",\n"
+    "    \"magnetization\": 0.0,\n"
+    "    \"type\": \"regular\",\n"
+    "    \"x\": {},\n"
+    "    \"y\": {}\n"
+    "}},\n"
+    , x+1, y, x+2, y);
   } // }}}
 
   // fn: w_urd {{{
@@ -585,19 +587,92 @@ decltype(auto) run(S root, Ops ops, L&& f_gate_type, Str&& fn)
   //
   // Tile Placement and Edge Routing
   //
-  auto vertex_tile {ns_representations::grid::run(root, ops, layers)};
+  auto m_vertex_tile {ns_representations::grid::run(root, ops, layers)};
+
+  // TODO Remove
+  // Pseudo number index
+  i64 counter{};
+
+  // Define function to compare values lt 0
+  auto f_lowest = [&counter](auto&& e) { if(e < counter){ counter=e; } return false; };
+
+  // Get the dummy vertex with the lowest value
+  ns_search::bfs::run(root,ops.preds,ops.succs,f_lowest);
+
+  // A struct to control the value of pseudo nodes
+  auto f_make_pseudo = [counter]
+  {
+    struct Pseudo
+    {
+      private:
+        i64 c;
+      public:
+        Pseudo(i64 c) : c(c) {}
+        i64 next(){ return --c; }
+        i64 curr(){ return c; }
+    };
+    return Pseudo{counter};
+  }();
+
+  using Tile = celaeno::graph::representations::grid::Tile;
+  using TileType = celaeno::graph::representations::grid::TileType;
+
+  std::map<i64,Tile> m;
+
+  auto m_tiles_route {ns_representations::grid::route(ops, m_vertex_tile, layers)};
+
+  for (std::set<Tile> visited; auto const& [tiles,route] : m_tiles_route)
+  {
+    for (auto it{route.begin()}; it != route.end(); ++it)
+    {
+      // Ignore first and last positions
+      if( it == route.begin() || std::next(it) == route.end() ){ continue; }
+
+      // Get current and adjacent positions
+      auto [x,y] = *it;
+      auto [px,py] = *std::prev(it);
+      auto [nx,ny] = *std::next(it);
+
+      // Check which have changed
+
+      // Set TileType
+      // Vertical wire
+      if( (px == x) && (x == nx ) )
+      {
+        m_vertex_tile.emplace(f_make_pseudo.next(),Tile(x,y,TileType::UD));
+      } // else if
+
+      // Horizontal wire
+      else if( (py == y) && (y == ny) )
+      {
+        m_vertex_tile.emplace(f_make_pseudo.next(),Tile(x,y,TileType::LR));
+      } // else if
+
+      // Up to right wire
+      else if( (py < y) && (nx > x) )
+      {
+        m_vertex_tile.emplace(f_make_pseudo.next(),Tile(x,y,TileType::UR));
+      } // else if
+
+      else
+      {
+        m_vertex_tile.emplace(f_make_pseudo.next(),Tile(x,y,TileType::LD));
+      } // else
+      // Left to down wire
+
+    } // for
+  } // for
+
 
   //
   // Tile Mapping
   //
-  NanoScl mapping(vertex_tile,f_gate_type);
+  NanoScl mapping(m_vertex_tile,f_gate_type);
 
-  // TODO Remove
-  auto routes {ns_representations::grid::route(ops, vertex_tile, layers)};
-  celaeno::graph::draw::svg::svg(fmt::format("{}.svg", fn),
-      vertex_tile,
-      routes,
-      [](auto){ return " "; }
+  celaeno::graph::draw::svg::svg(fmt::format("{}.svg", fn)
+    , m_vertex_tile
+    , m_tiles_route
+    , [](auto){ return " "; }
   );
 
 } // function: run }}}
