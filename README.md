@@ -57,7 +57,7 @@ docker build -t celaeno:latest -f docker/Dockertests .
 
 `Optional: Enable CMake flags`
 
-To enable any of the [CMake flags](cmake-flags), use them as a build argument, e.g.:
+To enable any of the [CMake flags](#cmake-flags), use them as a build argument, e.g.:
 
 ```sh
 docker build -t celaeno:latest --build-arg OPT_SEQ=true -f docker/Dockertests .
