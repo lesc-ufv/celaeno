@@ -88,7 +88,7 @@ To use the svg drawing algorithm:
 ./build/test/svg -i test/data/synth-91/b1.v -o b1
 ```
 
-### HDL to Nanomagnetic Logic Simulator (NMLSIM) 1.0
+### HDL to [Nanomagnetic Logic Simulator (NMLSIM) 1.0](https://gitlab.com/formigoni/docker-eda)
 
 To use the svg drawing algorithm:
 
