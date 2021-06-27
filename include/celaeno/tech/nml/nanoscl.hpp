@@ -486,12 +486,12 @@ class NanoScl
   private:
     std::stringstream buf;
   public:
-    template<typename F>
-    NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type);
+    template<typename F, String Str>
+    NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type, Str&& fn);
 }; // class: NanoScl
 
-template<typename F>
-NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
+template<typename F, String Str>
+NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type, Str&& fn)
 {
   auto [area_x,area_y] = ns_grid::area(m_vertex_tile);
 
@@ -573,7 +573,18 @@ NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type)
 
   this->buf << "\n]";
 
-  fmt::print("{}\n", this->buf.str());
+  // Write file
+  if (std::ofstream of{fn,std::ios::trunc}; ! of.good())
+  {
+    spdlog::error("{}@{} Not possible to create file {}", __FILE__,__LINE__,fn);
+    exit(1);
+  } // if
+  else
+  {
+    of << this->buf.str();
+    of.close();
+  } // else
+
 }
 // }}}
 
@@ -692,7 +703,7 @@ decltype(auto) run(S root, Ops ops, L&& f_gate_type, Str&& fn)
   //
   // Tile Mapping
   //
-  NanoScl mapping(m_vertex_tile,f_gate_type);
+  NanoScl mapping(m_vertex_tile,f_gate_type,fmt::format("{}.json", fn));
 
   celaeno::graph::draw::svg::svg(fmt::format("{}.svg", fn)
     , m_vertex_tile

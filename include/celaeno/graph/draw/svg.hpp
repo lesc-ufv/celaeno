@@ -146,7 +146,7 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
   // Check output file state
   if ( ! of.good())
   {
-    spdlog::error("{}@{} Not possible to open file {} for writting", __FILE__,__LINE__,filename);
+    spdlog::error("{}@{} Not possible to create file {}", __FILE__,__LINE__,filename);
     exit(1);
   } // if
 

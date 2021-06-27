@@ -52,17 +52,29 @@ namespace ns_reader = celaeno::graph::reader::verilog;
 // fn: main  {{{
 int main(int argc, char const* argv[])
 {
+  char const* help_msg =
+    "Usage:\n"
+    "./svg -i input-file.v -o output-file.svg\n\n"
+    "Options:\n"
+    "  -h|--help: Show this message\n"
+    "  -i: Input file\n"
+    "  -o: Output file\n"
+  ;
+
   // Check input arguments
-  if( argc != 3 )
+  if( argc != 5 )
   {
-    spdlog::error("No input file given");
-    exit(1);
+    fmt::print(help_msg);
+    exit(0);
   }
+
+  spdlog::info("Input file {}", argv[2]);
+  spdlog::info("Output file {}", argv[4]);
 
   // Read graph
   ns_graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  auto metadata {ns_reader::Reader{argv[1],emplace}};
+  auto metadata {ns_reader::Reader{argv[2],emplace}};
 
   // Helpers
   auto f_p = [&g](auto v){ return g.predecessors(v); };
@@ -92,7 +104,7 @@ int main(int argc, char const* argv[])
   };
 
   // Generate layout for nmlsim-1
-  ns_tech::nml::nanoscl::run(1, ops, f_gate_type, fmt::format("{}",argv[2]) );
+  ns_tech::nml::nanoscl::run(1, ops, f_gate_type, fmt::format("{}",argv[4]) );
 
   return 0;
 } // main }}}
