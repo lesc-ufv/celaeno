@@ -88,7 +88,7 @@ To use the svg drawing algorithm:
 ./build/test/svg -i test/data/synth-91/b1.v -o b1
 ```
 
-<img width="1000px" src="doc/examples/b1.png">
+<img width="800px" src="doc/examples/b1.png">
 
 ### HDL to [Nanomagnetic Logic Simulator (NMLSIM) 1.0](https://gitlab.com/formigoni/docker-eda)
 
@@ -98,7 +98,7 @@ To use the svg drawing algorithm:
 ./build/test/nanoscl -i test/data/synth-91/b1.v -o ./shared/b1
 ```
 
-<img width="1000px" src="doc/examples/b1-nmlsim.png">
+<img width="800px" src="doc/examples/b1-nmlsim.png">
 
 Several sample circuits are available under the `data` directory.
 
