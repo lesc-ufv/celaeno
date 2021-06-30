@@ -156,17 +156,7 @@ namespace cells
       "        \"x\": {},\n"
       "        \"y\": {}\n"
       "    }},\n"
-      "    {{\n"
-      "        \"clock_zone\": 0,\n"
-      "        \"fixed_magnetization\": false,\n"
-      "        \"id\": \"\",\n"
-      "        \"logic\": \"normal\",\n"
-      "        \"magnetization\": 0.0,\n"
-      "        \"type\": \"regular\",\n"
-      "        \"x\": {},\n"
-      "        \"y\": {}\n"
-      "    }}\n"
-    , x+1, y, x+2, y, x+1, y+1, x+1, y+2);
+    , x+1, y+1, x+2, y+1, x+1, y+2);
   } // }}}
 
   // fn: g_and {{{
@@ -317,17 +307,7 @@ namespace cells
       "        \"id\": \"\",\n"
       "        \"type\": \"regular\"\n"
       "    }},\n"
-      "    {{\n"
-      "        \"clock_zone\": 0,\n"
-      "        \"fixed_magnetization\": false,\n"
-      "        \"id\": \"\",\n"
-      "        \"logic\": \"normal\",\n"
-      "        \"magnetization\": 0.0,\n"
-      "        \"type\": \"regular\",\n"
-      "        \"x\": {},\n"
-      "        \"y\": {}\n"
-      "    }},\n"
-      , x, y, x+1, y, x+1, y+1, x+1, y+2);
+      , x, y+1, x+1, y+1, x+1, y+2);
   } // }}}
 
   // fn: w_lr {{{
@@ -364,7 +344,7 @@ namespace cells
       "        \"id\": \"\",\n"
       "        \"type\": \"regular\"\n"
       "    }},\n"
-      , x, y, x+1, y, x+2, y);
+      , x, y+1, x+1, y+1, x+2, y+1);
   } // }}}
 
   // fn: w_ud {{{
@@ -428,7 +408,17 @@ namespace cells
     "    \"x\": {},\n"
     "    \"y\": {}\n"
     "}},\n"
-    , x+1, y, x+2, y);
+    "{{\n"
+    "    \"clock_zone\": 0,\n"
+    "    \"fixed_magnetization\": false,\n"
+    "    \"id\": \"\",\n"
+    "    \"logic\": \"normal\",\n"
+    "    \"magnetization\": 0.0,\n"
+    "    \"type\": \"regular\",\n"
+    "    \"x\": {},\n"
+    "    \"y\": {}\n"
+    "}},\n"
+    , x+1, y, x+1, y+1, x+2, y+1);
   } // }}}
 
   // fn: w_urd {{{
