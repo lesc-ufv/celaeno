@@ -229,7 +229,7 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
   }; // lamb: impl_phase_1
 
   auto phase_1 =
-  [&]<Matrix M>(M m0, auto& l1, auto &l2)
+  [&]
   {
     // Compute best number of crossings
     i64 best_crossings{};
@@ -294,7 +294,7 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
       {
         // spdlog::info("opt_ror");
         l2 = opt_ror->second;
-        phase_1(incidence::run(l1,l2,f_adj),l1,l2);
+        phase_1();
       }
 
       //
@@ -305,7 +305,7 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
       {
         // spdlog::info("opt_roc");
         l1 = opt_roc->second;
-        phase_1(incidence::run(l1,l2,f_adj),l1,l2);
+        phase_1();
       }
 
       if( ! opt_ror && ! opt_roc ){ stop = true; }

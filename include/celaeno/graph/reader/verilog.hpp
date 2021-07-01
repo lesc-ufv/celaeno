@@ -71,9 +71,9 @@ class ParseError : std::exception
     std::string const error_msg;
 
   public:
-    template<typename T>
-    ParseError(T&& error_msg)
-      : error_msg(std::forward<T>(error_msg))
+    template<String S>
+    ParseError(S&& str)
+      : error_msg(std::forward<S>(str))
     {}
     virtual const char* what() const noexcept override
     {
@@ -101,7 +101,7 @@ class Reader
   // Constructors {{{
   public:
     template<typename S>
-    Reader(S&& input, T callback);
+    Reader(S&& _filename, T _callback);
   // }}}
 
   // Element Access {{{
@@ -111,10 +111,10 @@ class Reader
   // Private Methods {{{
   private:
     // Modifiers {{{
-    bool on_assign( std::string const& line ) const;
-    bool on_and( std::string const& line ) const;
-    bool on_or( std::string const& line ) const;
-    void update(auto&& lhs, GateType const& type, auto&&... ops) const;
+    bool on_assign( std::string const& _line ) const;
+    bool on_and( std::string const& _line ) const;
+    bool on_or( std::string const& _line ) const;
+    void update(auto&& _lhs, GateType const& _type, auto&&... _ops) const;
     // }}}
   // }}}
 };
@@ -133,20 +133,22 @@ std::string_view const Reader<T>::expr_or = "assign({0})=~?({0}){1}~?({0})";
 // Constructors {{{
 template<typename T>
 template<typename S>
-Reader<T>::Reader(S&& filename, T callback)
-  : callback(callback)
-  , id_counter(0)
+Reader<T>::Reader(S&& _filename, T _callback)
+  : callback(_callback)
+  , id_counter()
+  , ids()
+  , gate_type()
 {
 
 #ifndef NDEBUG
   spdlog::set_level(spdlog::level::debug);
 #endif
 
-  std::ifstream ifile{filename};
+  std::ifstream ifile{_filename};
 
   if (! ifile.good())
   {
-    spdlog::error("{}@{} Invalid input file {}", __FILE__, __LINE__,filename);
+    spdlog::error("{}@{} Invalid input file {}", __FILE__, __LINE__,_filename);
     exit(1);
   } // if ! ifile.good()
 
@@ -154,13 +156,13 @@ Reader<T>::Reader(S&& filename, T callback)
 
   { std::stringstream ss; ss << ifile.rdbuf(); input = ss.str(); }
 
-  auto eval_regex = [&](auto&& line, auto&& pattern, auto&& msg)
+  auto eval_regex = [&](auto&& _line, auto&& pattern, [[maybe_unused]] auto&& msg)
   {
     std::regex r{pattern};
 
     std::smatch m;
 
-    if( std::regex_match(line,m,r) )
+    if( std::regex_match(_line,m,r) )
     {
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
       spdlog::debug(msg);
@@ -175,36 +177,36 @@ Reader<T>::Reader(S&& filename, T callback)
     | ra::split(';')
   )
   {
-    std::string line(rng.begin(),rng.end());
+    std::string _line(rng.begin(),rng.end());
 
     // Newline
-    if (not (eval_regex(line,"^$","Newline")
+    if (not (eval_regex(_line,"^$","Newline")
     // Comment
-    || eval_regex(line,"^//.*$",fmt::format("Comment: {}",line))
+    || eval_regex(_line,"^//.*$",fmt::format("Comment: {}",_line))
     // Module
-    || eval_regex(line,
+    || eval_regex(_line,
         fmt::format("module{}.*",expr_id),
-        fmt::format("Module: {}",line))
+        fmt::format("Module: {}",_line))
     // Endmodule
-    || eval_regex(line,"endmodule","Endmodule")
+    || eval_regex(_line,"endmodule","Endmodule")
     // Inputs/Outputs
-    || eval_regex(line,
+    || eval_regex(_line,
         fmt::format("((input)|(output))({}[,;]?)+",expr_id),
-        fmt::format("IO: {}",line))
+        fmt::format("IO: {}",_line))
     // Wire declarations
-    || eval_regex(line,
+    || eval_regex(_line,
             fmt::format("(wire)?({}[,;]?)+",expr_id),
-            fmt::format("Wire: {}",line))
+            fmt::format("Wire: {}",_line))
     // Assigns
-    || this->on_assign(line)
+    || this->on_assign(_line)
     // And gates
-    || this->on_and(line)
+    || this->on_and(_line)
     // Or gates
-    || this->on_or(line))
+    || this->on_or(_line))
     // Error on parsing
     ){
-      spdlog::error("{}@{}: Did not match: {}\n",__FILE__,__LINE__,line);
-      throw ParseError(fmt::format("Error on parsing expression: {}", line));
+      spdlog::error("{}@{}: Did not match: {}\n",__FILE__,__LINE__,_line);
+      throw ParseError(fmt::format("Error on parsing expression: {}", _line));
     }
   }
 
@@ -231,12 +233,12 @@ std::map<i64,GateType> const& Reader<T>::data() const noexcept
 
 // Modifiers {{{
 template<typename T>
-bool Reader<T>::on_assign( std::string const& line ) const
+bool Reader<T>::on_assign( std::string const& _line ) const
 {
   std::regex r{fmt::format(expr_assign, expr_id)};
 
   std::smatch m;
-  if( std::regex_match(line,m,r) )
+  if( std::regex_match(_line,m,r) )
   {
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Assign: ({}) Input: ({})",
@@ -248,12 +250,12 @@ bool Reader<T>::on_assign( std::string const& line ) const
 }
 
 template<typename T>
-bool Reader<T>::on_and( std::string const& line ) const
+bool Reader<T>::on_and( std::string const& _line ) const
 {
   std::regex r{fmt::format(expr_and, expr_id, "&")};
 
   std::smatch m;
-  if( std::regex_match(line,m,r) )
+  if( std::regex_match(_line,m,r) )
   {
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Gate: ({}) Inputs: ({}) & ({})",
@@ -266,12 +268,12 @@ bool Reader<T>::on_and( std::string const& line ) const
 }
 
 template<typename T>
-bool Reader<T>::on_or( std::string const& line ) const
+bool Reader<T>::on_or( std::string const& _line ) const
 {
   std::regex r{fmt::format(expr_or, expr_id, "\\|")};
 
   std::smatch m;
-  if( std::regex_match(line,m,r) )
+  if( std::regex_match(_line,m,r) )
   {
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Gate: ({}) Inputs: ({}) | ({})",
@@ -284,7 +286,7 @@ bool Reader<T>::on_or( std::string const& line ) const
 }
 
 template<typename T>
-void Reader<T>::update(auto&& lhs, GateType const& type, auto&&... ops) const
+void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
 {
   // Include gate id in list if it was not found before
   [this]<typename... Args>(Args&&... args) -> void
@@ -299,27 +301,27 @@ void Reader<T>::update(auto&& lhs, GateType const& type, auto&&... ops) const
 
     (inc(std::forward<Args>(args)), ...);
 
-  }(std::forward<decltype(ops)>(ops)...);
+  }(std::forward<decltype(_ops)>(_ops)...);
 
-  // Insert gate type for lhs
-  if( ! this->ids.contains(lhs) )
+  // Insert gate _type for _lhs
+  if( ! this->ids.contains(_lhs) )
   {
-    this->ids[lhs] = this->id_counter;
-    this->gate_type[this->id_counter] = type;
+    this->ids[_lhs] = this->id_counter;
+    this->gate_type[this->id_counter] = _type;
     ++this->id_counter;
   }
 
   // Perform insertion callback
-  [&lhs,this]<typename... Args>(Args&&... args) -> void
+  [&_lhs,this]<typename... Args>(Args&&... args) -> void
   {
-    auto link = [&lhs,this](auto&& arg)
+    auto link = [&_lhs,this](auto&& arg)
     {
-      this->callback(std::make_pair(this->ids[arg], this->ids[lhs]));
+      this->callback(std::make_pair(this->ids[arg], this->ids[_lhs]));
     };
 
     (link(std::forward<Args>(args)),...);
 
-  }(std::forward<decltype(ops)>(ops)...);
+  }(std::forward<decltype(_ops)>(_ops)...);
 
 } // }}}
 

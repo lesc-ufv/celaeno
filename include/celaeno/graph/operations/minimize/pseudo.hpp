@@ -96,7 +96,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink)
       private:
         i64 c;
       public:
-        Pseudo(i64 c) : c(c) {}
+        Pseudo(i64 _c) : c(_c) {}
         i64 next(){ return --c; }
         i64 curr(){ return c; }
     };

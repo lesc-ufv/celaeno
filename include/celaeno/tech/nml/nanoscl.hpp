@@ -80,6 +80,7 @@ i32 const TILE_SIZE{3};
 // }}}
 
 // Using declarations {{{
+using Tile = celaeno::graph::representations::grid::Tile;
 using TileType = celaeno::graph::representations::grid::TileType;
 using MapVertexTile = celaeno::graph::representations::grid::MapVertexTile;
 using Scheme = ns_scheme::TwoddWave;
@@ -485,6 +486,7 @@ class NanoScl
 
 template<typename F, String Str>
 NanoScl::NanoScl(MapVertexTile const& m_vertex_tile, F&& f_gate_type, Str&& fn)
+  : buf({})
 {
   auto [area_x,area_y] = ns_grid::area(m_vertex_tile);
 
@@ -636,15 +638,12 @@ decltype(auto) run(S root, Ops ops, L&& f_gate_type, Str&& fn)
       private:
         i64 c;
       public:
-        Pseudo(i64 c) : c(c) {}
+        Pseudo(i64 _c) : c(_c) {}
         i64 next(){ return --c; }
         i64 curr(){ return c; }
     };
     return Pseudo{counter};
   }();
-
-  using Tile = celaeno::graph::representations::grid::Tile;
-  using TileType = celaeno::graph::representations::grid::TileType;
 
   std::map<i64,Tile> m;
 

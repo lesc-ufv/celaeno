@@ -93,7 +93,7 @@ struct Tile
   // Constructors
   public:
   Tile() = default;
-  Tile(i32 x, i32 y, TileType type) : x(x), y(y), type(type) {}
+  Tile(i32 _x, i32 _y, TileType _type) : x(_x), y(_y), type(_type) {}
   // Public Methods
   // // Operations
   std::pair<i64,i64> to_pair() const;
@@ -501,7 +501,7 @@ decltype(auto) route(Ops const& ops, MapVertexTile const& m_vertex_tile, L layer
       auto preds{ops.preds(u)};
 
       // Sort preds by x proximity of u
-      preds = fp::sort_by([&](auto u, auto v){ return m_vertex_tile.at(u).x < m_vertex_tile.at(v).x; },preds);
+      preds = fp::sort_by([&](auto _u, auto _v){ return m_vertex_tile.at(_u).x < m_vertex_tile.at(_v).x; },preds);
 
       for (i64 v_idx{}; auto v : preds)
       {
