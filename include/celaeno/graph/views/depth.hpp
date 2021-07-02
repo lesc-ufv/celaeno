@@ -48,6 +48,10 @@
 namespace celaeno::graph::views::depth
 {
 
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
+
 // Namespaces {{{
 namespace rg = ranges;
 namespace rv = ranges::views;
@@ -59,12 +63,29 @@ using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
-// Algorithm {{{
-template<SignedIntegral T, typename P, typename S>
-auto run(T root, P&& f_pred, S&& f_succ)
-  -> std::pair< std::map<T,std::vector<T>>, std::map<T,T> >
-  requires CallableWith<P,i64>
-  && CallableWith<S,i64>
+// Aliases {{{
+using Layer = u64;
+template<typename N> using LayerNodes = std::map<Layer,std::vector<N>>;
+template<typename N> using NodeLayer = std::map<N,Layer>;
+// }}}
+
+// struct: Result {{{
+template<typename N>
+struct Result
+{
+  LayerNodes<N> ln;
+  NodeLayer<N> nl;
+  Result(LayerNodes<N>& _ln, NodeLayer<N>& _nl)
+    : ln(std::move(_ln))
+    , nl(std::move(_nl))
+  {}
+}; // struct }}}
+
+// fn: run {{{
+template<SignedIntegral N, typename P, typename S>
+Result<N> run(N root, P&& f_pred, S&& f_succ)
+  requires CallableWith<P,N>
+  && CallableWith<S,N>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
@@ -72,14 +93,18 @@ auto run(T root, P&& f_pred, S&& f_succ)
   spdlog::debug("Algorithm: celaeno::graph::views::depth");
 #endif
 
-  // vertex -> layer
-  std::map<T,T> vl;
+  // layer -> nodes
+  LayerNodes<N> ln;
 
-  // layer -> vertices
-  std::map<T,std::vector<T>> lv;
+  // node -> layer
+  NodeLayer<N> nl;
 
-  // Emplace in lv and vl
-  auto emplace = [&](auto&& l, auto&& v) { vl.emplace(v,l); lv[l].push_back(v); };
+  // Emplace in ln and nl
+  auto emplace = [&](Layer l, N u)
+  {
+    [[maybe_unused]] bool result{ln.try_emplace(l,u).second && nl.try_emplace(u,l).second};
+    assertm(result,fmt::format("{}@{} Could not insert elements"));
+  };
 
   // Perform Topological sorting
   auto topo {kahn::run(root,std::forward<P>(f_pred),std::forward<S>(f_succ))};
@@ -87,23 +112,22 @@ auto run(T root, P&& f_pred, S&& f_succ)
   // lambda to get all levels of a set vertices
   auto levels = [&](auto&& vs)
   {
-    return rv::transform(vs,[&vl](auto&& u){ return vl.at(u); });
+    return rv::transform(vs,[&nl](auto&& u){ return nl.at(u); });
   };
 
   // lambda to get the predecessor with max layer
   auto max = [&](auto&& ps) { return std::ranges::max(levels(ps)); };
 
   // Split by layer
-  rg::for_each(topo,[&](auto&& v)
+  rg::for_each(topo,[&](auto&& u)
   {
-    auto preds {f_pred(v)};
+    auto preds {f_pred(u)};
     // If is in the first layer (has no predecessors), emplace 0
-    if( preds.size() == 0 ) { emplace(0,v); }
     // else, emplace max layer of the predecessors + 1
-    else { emplace(max(preds)+1,v); }
+    ( preds.size() == 0 )? emplace(0,u) : emplace(max(preds)+1,u);
   });
 
-  return { lv, vl };
+  return Result<N>(ln,nl);
 } // function: run }}}
 
 } // namespace celaeno::graph::view::depth

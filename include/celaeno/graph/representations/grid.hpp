@@ -45,14 +45,8 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/heuristics/manhattan.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
-#include <celaeno/graph/search/a-star.hpp>
-#include <celaeno/graph/search/kahn.hpp>
-#include <celaeno/graph/views/depth.hpp>
-#include <celaeno/graph/operations/minimize/edge-length.hpp>
-#include <celaeno/graph/operations/minimize/crossings.hpp>
 
 // namespace celaeno::graph::representations::grid {{{
 namespace celaeno::graph::representations::grid
@@ -105,7 +99,7 @@ std::pair<i64,i64> Tile::to_pair() const { return std::pair<i64,i64>(x,y); }
 
 // }}}
 
-// Using declarations {{{
+// Aliases {{{
 using Ops = celaeno::graph::Ops;
 using MapVertexTile = std::map<i64,Tile>;
 using VertexPoint = std::pair<i64,Tile>;
@@ -118,14 +112,10 @@ using namespace celaeno::concepts;
 
 // namespaces {{{
 namespace rg = ranges;
-namespace rv = ranges::views;
 namespace ra = ranges::actions;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-namespace ns_minimize = celaeno::graph::operations::minimize;
 namespace ns_search = celaeno::graph::search;
-namespace ns_views = celaeno::graph::views;
-namespace ns_heuristics = celaeno::heuristics;
 // }}}
 
 // function: root_reachable {{{

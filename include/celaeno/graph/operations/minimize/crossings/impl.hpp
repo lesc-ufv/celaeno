@@ -65,7 +65,7 @@ namespace rg = ranges;
 namespace ra = ranges::actions;
 namespace rv = ranges::views;
 namespace fp = fplus;
-namespace depth = celaeno::graph::views::depth;
+namespace ns_views = celaeno::graph::views;
 namespace barycenter = celaeno::heuristics::barycenter;
 namespace incidence = celaeno::graph::representations::incidence;
 namespace ccrossings = celaeno::graph::operations::count::crossings;
@@ -180,7 +180,7 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
   //
   // @ Create a depth view
   //
-  auto depth_view{depth::run(root,f_pred,f_succ).first};
+  auto depth_view{ns_views::depth::run(root,f_pred,f_succ).ln};
 
   //
   // @ Generate layer pairs
@@ -315,10 +315,7 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
     layers = ra::reverse(layers);
   } // while
 
-  return depth_view
-    | rv::transform([](auto&& e){ return e.second; })
-    | rg::to<std::vector<std::vector<i64>>>;
-
+  return fp::get_map_values(depth_view);
 } // }}}
 
 } // namespace celaeno::graph::operations::minimize::crossing::impl }}}

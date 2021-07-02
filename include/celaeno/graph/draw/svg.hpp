@@ -267,16 +267,8 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
   // Layer ordering
   //
   // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
-  auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).first};
-  auto layers = depth_view
-    | rv::transform([](auto&& e){ return e.second; })
-    | rg::to<std::vector<std::vector<i64>>>;
-
-  // TODO Remove
-  for (auto& layer : layers)
-  {
-    layer = fp::sort(layer);
-  } // for
+  auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).ln};
+  auto layers {fp::get_map_values(depth_view)};
 
   //
   // Tile Placement and Edge Routing

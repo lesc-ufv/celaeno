@@ -75,11 +75,9 @@ using namespace celaeno::aliases;
 //
 template<SignedIntegral T, typename P, typename S, typename A>
 auto run(T root, P&& f_pred, S&& f_succ, A&& f_adj)
-  requires CallableWith<P,i64>
-  &&
-  CallableWith<S,i64>
-  &&
-  CallableWith<A,i64,i64>
+  requires CallableWith<P,T>
+  && CallableWith<S,T>
+  && CallableWith<A,T,T>
 {
 
 #ifndef NDEBUG
@@ -88,14 +86,14 @@ auto run(T root, P&& f_pred, S&& f_succ, A&& f_adj)
 #endif
 
     // depth view: @level → vertices && @vertex → level
-    auto [lvs,_] = depth::run(root,f_pred,f_succ);
+    auto [ln,_] = depth::run(root,f_pred,f_succ);
 
     // Number of levels must be > 1
-    assertm(lvs.size() > 1, "Number of layers of the input graph is less 2");
+    assertm(ln.size() > 1, "Number of layers of the input graph is less 2");
 
     // Return the incidence matrix
     return incidence::all(
-      std::forward<decltype(lvs)>(lvs),
+      std::forward<decltype(ln)>(ln),
       std::forward<decltype(f_adj)>(f_adj)
     );
 

@@ -46,8 +46,8 @@ namespace celaeno::graph::operations::minimize::edge_length
 {
 
 // Namespaces {{{
-namespace ns_bfs = celaeno::graph::search::bfs;
-namespace ns_depth = celaeno::graph::views::depth;
+namespace ns_search = celaeno::graph::search;
+namespace ns_views = celaeno::graph::views;
 // }}}
 
 // Using declarations {{{
@@ -76,10 +76,10 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, D&& f_dist)
   auto f_lowest = [&counter](auto&& e) { if(e < counter){ counter=e; } return false; };
 
   // Get the dummy vertex with the lowest value
-  ns_bfs::run(root,f_pred,f_succ,f_lowest);
+  ns_search::bfs::run(root,f_pred,f_succ,f_lowest);
 
   // Create depth view
-  auto [view_id_layer,view_vertex_depth] = ns_depth::run(root, f_pred, f_succ);
+  auto [view_id_layer,view_vertex_depth] = ns_views::depth::run(root, f_pred, f_succ);
 
   // For the current level, check horizontal distances of each vertex against
   // the ones in its outgoing edges

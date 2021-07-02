@@ -104,7 +104,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink)
   }();
 
   // Get topologic layers
-  auto view_depth { ns_views::depth::run(root,f_pred,f_succ).first };
+  auto view_depth { ns_views::depth::run(root,f_pred,f_succ).ln };
 
   // Constant to control merge of nodes
   constexpr i8 const c{2};
@@ -151,7 +151,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink)
     } // for
 
     // Update layers
-    view_depth = ns_views::depth::run(root,f_pred,f_succ).first;
+    view_depth = ns_views::depth::run(root,f_pred,f_succ).ln;
 
     // Check if another pass is required
     if (i+1 == view_depth.size())

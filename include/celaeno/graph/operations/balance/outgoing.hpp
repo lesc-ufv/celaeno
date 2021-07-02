@@ -55,9 +55,8 @@ using Ops = celaeno::graph::Ops;
 namespace fp = fplus;
 namespace rg = ranges;
 
-namespace ns_depth_view = celaeno::graph::views::depth;
-
-namespace ns_bfs = celaeno::graph::search::bfs;
+namespace ns_views = celaeno::graph::views;
+namespace ns_search = celaeno::graph::search;
 // }}}
 
 // Using namespaces {{{
@@ -68,10 +67,10 @@ using namespace celaeno::aliases;
 // fn: run {{{
 template<SignedIntegral T, typename P, typename S, typename L, typename U>
 void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
-  requires CallableWith<P,i64>
-  && CallableWith<S,i64>
-  && CallableWith<L,std::pair<i64,i64>>
-  && CallableWith<U,std::pair<i64,i64>>
+  requires CallableWith<P,T>
+  && CallableWith<S,T>
+  && CallableWith<L,std::pair<T,T>>
+  && CallableWith<U,std::pair<T,T>>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
@@ -79,14 +78,14 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   spdlog::debug("Algorithm: celaeno::graph::operations::balance::outgoing");
 #endif
 
-  auto depth_view {ns_depth_view::run(root,
+  auto depth_view {ns_views::depth::run(root,
     std::forward<P>(f_pred),
     std::forward<S>(f_succ)
-    ).first
+    ).ln
   };
 
   // Dummy vertex with lowest value
-  i64 idx{};
+  T idx{};
 
   // Save a list of all nodes
   std::vector<T> nodes;
@@ -100,7 +99,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   };
 
   // Get the dummy vertex with the lowest value
-  ns_bfs::run(root,f_pred,f_succ,f_lowest);
+  ns_search::bfs::run(root,f_pred,f_succ,f_lowest);
 
   // Set counter to empty node id
   --idx;

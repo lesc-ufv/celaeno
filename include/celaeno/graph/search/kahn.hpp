@@ -62,9 +62,9 @@ using namespace celaeno::aliases;
 // Algorithm {{{
 template<SignedIntegral T, typename P, typename S, typename C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return false;})
-  requires CallableWith<P,i64>
-  && CallableWith<S,i64>
-  && CallableWith<C,i64>
+  requires CallableWith<P,T>
+  && CallableWith<S,T>
+  && CallableWith<C,T>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
@@ -82,9 +82,9 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return fa
   std::set<std::pair<T,T>> re;
 
   // Populate the deque
-  auto has_pred = [&f_pred](auto&& v){ return ! f_pred(v).empty(); };
-  bfs::run(root,f_pred,f_succ,[&has_pred,&deque](auto&& v)
-    { if( ! has_pred(v) ){ deque.push_back(v); } return false; });
+  auto f_has_pred = [&f_pred](auto u){ return ! f_pred(u).empty(); };
+  bfs::run(root,f_pred,f_succ,[&](auto u)
+    { if( ! f_has_pred(u) ){ deque.push_back(u); } return false; });
 
   while (! deque.empty() )
   {
@@ -103,8 +103,8 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return fa
       // remove edge c -> s
       re.insert({c,s});
       // If s has no more predecessors
-      auto is_rm = [&s,&re](auto&& v){ return re.contains({v,s}); };
-      auto preds_s {fp::drop_if(is_rm, f_pred(s))};
+      auto f_is_rm = [&s,&re](auto u){ return re.contains({u,s}); };
+      auto preds_s {fp::drop_if(f_is_rm, f_pred(s))};
       // Insert s into the queue
       if( preds_s.empty() ) { deque.push_back(s); }
     }
