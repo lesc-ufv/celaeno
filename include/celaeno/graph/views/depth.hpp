@@ -102,8 +102,8 @@ Result<N> run(N root, P&& f_pred, S&& f_succ)
   // Emplace in ln and nl
   auto emplace = [&](Layer l, N u)
   {
-    [[maybe_unused]] bool result{ln.try_emplace(l,u).second && nl.try_emplace(u,l).second};
-    assertm(result,fmt::format("{}@{} Could not insert elements"));
+    ln[l].emplace_back(u);
+    nl[u] = l;
   };
 
   // Perform Topological sorting
