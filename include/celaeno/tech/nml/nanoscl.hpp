@@ -690,6 +690,7 @@ decltype(auto) run(S root, Ops ops, L&& f_gate_type, Str&& fn)
   } // for
 
 
+#ifndef DEBUG_DISABLE_OUTPUT
   //
   // Tile Mapping
   //
@@ -700,6 +701,7 @@ decltype(auto) run(S root, Ops ops, L&& f_gate_type, Str&& fn)
     , m_tiles_route
     , [](auto){ return " "; }
   );
+#endif // DEBUG_DISABLE_OUTPUT
 
 } // function: run }}}
 

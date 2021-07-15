@@ -38,6 +38,7 @@ endif()
 
 # Options
 option(DEBUG_SVG_HPP "Enables logging for svg.hpp" OFF)
+option(DEBUG_DISABLE_OUTPUT "Disables file output" OFF)
 option(DEBUG_SHOW_ALG "Displays executed algorithms orderly" OFF)
 option(DEBUG_SHOW_HDL "Displays read HDL expressions" OFF)
 option(OPT_SEQ "Single threaded mode" OFF)
@@ -64,6 +65,7 @@ function(add_test target)
   target_compile_definitions(${target}
     PRIVATE
       $<$<BOOL:${DEBUG_SVG_HPP}>:DEBUG_SVG_HPP>
+      $<$<BOOL:${DEBUG_DISABLE_OUTPUT}>:DEBUG_DISABLE_OUTPUT>
       $<$<BOOL:${DEBUG_SHOW_ALG}>:DEBUG_SHOW_ALG>
       $<$<BOOL:${DEBUG_SHOW_HDL}>:DEBUG_SHOW_HDL>
       $<$<BOOL:${OPT_SEQ}>:OPT_SEQ>

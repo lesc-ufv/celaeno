@@ -296,8 +296,10 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
   auto paths{route(ops, vertex_tile, layers)};
 #endif
 
+#ifndef DEBUG_DISABLE_OUTPUT
   // Write output .svg file
   svg(fmt::format("{}.svg", fn), vertex_tile, paths, f_label);
+#endif // DEBUG_DISABLE_OUTPUT
 
 } // function: run }}}
 
