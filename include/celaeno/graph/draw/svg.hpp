@@ -288,6 +288,7 @@ decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
   auto [x,y] = ns_representations::grid::area(vertex_tile);
 
   // Logging
+  logger->info("File: {}", fn);
   logger->info("Placement Time: {}", time_placement);
   logger->info("Routing Time: {}", time_routing);
   logger->info("Area: {}x{}", x,y);
