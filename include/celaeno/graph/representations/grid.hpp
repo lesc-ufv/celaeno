@@ -52,6 +52,11 @@
 namespace celaeno::graph::representations::grid
 {
 
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+#define DEBUG ! NDEBUG
+// }}}
+
 // enum class: TileType {{{
 //
 // @Type 1 : Node                   : ND
@@ -417,40 +422,91 @@ auto run(T root, Ops const& ops, L const& layers)
   //
   // Include outgoing edge offset
   //
-  // TODO FIX overlaps
-  for (auto layer : layers)
+  for (auto it{layers.begin()}; it != layers.end(); ++it)
   {
-    layer = fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; },layer);
+    auto layer {fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; } ,*it)};
 
-    for (i64 x_offset{}; auto u : layer) { solution.at(u).x += x_offset; x_offset += 2; } // for
+    i64 x_offset{};
+    for (auto it{layer.begin()}; it != layer.end(); ++it)
+    {
+      // If is last node of layer
+      if( std::next(it) == layer.end() )
+      {
+        solution.at(*it).x += x_offset;
+        break;
+      }
+
+      // Alias current 'u' and next 'v' nodes
+      auto u{*it};
+      auto v{*std::next(it)};
+
+      // Update 'u' x pos.
+      solution.at(u).x += x_offset;
+
+      // Calculate next offset
+      auto sz_succs{ops.succs(u).size()};
+      auto sz_preds{ops.preds(v).size()};
+      if( sz_succs > 1 && sz_preds > 1 )
+      {
+        if(solution.at(u).x+2 >= solution.at(v).x){ x_offset += 2; }
+      }
+      else if( sz_succs > 1 || sz_preds > 1 )
+      {
+        if(solution.at(u).x+1 >= solution.at(v).x){ ++x_offset; }
+      }
+    } // for
+
+#ifdef DEBUG
+    // Check for overlapps
+    using Xy = std::pair<i64,i64>;
+
+    std::set<Xy> s_xy;
+
+    for (auto u : layer)
+    {
+      Xy xy {solution.at(u).to_pair()};
+      assertm(! s_xy.contains(xy),
+        fmt::format("{}@{}: Overlapping nodes", __FILE__, __LINE__)
+      );
+      s_xy.emplace(xy);
+    } // for
+
+#endif // DEBUG
   } // for
 
   //
   // Set nodes to always be in the same/previous rows of successors
   //
-  i64 x_layer{};
   for (auto it{layers.begin()}; it != layers.end(); ++it)
   {
-    x_layer = 0;
+    i64 x_layer{};
 
     auto layer {fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; },*it)};
 
-    // Get max x-dist of a node to its successor
+    // Get max x-dist of a node to its successors
     for (auto u : layer)
     {
-      auto f_x_dist = [&]( auto v ){ return std::abs(solution.at(u).x - solution.at(v).x); };
+      auto f_x_dist = [&]( auto v )
+      {
+        i64 dist{solution.at(v).x - solution.at(u).x};
+        return (dist < 0)? std::abs(dist) : 0;
+      };
 
+      // Get all succs
       auto succs{ops.succs(u)};
 
       if( succs.empty() ){ continue; }
 
+      // Transform succs in their respective x dists
       auto x_dists = fp::transform(f_x_dist,succs);
 
+      // Get max x dist
       auto max_x_dist = fp::maximum(x_dists);
 
       x_layer = (max_x_dist > x_layer)? max_x_dist : x_layer;
-    } //
+    } // for
 
+    // Make sure the node is still aligned if it connects to column to the right
     x_layer += 2;
 
     if( std::next(it) != layers.end() )
