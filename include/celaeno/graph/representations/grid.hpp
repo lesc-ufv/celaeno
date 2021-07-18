@@ -422,23 +422,23 @@ auto run(T root, Ops const& ops, L const& layers)
   //
   // Include outgoing edge offset
   //
-  for (auto it{layers.begin()}; it != layers.end(); ++it)
+  for (auto it1{layers.begin()}; it1 != layers.end(); ++it1)
   {
-    auto layer {fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; } ,*it)};
+    auto layer {fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; } ,*it1)};
 
     i64 x_offset{};
-    for (auto it{layer.begin()}; it != layer.end(); ++it)
+    for (auto it2{layer.begin()}; it2 != layer.end(); ++it2)
     {
       // If is last node of layer
-      if( std::next(it) == layer.end() )
+      if( std::next(it2) == layer.end() )
       {
-        solution.at(*it).x += x_offset;
+        solution.at(*it2).x += x_offset;
         break;
       }
 
       // Alias current 'u' and next 'v' nodes
-      auto u{*it};
-      auto v{*std::next(it)};
+      auto u{*it2};
+      auto v{*std::next(it2)};
 
       // Update 'u' x pos.
       solution.at(u).x += x_offset;
@@ -518,6 +518,73 @@ auto run(T root, Ops const& ops, L const& layers)
     } // if
   } // for
 
+  //
+  // Adjust y-coordinates
+  //
+
+  i64 min_y{};
+  for (auto it1{layers.begin()}; it1 != layers.end(); ++it1)
+  {
+    auto layer {fp::sort_by([&](auto u, auto v){ return solution.at(u).x < solution.at(v).x; } ,*it1)};
+
+    if( it1 == layers.begin() )
+    {
+      i64 y_offset{};
+      for (auto it2{layer.begin()}; it2 != layer.end(); ++it2)
+      {
+        auto u{*it2};
+        // Include incremental y offset
+        solution.at(u).y -= y_offset++;
+        // Include x-dist y offset
+        if( it2 != layer.begin() )
+        {
+          // Get prev layer node
+          auto v{*std::prev(it2)};
+          // Check if x-dist is gt than 1
+          if(auto diff{fp::abs_diff(solution.at(u).x,solution.at(v).x)}; diff > 1)
+          {
+            // Adjust y accordingly
+            solution.at(v).y += diff-1;
+          } // if
+        } // if
+        if( auto y{solution.at(u).y}; y < min_y ){ min_y = y; }
+      } // for
+      continue;
+    }
+
+    size_t y_offset{fw::apply(layer
+      , fw::transform([&](auto e){ return ops.preds(e).size(); })
+      , fw::sum()
+    )};
+
+    // Check if layer is not empty
+    assertm(! layer.empty(),"Layer must not be empty");
+
+    // Get y from the maximum-y of pred of first elem.
+    auto y{fp::maximum(fp::transform([&](auto e){ return solution.at(e).y; },ops.preds(*layer.begin())))};
+
+    for (auto it2{layer.begin()}; it2 != layer.end(); ++it2)
+    {
+      auto u{*it2};
+      // Update min_y
+      if( auto y{solution.at(u).y}; y < min_y ){ min_y = y; }
+      // Adjust node y-pos
+      solution.at(u).y = y_offset + y--;
+      // Remove x-dist from y
+      if(auto it_v{std::next(it2)}; it_v != layer.end() )
+      {
+        auto v{*it_v};
+        y -= fp::abs_diff(solution.at(u).x,solution.at(v).x)-1;
+      }
+    } // for
+  } // for
+
+  // Remove negative y-coords
+  if( min_y < 0 )
+  {
+    rg::for_each(solution,[&](auto& e){ e.second.y += std::abs(min_y); });
+  }
+
   return solution;
 } // }}}
 
@@ -541,13 +608,13 @@ decltype(auto) route(Ops const& ops, MapVertexTile const& m_vertex_tile, L layer
     std::set<i64> visited;
 
     // For each node u on layer
-    for (i64 u_idx{1}; auto u : layer)
+    for (auto u : layer)
     {
       // For each node v, pred of u
       auto preds{ops.preds(u)};
 
       // Sort preds by x proximity of u
-      preds = fp::sort_by([&](auto _u, auto _v){ return m_vertex_tile.at(_u).x < m_vertex_tile.at(_v).x; },preds);
+      rg::sort(preds,{},[&](auto _u){ return fp::abs_diff(m_vertex_tile.at(_u).x,m_vertex_tile.at(u).x); });
 
       for (i64 v_idx{}; auto v : preds)
       {
@@ -555,17 +622,17 @@ decltype(auto) route(Ops const& ops, MapVertexTile const& m_vertex_tile, L layer
         auto tiles {std::make_pair(m_vertex_tile.at(v),m_vertex_tile.at(u))};
 
         // Use std::pair
-        auto [t1,t2] = std::make_pair(tiles.first.to_pair(),tiles.second.to_pair());
+        auto [t1,t2] = std::make_pair(tiles.first,tiles.second);
 
         // Create path
         std::deque<std::pair<i64,i64>> path;
 
         // Set coordinates
-        auto [y_i,y_m,y_f,x_i,x_f] = std::make_tuple(t1.second,t1.second+u_idx,t2.second,t1.first,t2.first);
+        auto [y_i,y_m,y_f,x_i,x_f] = std::make_tuple(t1.y,t1.y+1,t2.y,t1.x,t2.x);
 
         // Adjust starting x-pos if predecessor was already visited
-        if (visited.contains(v)) { path.emplace_back(x_i++,y_i); } // if
-        else { visited.insert(v); } // else
+        if ( ! visited.contains(v)) { path.emplace_back(x_i++,y_i); visited.insert(v); } // if
+        else { ++y_m;  } // else
 
         // Adjust y-col for next predecessor
         if(v_idx != 0) { --x_f; } // if
@@ -587,7 +654,7 @@ decltype(auto) route(Ops const& ops, MapVertexTile const& m_vertex_tile, L layer
         paths.emplace(tiles, path);
 
         // Increment indices
-        ++u_idx; ++v_idx;
+        ++v_idx;
       } // for
 
     } // for
