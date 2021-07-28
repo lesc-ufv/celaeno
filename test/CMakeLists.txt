@@ -93,6 +93,7 @@ endfunction(add_test)
 # add_test(g_search_bfs "include/celaeno/test/graph/search/bfs.cpp")
 # add_test(g_search_dfs "include/celaeno/test/graph/search/dfs.cpp")
 # add_test(g_search_kahn "include/celaeno/test/graph/search/kahn.cpp")
+add_test(g_search_zz "include/celaeno/test/graph/search/zig-zag.cpp")
 # add_test(test_a_star "include/celaeno/test/graph/a-star.cpp")
 #
 # ## Views
@@ -109,9 +110,9 @@ endfunction(add_test)
 #
 # ## Representations
 # add_test(g_representations_incidence "include/celaeno/test/graph/representations/incidence.cpp")
-
-## Drawing
-add_test(svg "include/celaeno/test/graph/draw/svg.cpp")
-
-## HDL
-add_test(nanoscl "include/celaeno/test/tech/nml/nanoscl.cpp")
+#
+# ## Drawing
+# add_test(svg "include/celaeno/test/graph/draw/svg.cpp")
+#
+# ## HDL
+# add_test(nanoscl "include/celaeno/test/tech/nml/nanoscl.cpp")
