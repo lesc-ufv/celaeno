@@ -76,13 +76,18 @@ enum class DIR
 
 // fn: run {{{
 template<SignedIntegral T, typename C = std::function<bool(i64)>>
-std::vector<T> run(T root, Ops ops, C&& f_cb = [](auto){return false;})
+std::vector<T> run(T root,
+  Ops ops,
+  std::vector<std::pair<T,T>>& path = {},
+  std::vector<T>& cycles = {},
+  C&& f_cb = [](auto){ return false; }
+)
 {
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
   spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::search::zig_zag");
 #endif
-  // Keep track of current dir
+  // Keep track of current direction
   DIR dir{DIR::OUT_IN};
 
   // Zig-Zag ordered result
@@ -112,10 +117,11 @@ std::vector<T> run(T root, Ops ops, C&& f_cb = [](auto){return false;})
       out.push_back(u);
     } // else
 
-    if( p != u )
-    {
-      fmt::print("{} → {}\n", p, u);
-    } // if
+    // Perform callback
+    if( f_cb(u) ){ break; }
+
+    // Save curr edge to path
+    if ( p != u ) { path.emplace_back(p,u); } // if
 
     // Mark u as visited
     set_visited.emplace(u);
@@ -135,11 +141,14 @@ std::vector<T> run(T root, Ops ops, C&& f_cb = [](auto){return false;})
     } // else
 
     // Check cycles
-    if(auto cycle{fp::keep_if([&,p=p](auto e){ return e != p && set_visited.contains(e); }, fp::append(preds,succs))};
+    if(auto cycle{fp::keep_if([&,p=p](auto e)
+      {
+        return e != p && set_visited.contains(e);
+      }, fp::append(preds,succs))};
       ! cycle.empty()
     )
     {
-      fmt::print("{} → {}\n", u, cycle);
+      rg::copy(cycle,std::back_inserter(cycles));
     } // if
 
     // Filter visited nodes

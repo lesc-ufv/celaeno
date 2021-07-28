@@ -67,12 +67,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Create ops
   ns_graph::Ops ops(f_p, f_s, f_a, f_l, f_u);
 
-  // Print graph
-  for (auto [u,v] : g.data())
-  {
-    fmt::print("{} → {}\n", u, v);
-  } // for
-
+  // Get outputs
   std::vector<i64> outputs;
   ns_search::bfs::run(0, ops,
   [&](auto e)
@@ -81,14 +76,15 @@ int main([[maybe_unused]] int argc, char const* argv[])
     return false;
   });
 
-  fmt::print("Outputs: {}\n", outputs);
-
-  fmt::print("Using: {}\n", outputs.at(0));
+  std::vector<std::pair<i64,i64>> zz_p;
+  std::vector<i64> zz_c;
 
   // Run zig-zag
-  auto result{ns_search::zig_zag::run(outputs.at(0),ops)};
+  auto result{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c)};
 
   fmt::print("Ordering: {}\n", result);
+  fmt::print("Path: {}\n", zz_p);
+  fmt::print("Cycles: {}\n", zz_c);
 
   return 0;
 } // main
