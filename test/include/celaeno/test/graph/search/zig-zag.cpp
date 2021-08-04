@@ -31,9 +31,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+#include <fplus/fplus.hpp>
+#include <range/v3/all.hpp>
 #include <fmt/core.h>
+#include <spdlog/spdlog.h>
 
 #include <celaeno/aliases.hpp>
+#include <celaeno/heuristics/manhattan.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
 #include <celaeno/graph/draw/svg.hpp>
@@ -45,11 +49,321 @@ using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{
+namespace fp = fplus;
+namespace fw = fplus::fwd;
+namespace rg = ranges;
+namespace rv = ranges::views;
+
 namespace ns_graph = celaeno::graph;
+namespace ns_heuristics = celaeno::heuristics;
 namespace ns_reader = celaeno::graph::reader::verilog;
 namespace ns_search = celaeno::graph::search;
 // }}}
 
+// Macros {{{
+#define assertm(exp, msg) assert(((void)msg, exp))
+// }}}
+
+// Aliases {{{
+using Node = i64;
+using Nodes = std::vector<Node>;
+using Dist = i64;
+using Annotations = std::map<Node,std::map<Node,Dist>>;
+using Tile = std::pair<i64,i64>;
+using Tiles = std::vector<Tile>;
+using Path = std::vector<std::pair<Node,Node>>;
+using Cycles = std::vector<Node>;
+using Placement = std::map<i64,std::pair<i64,i64>>;
+// }}}
+
+// fun: annotate {{{
+Annotations annotate(ns_graph::Ops const& ops, Nodes const& zz_o, Cycles const& zz_c)
+{
+  // Annotations
+  Annotations zz_a;
+
+  // Process all cycle nodes
+  for (auto c : zz_c)
+  {
+    // auto it{rg::find_if(zz_o,[&](auto e){ return e == c; })};
+
+    for (auto it{zz_o.begin()}; it != zz_o.end(); ++it )
+    {
+      // Get current node of ordered sequence
+      i64 u{*it};
+
+      // Set cycle distance to self to 0
+      if( u == c ) { zz_a[c][c] = 0; continue; } // if
+
+      // Get all nodes adjacent to 'u'
+      auto n{fp::append(ops.preds(u),ops.succs(u))};
+
+      // Keep annotated nodes
+      // Return their distances
+      auto d {fw::apply(n
+        , fw::keep_if([&](auto e){ return zz_a[c].contains(e); })
+        , fw::transform([&](auto e){ return zz_a[c][e]; })
+      )};
+
+      // If there is at least one node adjacent 'u' that is annotated
+      // Annotated 'u' based on their annotations
+      if( ! d.empty() )
+      {
+        if( fp::abs_diff(fp::maximum(d),fp::minimum(d)) <= 2 )
+        {
+          zz_a[c][u] = fp::minimum(d)+1;
+        }
+        else
+        {
+          zz_a[c][u] = fp::maximum(d)+1;
+        } // else
+      } // if
+      else
+      {
+        zz_a[c][u] = 1;
+      } // else
+    } // for
+  } // for
+
+  return zz_a;
+} // function: annotate }}}
+
+// enum: Priority {{{
+enum class Priority
+{
+  LOW,
+  HIGH,
+};
+// }}}
+
+// fn: Priority {{{
+Priority get_priority(i64 degree)
+{
+  return (degree <= 2)? Priority::LOW : Priority::HIGH;
+};
+// }}}
+
+// fun: tiles_from_annotations {{{
+std::optional<Tiles> tiles_from_annotations(
+  Node src,
+  Node dest,
+  ns_graph::Ops const& ops,
+  Annotations const& a,
+  Placement const& placement)
+{
+  // fmt::print("Placement: {}\n", placement); // TODO remove
+
+  // Set search offsets
+  static const std::vector<Tile> high_offsets {{0,1},{1,0},{0,-1},{-1,0}};
+  static const std::vector<Tile> low_offsets  {{0,-1},{-1,0},{1,0},{0,1}};
+
+  // Obtain degree priority of 'dest'
+  auto [preds,succs] = std::make_pair(ops.preds(dest),ops.succs(dest));
+
+  // Degree
+  auto degree{preds.size()+succs.size()};
+
+  // Priority
+  auto priority{get_priority(degree)};
+
+  // Check if for every cycle node k, there distance restriction for dest
+  std::vector<std::pair<Node,Dist>> dest_constraints;
+  for (auto [k,v] : a)
+  {
+    // Ignore self-distance
+    if( k == dest ){ continue; }
+
+    // Save all distances required to place 'dest' in respect to other nodes
+    auto constraints{fw::apply(v
+      , fw::keep_if([&](auto e){ return e.first == dest; })
+      , fw::map_to_pairs()
+      , fw::transform([&,k=k](auto e){ return std::make_pair(k,e.second); })
+    )};
+
+    // Insert in constraints container
+    rg::copy(constraints,std::back_inserter(dest_constraints));
+
+  } // for
+
+  // fmt::print("Annotations of {}: {}\n", dest, dest_constraints); // TODO remove
+
+  // Keep tiles that respect 'dest' annotations
+  auto f_sum_tiles =
+  [](Tile a, Tile b)
+  {
+    return std::make_pair(a.first+b.first,a.second+b.second);
+  };
+
+  // Canditate tiles sorted by priority
+  auto src_tile{placement.at(src)};
+  auto dest_tiles
+  {
+    (priority == Priority::HIGH)?
+      fp::transform([&](Tile t){ return f_sum_tiles(src_tile,t); },high_offsets)
+    :
+      fp::transform([&](Tile t){ return f_sum_tiles(src_tile,t); },low_offsets)
+  };
+
+  // Verify which tiles adhere to annotations
+  dest_tiles = fp::keep_if(
+    [&](Tile const& dest_tile)
+    {
+      for (auto [node,dist] : dest_constraints)
+      {
+        auto target_tile{placement.at(node)};
+        auto target_dist{ns_heuristics::manhattan::run(dest_tile,target_tile)};
+        if( target_dist != dist ){ return false; }
+      } // for
+      return true;
+    },dest_tiles);
+
+  // Remove occupied positions
+  auto filtered_dest_tiles {fw::apply(dest_tiles
+    , fw::keep_if([&](auto&& t)
+      {
+        return ! fp::is_elem_of(t,fp::get_map_values(placement));
+      })
+  )};
+
+
+  // fmt::print("dest_tiles: {}\n", dest_tiles); // TODO remove
+  //
+  // fmt::print("filtered_dest_tiles: {}\n", filtered_dest_tiles); // TODO remove
+  //
+
+  // If not viable position was found, return null
+  if( filtered_dest_tiles.empty() ) { return std::nullopt; } // if
+
+  return filtered_dest_tiles;
+
+
+} // function: tiles_from_annotations }}}
+
+// // fun: place {{{
+// decltype(auto) place(ns_graph::Ops const& ops, Path const& m_p, Cycles const& v_c, Annotations const& m_a)
+// {
+//   //
+//   // Pick a random cycle node
+//   //
+//   assertm(! v_c.empty(), "Cycle vector must not be empty!");
+//
+//   auto f_rand_index =
+//   [](auto const& c)
+//   {
+//     std::uniform_int_distribution<Node> dist(0,c.size());
+//     std::mt19937 gen{std::random_device{}()};
+//     return dist(gen);
+//   };
+//
+//   //
+//   // Create ownership table
+//   //
+//   using Tile = std::pair<i64,i64>;
+//   std::map<Tile,Node> ot;
+//
+//
+//   //
+//   // Degree matcher
+//   //
+//   auto f_filter_positions =
+//   [&](Node u, Tile const& t, i64 degree)
+//   {
+//     // Positions
+//     auto f_left  = [](Tile const& t) -> Tile { return std::make_pair(t.first-1,t.second); };
+//     auto f_right = [](Tile const& t) -> Tile { return std::make_pair(t.first+1,t.second); };
+//     auto f_up    = [](Tile const& t) -> Tile { return std::make_pair(t.first,t.second-1); };
+//     auto f_down  = [](Tile const& t) -> Tile { return std::make_pair(t.first,t.second+1); };
+//
+//     // Get priority
+//     Priority p{get_priority(degree)};
+//
+//     // Populate positions based on priority
+//     std::vector<Tile> positions;
+//
+//     auto emplace_back = [&]<typename... T>(T&&... t){ (positions.emplace_back(std::forward<T>(t)),...); };
+//
+//     if(p == Priority::LOW)
+//     {
+//       emplace_back(f_up(t),f_left(t),f_right(t),f_down(t));
+//     } // if
+//     else
+//     {
+//       emplace_back(f_down(t),f_right(t),f_up(t),f_left(t));
+//     } // else
+//
+//     // Filter invalid positions
+//     // Valid position:
+//     // cond1: is free?
+//     // cond2: is owner adjacent to u? (u → v) or (v → u)
+//     // cond3: TODO Are available positions enough for u?
+//     // Must consider: (cond1 or cond2) and cond3
+//     auto is_valid_pos =
+//     [&](Tile const& t) -> bool
+//     {
+//       return
+//           ( ! ot.contains(t) )? true
+//         : ( ops.adj(u,ot.at(t)) or ops.adj(ot.at(t),u) )? true
+//         : false;
+//     };
+//
+//     return fp::keep_if(is_valid_pos,positions);
+//   }; // lamb: f_filter_positions
+//
+//   //
+//   // Get preferred position by annotations
+//   //
+//   auto f_get_position =
+//   [&](Node u)
+//   {
+//     using Requirements = std::map<Node,Dist>;
+//
+//     Requirements req;
+//
+//     // Get requirements
+//     for (Node c : v_c)
+//     {
+//       auto e_rng{m_a.equal_range(c)};
+//
+//       for (auto it{e_rng.first}; it != e_rng.second; ++it)
+//       {
+//
+//       } // for
+//     } // for
+//
+//     // Get valid positions relative to required distances from cycle nodes
+//   };
+//
+//   //
+//   // Place node and update ownership table
+//   //
+//   auto place_and_reserve =
+//   [&](Node p, Node u)
+//   {
+//     // Get nodes adjacent to u
+//     auto preds{ops.preds(u)};
+//     auto succs{ops.succs(u)};
+//
+//     // Get u's priority
+//     Priority priority{get_priority(preds.size() + succs.size())};
+//
+//     // Get preferred tile by annotations
+//
+//     // Get positions ordered by priority and filtered by degree
+//     // auto positions{f_get_positions(u,tile,)};
+//
+//   };
+//
+//   // Position initial node
+//   Node u{f_rand_index(v_c)};
+//
+//   for (auto e : m_p)
+//   {
+//
+//   } // for
+//
+// } // function: place }}}
+
+// fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
 {
   // Read graph
@@ -76,15 +390,57 @@ int main([[maybe_unused]] int argc, char const* argv[])
     return false;
   });
 
-  std::vector<std::pair<i64,i64>> zz_p;
-  std::vector<i64> zz_c;
+  Path zz_p; // Path
+  Cycles zz_c; // Cycles
 
   // Run zig-zag
-  auto result{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c)};
+  auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c)};
 
-  fmt::print("Ordering: {}\n", result);
+  zz_c = {4,6};
+
+  // Annotations
+  Annotations zz_a{annotate(ops, zz_o, zz_c)};
+
+  fmt::print("Ordering: {}\n", zz_o);
   fmt::print("Path: {}\n", zz_p);
   fmt::print("Cycles: {}\n", zz_c);
+  fmt::print("Annotations:\n");
+  rg::for_each(zz_a, [](auto e){ fmt::print("{}\n", e); });
+  fmt::print("\n--------\n\n");
+
+  Placement placement;
+
+  auto it{zz_p.begin()};
+  auto src{it->first};
+  auto dest{it->second};
+
+  placement[src] = std::make_pair(0,0);
+
+  while(auto tiles{tiles_from_annotations(src, dest, ops, zz_a, placement)})
+  {
+    placement[dest] = tiles->at(0);
+
+    if( it = std::next(it); it == zz_p.end() ){ break; }
+
+    std::tie(src,dest) = std::tie(it->first,it->second);
+  } // while
+
+  // placement[7] = std::make_pair(0,0);
+  // placement[6] = std::make_pair(0,1);
+  // placement[10] = std::make_pair(-1,1);
+  // placement[9] = std::make_pair(-1,2);
+  // placement[8] = std::make_pair(-2,2);
+  // placement[4] = std::make_pair(0,2);
+  // placement[3] = std::make_pair(1,2);
+  // placement[1] = std::make_pair(0,3);
+
+  // Node src{7};
+  // Node dest{}
+  // while(auto tiles{tiles_from_annotations(curr, next, ops, zz_a, placement)})
+  // {
+  // } // while
+
+  fmt::print("Placement:\n{}\n", placement);
 
   return 0;
-} // main
+} // main }}}
