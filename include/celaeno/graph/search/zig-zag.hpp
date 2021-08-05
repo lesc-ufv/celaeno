@@ -175,8 +175,6 @@ std::vector<T> run(T root,
 
   } // while
 
-  cycles = {4,6};
-
   return out;
 } // }}}
 

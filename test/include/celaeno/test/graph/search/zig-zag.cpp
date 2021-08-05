@@ -405,8 +405,8 @@ int main([[maybe_unused]] int argc, char const* argv[])
   Annotations zz_a{annotate(ops, zz_c)};
 
   fmt::print("Ordering: {}\n", zz_o);
-  fmt::print("Path: {}\n", zz_p);
-  fmt::print("Rev Path: {}\n", fp::swap_pairs_elems(zz_p));
+  fmt::print("Path: {}\n", fp::sort_by([](auto a, auto b){ return a.first < b.first; },zz_p));
+  fmt::print("Rev Path: {}\n", fp::sort_by([](auto a, auto b){ return a.first < b.first; },fp::swap_pairs_elems(zz_p)));
   fmt::print("Cycles: {}\n", zz_c);
   fmt::print("Annotations:\n");
   rg::for_each(zz_a, [](auto e){ fmt::print("{}\n", e); });
