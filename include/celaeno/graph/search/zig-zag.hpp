@@ -142,9 +142,14 @@ std::vector<T> run(T root,
     } // else
 
     // Check cycles
-    if(auto cycle{fp::keep_if([&,p=p](auto e)
+    if(auto cycle{fp::keep_if([&,u=u,p=p](auto e)
       {
-        return e != p && set_visited.contains(e);
+        if( e != p && set_visited.contains(e) )
+        {
+          path.emplace_back(u,e);
+          return true;
+        } // if
+        return false;
       }, fp::append(preds,succs))};
       ! cycle.empty()
     )
@@ -169,6 +174,8 @@ std::vector<T> run(T root,
     } // else
 
   } // while
+
+  cycles = {4,6};
 
   return out;
 } // }}}

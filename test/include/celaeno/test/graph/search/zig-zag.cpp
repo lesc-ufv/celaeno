@@ -77,7 +77,7 @@ using Placement = std::map<i64,std::pair<i64,i64>>;
 // }}}
 
 // fun: annotate {{{
-Annotations annotate(ns_graph::Ops const& ops, Nodes const& zz_o, Cycles const& zz_c)
+Annotations annotate(ns_graph::Ops const& ops, Cycles const& zz_c)
 {
   // Annotations
   Annotations zz_a;
@@ -85,9 +85,13 @@ Annotations annotate(ns_graph::Ops const& ops, Nodes const& zz_o, Cycles const& 
   // Process all cycle nodes
   for (auto c : zz_c)
   {
-    // auto it{rg::find_if(zz_o,[&](auto e){ return e == c; })};
+    auto bfs{ns_search::bfs::run(c,ops.preds,ops.succs)};
 
-    for (auto it{zz_o.begin()}; it != zz_o.end(); ++it )
+    fmt::print("{} bfs: {}\n", c, bfs);
+
+    // auto it{rg::find_if(bfs,[&](auto e){ return e == c; })};
+
+    for (auto it{bfs.begin()}; it != bfs.end(); ++it )
     {
       // Get current node of ordered sequence
       i64 u{*it};
@@ -109,14 +113,15 @@ Annotations annotate(ns_graph::Ops const& ops, Nodes const& zz_o, Cycles const& 
       // Annotated 'u' based on their annotations
       if( ! d.empty() )
       {
-        if( fp::abs_diff(fp::maximum(d),fp::minimum(d)) <= 2 )
-        {
-          zz_a[c][u] = fp::minimum(d)+1;
-        }
-        else
-        {
-          zz_a[c][u] = fp::maximum(d)+1;
-        } // else
+        zz_a[c][u] = fp::minimum(d)+1;
+        // if( fp::abs_diff(fp::maximum(d),fp::minimum(d)) <= 2 )
+        // {
+        //   zz_a[c][u] = fp::minimum(d)+1;
+        // }
+        // else
+        // {
+        //   zz_a[c][u] = fp::maximum(d)+1;
+        // } // else
       } // if
       else
       {
@@ -396,13 +401,12 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Run zig-zag
   auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c)};
 
-  zz_c = {4,6};
-
   // Annotations
-  Annotations zz_a{annotate(ops, zz_o, zz_c)};
+  Annotations zz_a{annotate(ops, zz_c)};
 
   fmt::print("Ordering: {}\n", zz_o);
   fmt::print("Path: {}\n", zz_p);
+  fmt::print("Rev Path: {}\n", fp::swap_pairs_elems(zz_p));
   fmt::print("Cycles: {}\n", zz_c);
   fmt::print("Annotations:\n");
   rg::for_each(zz_a, [](auto e){ fmt::print("{}\n", e); });
@@ -424,21 +428,6 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
     std::tie(src,dest) = std::tie(it->first,it->second);
   } // while
-
-  // placement[7] = std::make_pair(0,0);
-  // placement[6] = std::make_pair(0,1);
-  // placement[10] = std::make_pair(-1,1);
-  // placement[9] = std::make_pair(-1,2);
-  // placement[8] = std::make_pair(-2,2);
-  // placement[4] = std::make_pair(0,2);
-  // placement[3] = std::make_pair(1,2);
-  // placement[1] = std::make_pair(0,3);
-
-  // Node src{7};
-  // Node dest{}
-  // while(auto tiles{tiles_from_annotations(curr, next, ops, zz_a, placement)})
-  // {
-  // } // while
 
   fmt::print("Placement:\n{}\n", placement);
 
