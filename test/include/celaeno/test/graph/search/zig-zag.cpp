@@ -73,8 +73,18 @@ using Tile = std::pair<i64,i64>;
 using Tiles = std::vector<Tile>;
 using Path = std::vector<std::pair<Node,Node>>;
 using Cycles = std::vector<Node>;
-using Placement = std::map<i64,std::pair<i64,i64>>;
+using Placement = std::map<Node,Tile>;
+using Occupation = std::set<Tile>;
 // }}}
+
+// fn: lookahead {{{
+//
+// Uses placement hash to determine how many tiles are still available
+//
+Tiles lookahead(Occupation const& o, Tiles const& ts)
+{
+  return Tiles{fp::keep_if([&](Tile&& t){ return ! o.contains(t); },ts)};
+} // function: lookahead }}}
 
 // fun: annotate {{{
 Annotations annotate(ns_graph::Ops const& ops, Cycles const& zz_c)
