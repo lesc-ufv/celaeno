@@ -37,6 +37,7 @@
 #include <spdlog/spdlog.h>
 
 #include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
 #include <celaeno/heuristics/manhattan.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
@@ -45,6 +46,7 @@
 #include <celaeno/graph/search/bfs.hpp>
 
 // Using namespace {{{
+using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
@@ -52,6 +54,7 @@ using namespace celaeno::aliases;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
+namespace ra = ranges::actions;
 namespace rv = ranges::views;
 
 namespace ns_graph = celaeno::graph;
@@ -67,6 +70,8 @@ namespace ns_search = celaeno::graph::search;
 // Aliases {{{
 using Node = i64;
 using Nodes = std::vector<Node>;
+using Edge = std::pair<Node,Node>;
+using Edges = std::vector<Edge>;
 using Dist = i64;
 using Annotations = std::map<Node,std::map<Node,Dist>>;
 using Tile = std::pair<i64,i64>;
@@ -75,6 +80,7 @@ using Path = std::vector<std::pair<Node,Node>>;
 using Cycles = std::vector<Node>;
 using Placement = std::map<Node,Tile>;
 using Occupation = std::set<Tile>;
+using Tree = std::multimap<Node,Node>;
 // }}}
 
 // fn: lookahead {{{
@@ -83,8 +89,164 @@ using Occupation = std::set<Tile>;
 //
 Tiles lookahead(Occupation const& o, Tiles const& ts)
 {
-  return Tiles{fp::keep_if([&](Tile&& t){ return ! o.contains(t); },ts)};
+  return Tiles{fp::keep_if([&](Tile t){ return ! o.contains(t); },ts)};
 } // function: lookahead }}}
+
+// fn: cycles_intersection {{{
+//
+// @creates a cycle tree, given an initial node in the graph
+// @returns the intersection of the cycles.
+//
+Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
+{
+  // Novel intersection cycles
+  Cycles out;
+
+  // Cycles tree
+  std::vector<Tree> vector_t;
+
+  // Find out the greatest tree
+  for (auto r : {cycles.at(0)})
+  {
+    // Current tree
+    Tree t;
+
+    // Stack to determine the visiting order for nodes
+    std::stack<Node> stack_node;
+
+    // Push initial node
+    stack_node.push(r);
+
+    // Save edges previously visited to avoid self cycles
+    std::stack<Nodes> stack_i;
+
+    // Push initial element for stack_edge
+    stack_i.push({r});
+
+    // Keep track of visited Edges
+    std::set<Edge> set_edge;
+
+    while( ! stack_node.empty() )
+    {
+      // Take node of stack top
+      Node u{stack_node.top()}; stack_node.pop();
+
+      fmt::print("u: {}\n", u);
+
+      // Take its predecessors and successors
+      auto [p,s] = std::make_pair(ops.preds(u),ops.succs(u));
+
+      // Create a joined view of 'p' and 's'
+      auto n{rv::concat(p,s)};
+
+      fmt::print("Concat view: {}\n", n);
+
+      // Take top of stack_i
+      auto i{stack_i.top()};
+
+      // pop i whilst u is not contained
+      auto contains = []<Range R>(R&& r, Node u){ return rg::find(r,u) != rg::end(r); };
+
+      // Rewind
+      while( ! contains(i,u) )
+      {
+        // Check for errors
+        if( stack_i.empty() )
+        {
+          spdlog::error("{}@{} Stack must never be empty", __FILE__,__LINE__);
+          exit(1);
+        } // if
+
+        stack_i.pop();
+
+        i = stack_i.top();
+      }
+
+      fmt::print("i: {}\n", i);
+
+      // Check if leaf is the same id as root
+      if( ! contains(i,r) && contains(n,r) )
+      {
+        fmt::print("First opt\n");
+        // Create leaf edge
+        auto e {Edge{u,r}};
+
+        // Insert in tree
+        t.emplace(e);
+
+        stack_i.push(i);
+
+        fmt::print("-------\n");
+        // Finish current processing
+        continue;
+      } // if
+      else
+      {
+        fmt::print("Second opt\n");
+      } // else
+
+      // Nodes to insert in stack_i
+      Nodes nodes_i;
+
+      // Insert u for next stack pop of i
+      nodes_i.emplace_back(u);
+
+      bool next{false};
+
+      fmt::print("Edges: ");
+      // Check for each node in n, if a novel edge may be created
+      for (Node v : n)
+      {
+        if( v == r ){ continue; }
+
+        // Create potetial edge
+        auto e{Edge{u,v}};
+
+        // Check if is valid for processing
+        if( ( (! set_edge.contains(e)) or contains(cycles,v) ) && ! contains(i,v) )
+        {
+          fmt::print("{},", e);
+
+          next = true;
+          // Update tree
+          t.emplace(e);
+          // Mark edge as visited
+          set_edge.emplace(e);
+          // Include v for next previously visited nodes_i
+          nodes_i.emplace_back(v);
+          // Include v in the nodes stack
+          stack_node.push(v);
+        } // if
+      } // for
+      fmt::print("\n");
+
+      if( next ) stack_i.push(nodes_i);
+
+      fmt::print("-------\n");
+    } // while
+
+    vector_t.emplace_back(t);
+  } // for
+
+
+  rg::sort(vector_t,{},[](auto&& t){ return t.size(); });
+
+  auto test{*vector_t.rbegin()};
+
+  for (auto e : test)
+  {
+    fmt::print("{}\n", e);
+  } // for
+
+  // // Check if out is not empty
+  // if( ! out.empty() )
+  // {
+  //   spdlog::error("{}@{} Result must not be empty", __FILE__,__LINE__);
+  //   exit(1);
+  // } // if
+
+  return out;
+} // function: cycles_intersection }}}
 
 // fun: annotate {{{
 Annotations annotate(ns_graph::Ops const& ops, Cycles const& zz_c)
@@ -440,6 +602,8 @@ int main([[maybe_unused]] int argc, char const* argv[])
   } // while
 
   fmt::print("Placement:\n{}\n", placement);
+
+  cycles_intersection(ops,{7,6});
 
   return 0;
 } // main }}}
