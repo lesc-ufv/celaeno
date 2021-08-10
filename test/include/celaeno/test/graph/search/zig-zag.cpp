@@ -76,11 +76,12 @@ using Dist = i64;
 using Annotations = std::map<Node,std::map<Node,Dist>>;
 using Tile = std::pair<i64,i64>;
 using Tiles = std::vector<Tile>;
-using Path = std::vector<std::pair<Node,Node>>;
+using GraphPath = std::deque<Node>;
+using GraphPaths = std::vector<GraphPath>;
+using GridPath = std::vector<std::pair<Node,Node>>;
 using Cycles = std::vector<Node>;
 using Placement = std::map<Node,Tile>;
 using Occupation = std::set<Tile>;
-using Tree = std::multimap<Node,Node>;
 // }}}
 
 // fn: lookahead {{{
@@ -92,24 +93,38 @@ Tiles lookahead(Occupation const& o, Tiles const& ts)
   return Tiles{fp::keep_if([&](Tile t){ return ! o.contains(t); },ts)};
 } // function: lookahead }}}
 
-// fn: cycles_intersection {{{
+// fn: print_stack {{{
+template<typename Stack>
+void print_stack(Stack s)
+{
+  fmt::print("Stack: ");
+  while( ! s.empty() )
+  {
+    auto u{s.top()}; s.pop();
+    fmt::print("{} → ", u);
+  } // while
+  fmt::print("\n");
+} // function: print_stack
+// }}}
+
+// fn: cyclic_paths {{{
 //
 // @creates a cycle tree, given an initial node in the graph
 // @returns the intersection of the cycles.
 //
-Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
+GraphPaths cyclic_paths(ns_graph::Ops const& ops, Cycles const& cycles)
 {
   // Novel intersection cycles
-  Cycles out;
-
-  // Cycles tree
-  std::vector<Tree> vector_t;
+  std::vector<GraphPaths> out;
 
   // Find out the greatest tree
-  for (auto r : {cycles.at(0)})
+  for (auto r : cycles)
   {
-    // Current tree
-    Tree t;
+    // Current cyclic paths
+    GraphPaths graph_paths;
+
+    // Current path
+    std::deque<Node> deque_path;
 
     // Stack to determine the visiting order for nodes
     std::stack<Node> stack_node;
@@ -131,15 +146,8 @@ Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
       // Take node of stack top
       Node u{stack_node.top()}; stack_node.pop();
 
-      fmt::print("u: {}\n", u);
-
-      // Take its predecessors and successors
-      auto [p,s] = std::make_pair(ops.preds(u),ops.succs(u));
-
-      // Create a joined view of 'p' and 's'
-      auto n{rv::concat(p,s)};
-
-      fmt::print("Concat view: {}\n", n);
+      // Take its adjacent nodes
+      auto n {fp::append(ops.preds(u),ops.succs(u))};
 
       // Take top of stack_i
       auto i{stack_i.top()};
@@ -147,7 +155,7 @@ Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
       // pop i whilst u is not contained
       auto contains = []<Range R>(R&& r, Node u){ return rg::find(r,u) != rg::end(r); };
 
-      // Rewind
+      // Backtrace
       while( ! contains(i,u) )
       {
         // Check for errors
@@ -159,31 +167,40 @@ Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
 
         stack_i.pop();
 
-        i = stack_i.top();
-      }
+        // Backtrace path if went back a level in the tree
+        if( i != stack_i.top() ){ deque_path.pop_front(); }
 
-      fmt::print("i: {}\n", i);
+        // Update exclusion set
+        i = stack_i.top();
+
+      } // while
+
+      // Include 'u' in path
+      deque_path.push_front(u);
 
       // Check if leaf is the same id as root
       if( ! contains(i,r) && contains(n,r) )
       {
-        fmt::print("First opt\n");
         // Create leaf edge
         auto e {Edge{u,r}};
 
-        // Insert in tree
-        t.emplace(e);
+        // Save path
+        deque_path.push_front(r);
 
+        graph_paths.emplace_back(deque_path);
+
+        // Remove cycle marker
+        deque_path.pop_front();
+
+        // Traceback to predecessor of 'u'
+        deque_path.pop_front();
+
+        // Might need to test current node again
         stack_i.push(i);
 
-        fmt::print("-------\n");
         // Finish current processing
         continue;
       } // if
-      else
-      {
-        fmt::print("Second opt\n");
-      } // else
 
       // Nodes to insert in stack_i
       Nodes nodes_i;
@@ -191,9 +208,9 @@ Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
       // Insert u for next stack pop of i
       nodes_i.emplace_back(u);
 
+      // Check if depth increased
       bool next{false};
 
-      fmt::print("Edges: ");
       // Check for each node in n, if a novel edge may be created
       for (Node v : n)
       {
@@ -205,11 +222,7 @@ Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
         // Check if is valid for processing
         if( ( (! set_edge.contains(e)) or contains(cycles,v) ) && ! contains(i,v) )
         {
-          fmt::print("{},", e);
-
           next = true;
-          // Update tree
-          t.emplace(e);
           // Mark edge as visited
           set_edge.emplace(e);
           // Include v for next previously visited nodes_i
@@ -218,35 +231,29 @@ Cycles cycles_intersection(ns_graph::Ops const& ops, Cycles const& cycles)
           stack_node.push(v);
         } // if
       } // for
-      fmt::print("\n");
 
-      if( next ) stack_i.push(nodes_i);
+      // Update stack_i for new depth
+      if( next ){ stack_i.push(nodes_i); }
+      // Backtrace if dead-end
+      else { deque_path.pop_front(); } // else
 
-      fmt::print("-------\n");
     } // while
 
-    vector_t.emplace_back(t);
+    out.emplace_back(graph_paths);
   } // for
 
-
-  rg::sort(vector_t,{},[](auto&& t){ return t.size(); });
-
-  auto test{*vector_t.rbegin()};
-
-  for (auto e : test)
+  auto f_by_greatest_cycle =
+  [](GraphPaths const& graph_paths)
   {
-    fmt::print("{}\n", e);
-  } // for
+    return fw::apply(graph_paths
+      , fw::transform([](GraphPath const& graph_path){ return graph_path.size(); })
+      , fw::maximum()
+    );
+  };
 
-  // // Check if out is not empty
-  // if( ! out.empty() )
-  // {
-  //   spdlog::error("{}@{} Result must not be empty", __FILE__,__LINE__);
-  //   exit(1);
-  // } // if
-
-  return out;
-} // function: cycles_intersection }}}
+  // Return by greatest cycles
+  return fp::maximum_by([&](auto&& a, auto&& b){ return f_by_greatest_cycle(a) < f_by_greatest_cycle(b); },out);
+} // function: cyclic_paths }}}
 
 // fun: annotate {{{
 Annotations annotate(ns_graph::Ops const& ops, Cycles const& zz_c)
@@ -417,7 +424,7 @@ std::optional<Tiles> tiles_from_annotations(
 } // function: tiles_from_annotations }}}
 
 // // fun: place {{{
-// decltype(auto) place(ns_graph::Ops const& ops, Path const& m_p, Cycles const& v_c, Annotations const& m_a)
+// decltype(auto) place(ns_graph::Ops const& ops, GridPath const& m_p, Cycles const& v_c, Annotations const& m_a)
 // {
 //   //
 //   // Pick a random cycle node
@@ -567,43 +574,31 @@ int main([[maybe_unused]] int argc, char const* argv[])
     return false;
   });
 
-  Path zz_p; // Path
+  [[maybe_unused]] GridPath zz_p; // Path
   Cycles zz_c; // Cycles
 
-  // Run zig-zag
+  // 1. Run zig-zag
   auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c)};
 
-  // Annotations
-  Annotations zz_a{annotate(ops, zz_c)};
+  // 2. Get cyclic paths
+  auto paths{cyclic_paths(ops,zz_c)};
 
-  fmt::print("Ordering: {}\n", zz_o);
-  fmt::print("Path: {}\n", fp::sort_by([](auto a, auto b){ return a.first < b.first; },zz_p));
-  fmt::print("Rev Path: {}\n", fp::sort_by([](auto a, auto b){ return a.first < b.first; },fp::swap_pairs_elems(zz_p)));
-  fmt::print("Cycles: {}\n", zz_c);
-  fmt::print("Annotations:\n");
-  rg::for_each(zz_a, [](auto e){ fmt::print("{}\n", e); });
-  fmt::print("\n--------\n\n");
+  fmt::print("------\n");
 
-  Placement placement;
+  for (i64 i{}; auto&& path : paths){ fmt::print("Path {}: {}\n", i++, path); } // for
 
-  auto it{zz_p.begin()};
-  auto src{it->first};
-  auto dest{it->second};
+  fmt::print("------\n");
 
-  placement[src] = std::make_pair(0,0);
+  // 3. Get intersection of two smallest inner sub-cycles if they exist
+  auto intersection{fw::apply(paths
+    , fw::transform([](auto e){ return fp::trim(7,e); })
+    , fw::sort_by([](auto a, auto b){ return a.size() < b.size(); })
+    , fw::take_exact(2)
+    , fw::sets_intersection()
+  )};
 
-  while(auto tiles{tiles_from_annotations(src, dest, ops, zz_a, placement)})
-  {
-    placement[dest] = tiles->at(0);
+  fmt::print("Intersection: {}\n", intersection);
+  fmt::print("------\n");
 
-    if( it = std::next(it); it == zz_p.end() ){ break; }
-
-    std::tie(src,dest) = std::tie(it->first,it->second);
-  } // while
-
-  fmt::print("Placement:\n{}\n", placement);
-
-  cycles_intersection(ops,{7,6});
-
-  return 0;
+  return EXIT_SUCCESS;
 } // main }}}
