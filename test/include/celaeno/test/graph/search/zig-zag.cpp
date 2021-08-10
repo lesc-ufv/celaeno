@@ -107,15 +107,14 @@ void print_stack(Stack s)
     fmt::print("{} → ", u);
   } // while
   fmt::print("\n");
-} // function: print_stack
-// }}}
+} // function: print_stack }}}
 
 // fn: cyclic_paths {{{
 //
-// @creates a cycle tree, given an initial node in the graph
-// @returns the intersection of the cycles.
+// Given nodes that are part of cycles
+// Returns the paths that compose the cycles
 //
-GraphPaths cyclic_paths(ns_graph::Ops const& ops, Cycles const& cycles)
+[[nodiscard]] GraphPaths cyclic_paths(ns_graph::Ops const& ops, Cycles const& cycles)
 {
   // Novel intersection cycles
   std::vector<GraphPaths> out;
@@ -184,9 +183,6 @@ GraphPaths cyclic_paths(ns_graph::Ops const& ops, Cycles const& cycles)
       // Check if leaf is the same id as root
       if( ! contains(i,r) && contains(n,r) )
       {
-        // Create leaf edge
-        auto e {Edge{u,r}};
-
         // Save path
         deque_path.push_front(r);
 
@@ -267,6 +263,71 @@ GraphPaths cyclic_paths(ns_graph::Ops const& ops, Cycles const& cycles)
   // Return by greatest cycles
   return fp::maximum_by([&](auto&& a, auto&& b){ return f_by_greatest_cycle(a) < f_by_greatest_cycle(b); },out);
 } // function: cyclic_paths }}}
+
+// fn: e_bfs {{{
+[[nodiscard]] decltype(auto) e_bfs(ns_graph::Ops const& ops, Node r)
+{
+  // Empty node queue
+  std::queue<Node> q;
+
+  // Push initial element
+  q.push(r);
+
+  // Visited Nodes
+  std::set<Node> vn;
+
+  // Visited edges
+  std::set<Edge> ve;
+
+  // Distance annotations
+  using Distances = std::set<i64>;
+
+  std::map<Node,Distances> h;
+
+  // Push initial distance
+  h[r] = {0};
+
+  while (! q.empty())
+  {
+    // Get next node from queue front
+    Node u{q.front()}; q.pop();
+
+    // If node has been visited, skip iteration
+    if( vn.contains(u) ){ continue; }
+
+    // Else visit node
+    vn.insert(u);
+
+    // Helper to retrieve neighboring vertices of a vertex 'v'
+    auto neighbors = [&](Node v){ return fp::append(ops.preds(v),ops.succs(v)); };
+
+    // Helper to check if a set of edges has been visited
+    auto contains = []<Range R, typename... E>(R&& r, E&&... e)
+      requires IsPairsOf<Node,E...> // Edges must be node pairs
+    {
+      return (r.contains(e) or ...);
+    };
+
+    // Retrieve neighbors of 'u', remove ones that form visited edges
+    auto targets{fp::keep_if(
+      [&](Node v){ return ! contains(ve, Edge{u,v}, Edge{v,u}); }, neighbors(u)
+    )};
+
+    // Iterate throught target edge nodes
+    for (auto v : targets)
+    {
+      // Inherit distances from u to v
+      rg::for_each(h[u],[&,v=v](auto d){ h[v].insert(d+1); });
+      // Visit edge
+      ve.emplace(u,v);
+      // Enqueue v if not visited
+      if( ! vn.contains(v) ){ q.push(v); }
+    } // for
+
+  } // while: ! q.empty()
+
+  return h;
+} // function: e_bfs }}}
 
 // fun: annotate {{{
 Annotations annotate(ns_graph::Ops const& ops, Cycles const& zz_c)
@@ -613,5 +674,19 @@ int main([[maybe_unused]] int argc, char const* argv[])
   fmt::print("Intersection: {}\n", intersection);
   fmt::print("------\n");
 
+  fmt::print("eBFS:\n");
+  for (Node r : intersection)
+  {
+    fmt::print("- Table for {}:\n", r);
+
+    for (auto&& [k,v] : e_bfs(ops,r))
+    {
+      fmt::print("-- {} → {}\n", k,v);
+    } // for
+  } // for
+
+  fmt::print("------\n");
+
+  fmt::print("⊂ and ⊄\n");
   return EXIT_SUCCESS;
 } // main }}}
