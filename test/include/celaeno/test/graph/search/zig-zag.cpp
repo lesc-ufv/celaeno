@@ -31,6 +31,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+#include <algorithm>
+#include <ranges>
+
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #include <fmt/core.h>
@@ -187,7 +190,17 @@ GraphPaths cyclic_paths(ns_graph::Ops const& ops, Cycles const& cycles)
         // Save path
         deque_path.push_front(r);
 
-        graph_paths.emplace_back(deque_path);
+        // Check elements for equality with reversed container to remove
+        // duplicate paths
+        bool exists{rg::any_of(graph_paths,
+          [&,rv_deque_path = rv::reverse(deque_path)](auto&& e)
+          {
+            return rg::equal(e,rv_deque_path);
+          }
+        )};
+
+        // Conditionally include in graph_paths
+        if( ! exists ){ graph_paths.emplace_back(deque_path); }
 
         // Remove cycle marker
         deque_path.pop_front();
