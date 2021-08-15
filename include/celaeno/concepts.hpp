@@ -64,6 +64,13 @@ concept SameAs = std::same_as<T,U>;
 template<typename T, typename U>
 concept ConvertibleTo = std::convertible_to<std::decay_t<T>,std::decay_t<U>>;
 
+template<typename T, typename F, typename... Args>
+concept Returns =
+requires(F f, Args... args)
+{
+  { f(args...) } -> std::same_as<T>;
+};
+
 template<typename T, typename U>
 concept IsPairOf =
 requires(U u)
