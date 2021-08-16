@@ -42,6 +42,7 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/fun/fun.hpp>
 #include <celaeno/heuristics/manhattan.hpp>
 #include <celaeno/heuristics/chebyshev.hpp>
 #include <celaeno/graph/graph.hpp>
@@ -56,6 +57,7 @@ using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{
+namespace fn = celaeno::fun;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
@@ -258,17 +260,12 @@ void print_stack(Stack s)
     out.emplace_back(graph_paths);
   } // for
 
-  auto f_by_greatest_cycle =
-  [](GraphPaths const& graph_paths)
-  {
-    return fw::apply(graph_paths
-      , fw::transform([](GraphPath const& graph_path){ return graph_path.size(); })
-      , fw::maximum()
-    );
-  };
 
-  // Return by greatest cycles
-  return fp::maximum_by([&](auto&& a, auto&& b){ return f_by_greatest_cycle(a) < f_by_greatest_cycle(b); },out);
+  // Choose the result with largest paths
+  auto f_largest = [](Range auto&& r){ return fn::fn(r).as(rg::size).max(); };
+
+  // Return largest generated paths
+  return fn::fn(out).max({},[&](auto&& e){ return f_largest(e); });
 } // function: cyclic_paths }}}
 
 // fn: e_bfs {{{
@@ -470,13 +467,7 @@ Tiles Adjacencies::from_right()
     // Check if there are predecessors of u contained in cycles,
     // if no, and is last, position it to the right
     // else up
-    auto u_preds{fp::keep_if(
-      [&](Node v)
-      {
-        return rg::contains(cycles,v);
-      }
-      ,ops.preds(u)
-    )};
+    auto u_preds{fn::fn(ops.preds(u)).in(cycles).template into<Nodes>()};
 
     // Go up if is not last, otherwise left/right based on partition
     p[u] = (! u_preds.empty())? adj.up : (r == Partition::R)? adj.right : adj.left;
@@ -495,7 +486,7 @@ void place_cycle(Ops const& ops
   , Partition r)
 {
   // Check if a tile is occupied
-  auto f_is_occupied = [&](Tile const& t){ return rg::contains(rv::values(p),t); };
+  auto f_is_free = [&](Tile const& t){ return ! rg::contains(rv::values(p),t); };
 
   // TODO: Replace this O(n^2) function
   auto path{fp::nub(cycle)};
@@ -507,10 +498,11 @@ void place_cycle(Ops const& ops
   // therefore:
   // - Find first occurrence of a node from inter in path
   // - Shift the path left, until the intersection elements are the first ones
-  rg::rotate(path, rg::find_first_of(path,inter) );
-
-  // Create subrange for first partition
-  auto slice{rv::slice(path,std::distance(path.begin(),path.begin()+inter.size()),path.size())};
+  // - Create subrange for second partition
+  auto slice = fn::fn(path)
+    .rotate(rg::find_first_of(path,inter))
+    .cut(inter.size(),path.size())
+    .template into<Nodes>();
 
   // Keep a map with a list of possible tiles, for backtracking
   std::map<Node,Tiles> m_backtrack;
@@ -522,7 +514,7 @@ void place_cycle(Ops const& ops
   bool b_reversed{false};
 
   // Fill stack with unplaced elements
-  rg::for_each(rv::reverse(slice), [&](Node v){ unplaced.push(v); });
+  fn::fn(slice).reverse().every([&](Node v){ unplaced.push(v); });
 
   // Helper to reverse path if current fails
   auto f_try_reverse_path = [&]
@@ -532,8 +524,7 @@ void place_cycle(Ops const& ops
     unplaced = std::stack<Node>{};
     placed = std::stack<Node>{};
     b_reversed = true;
-    rg::for_each(slice, [&](Node v){ p.erase(v); });
-    rg::for_each(slice, [&](Node v){ unplaced.push(v); });
+    fn::fn(slice).every([&](Node v){ p.erase(v); unplaced.push(v); });
   };
 
   while( ! unplaced.empty() )
@@ -545,11 +536,17 @@ void place_cycle(Ops const& ops
     if( p.contains(u) ){ continue; }
 
     // Get all neighbors
-    auto f_neighbors = [&](Node v){ return fp::append(ops.preds(v),ops.succs(v)); };
+    auto f_neighbors = [&](Node v)
+    {
+      return fn::fn(ops.preds(v)).add(ops.succs(v)).into<Nodes>();
+    };
 
     // Filter nodes that are not positioned
-    auto neighbors_positioned{
-      fp::keep_if([&](Node v){ return p.contains(v); },f_neighbors(u))
+    Nodes nodes_placed
+    {
+      fn::fn(f_neighbors(u))
+        .keep([&](Node v){ return p.contains(v); })
+        .template into<Nodes>()
     };
 
     // Get all possible positions adjacent to positions of neighbors
@@ -564,46 +561,52 @@ void place_cycle(Ops const& ops
           F([&](Tile const& t) { return Adjacencies{t}.from_left(); })
        :  F([&](Tile const& t) { return Adjacencies{t}.from_right(); });
 
-      for (auto v : neighbors_positioned)
-      {
-        rg::copy(f_get_candidates(p[v]),std::back_inserter(candidates));
-      } // for
+      // Get all candidate positions from previously positioned neighbors
+      // Remove occupied positions
+      candidates = fn::fn(nodes_placed)
+        .as([&](Node v){ return f_get_candidates(p[v]); })
+        .squash()
+        .drop([&](Tile t){ return ! f_is_free(t); })
+        .template into<Tiles>();
 
-      // Filter out occupied positions
-      candidates = fp::keep_if([&](Tile t){ return ! f_is_occupied(t); }, candidates);
-
-      // For each tile in candidates
-      rg::sort(candidates,{},[&](Tile t)
+      // Define the quality of a tiles based on annotations
+      auto f_quality = [&](Tile t)
       {
         // Count how many distance constraints from intersection it adheres, and
         // use this as a method for sorting best positions
         return - rg::count_if(inter,
         [&](Node v)
         {
-          auto const& annotations{m_node_m_a.at(v).at(u)};
-          auto dist{ns_heuristics::manhattan::run(t,p[v])};
-          return has(annotations,dist);
+          auto&& targets{m_node_m_a.at(v).at(u)};
+          auto   dist{ns_heuristics::manhattan::run(t,p[v])};
+          return has(targets,dist);
         });
-      });
+      };
 
-      // For each tile in candidates, prioritise all that adhere to edge
+      // Sort candidates by quality
+      candidates = fn::fn(candidates).sort({},f_quality).template into<Tiles>();
+
+      // For each tile in candidates, remove all that does not adhere to edge
       // constraints.
-      candidates = fp::keep_if([&](Tile t)
+      auto f_target = [&](Node u, Node v)
       {
-        // Count how many distance constraints from intersection it adheres, and
-        // use this as a method for sorting best positions
-        return rg::all_of(neighbors_positioned,
-        [&](Node v)
-        {
-          i64 req_dist = ( m_edge_weight.contains({u,v}) )?
-            m_edge_weight.at({u,v}) : m_edge_weight.at({v,u});
+        return ( m_edge_weight.contains({u,v}) )?
+            m_edge_weight.at({u,v})
+          : m_edge_weight.at({v,u});
+      };
 
-          auto cur_dist{ns_heuristics::manhattan::run(t,p.at(v))};
+      auto f_dist = [&](Tile a, Tile b)
+      {
+        return ns_heuristics::manhattan::run(a,b);
+      };
 
-          return req_dist == cur_dist;
-        });
-      }, candidates);
-
+      // Keep a candidate if it satisfies edges constraints to all its placed
+      // neighbors
+      candidates = fn::fn(candidates)
+        .keep([&](Tile t) {
+            return fn::fn(nodes_placed)
+              .all([&](Node v){ return f_target(u,v) == f_dist(t,p.at(v)); }); })
+        .template into<Tiles>();
     } // if
     else
     {
