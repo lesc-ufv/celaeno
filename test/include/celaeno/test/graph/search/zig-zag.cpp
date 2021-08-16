@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <ranges>
+#include <tuple>
 
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
@@ -42,6 +43,7 @@
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/heuristics/manhattan.hpp>
+#include <celaeno/heuristics/chebyshev.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
 #include <celaeno/graph/draw/svg.hpp>
@@ -67,21 +69,22 @@ namespace ns_search = celaeno::graph::search;
 // }}}
 
 // Error Handlers {{{
-template<String S, typename... C>
-decltype(auto) err_check_if(S&& msg, C&&... conds)
+template<typename... C>
+[[nodiscard]] auto err(C&&... conds)
 {
-  if( ! ( conds && ... ) )
+  return
+  [passed=(conds && ...)]<String S, Printable... Args>(S&& msg, Args&&... args)
   {
-    spdlog::error(msg);
-    exit(1);
-  } // if
+    if( ! passed )
+    {
+      spdlog::error(std::forward<S>(msg), std::forward<Args>(args)...);
+      exit(1);
+    } // if
+  };
 } // function: check_if }}}
 
-// Macros {{{
-#define assertm(exp, msg) assert(((void)msg, exp))
-// }}}
-
 // Aliases {{{
+using Ops = ns_graph::Ops;
 using Node = i64;
 using Nodes = std::vector<Node>;
 using Edge = std::pair<Node,Node>;
@@ -99,15 +102,6 @@ using Cycles = std::vector<Node>;
 using Placement = std::map<Node,Tile>;
 using Occupation = std::set<Tile>;
 // }}}
-
-// fn: lookahead {{{
-//
-// Uses placement hash to determine how many tiles are still available
-//
-Tiles lookahead(Occupation const& o, Tiles const& ts)
-{
-  return Tiles{fp::keep_if([&](Tile t){ return ! o.contains(t); },ts)};
-} // function: lookahead }}}
 
 // fn: print_stack {{{
 template<typename Stack>
@@ -127,7 +121,7 @@ void print_stack(Stack s)
 // Given nodes that are part of cycles
 // Returns the paths that compose the cycles
 //
-[[nodiscard]] GraphPaths cyclic_paths(ns_graph::Ops const& ops, Cycles const& cycles)
+[[nodiscard]] GraphPaths cyclic_paths(Ops const& ops, Cycles const& cycles)
 {
   // Novel intersection cycles
   std::vector<GraphPaths> out;
@@ -279,7 +273,7 @@ void print_stack(Stack s)
 
 // fn: e_bfs {{{
 template<typename F = std::function<void(Edge)>>
-[[nodiscard]] Annotations e_bfs(ns_graph::Ops const& ops
+[[nodiscard]] Annotations e_bfs(Ops const& ops
   , Node r
   , F&& f = [](Edge) -> void {}
 )
@@ -348,7 +342,7 @@ template<typename F = std::function<void(Edge)>>
 } // function: e_bfs }}}
 
 // fn: edge_weights {{{
-std::map<Edge,Weight> edge_weight(ns_graph::Ops const& ops,
+[[nodiscard]] std::map<Edge,Weight> edge_weight(Ops const& ops,
   Range auto&& nodes,
   std::map<Node,Annotations> const& m_n_m_a)
 {
@@ -373,9 +367,7 @@ std::map<Edge,Weight> edge_weight(ns_graph::Ops const& ops,
       auto w_a{u_annotations.at(w)};
 
       // Check for errors
-      err_check_if(fmt::format("v_a and w_a must not be empty"),
-        ! v_a.empty(), ! w_a.empty()
-      );
+      err( ! v_a.empty(), ! w_a.empty()) ("v_a and w_a must not be empty");
 
       // Get max elements of v_a
       auto v_a_max {rg::max_element(v_a)};
@@ -386,22 +378,34 @@ std::map<Edge,Weight> edge_weight(ns_graph::Ops const& ops,
       // Get max between abs diff
       auto diff{fp::abs_diff(*v_a_max,*w_a_max)};
 
-      // If a previous value was assigned to the edge,
-      // use min
+      // If a previous value was assigned to the edge, use min
+      auto best{(out.contains(e))? std::min(out.at(e),diff) : diff};
 
-      out[e] = (out.contains(e))? std::min(out.at(e),diff) : diff;
+      // Check if reverse edge exists, if so, update it with the maximum between
+      // it and current result
+      auto e_rev{Edge{e.second,e.first}};
+
+      if(out.contains(e_rev))
+      {
+        out[e_rev] = std::max(out[e_rev],best);
+      } // if
+      else
+      {
+        out[e] = best;
+      } // else
+
     }); // e_bfs
   } // for
 
   return out;
 } // function: edge_weight }}}
 
-// enum: Rotation {{{
-enum class Rotation
+// enum: Partition {{{
+enum class Partition
 {
-  CLOCKWISE,
-  COUNTERCLOCKWISE,
-}; // enum: Rotation }}}
+  L,
+  R,
+}; // enum: Partition }}}
 
 // struct: Adjacencies {{{
 struct Adjacencies
@@ -411,437 +415,238 @@ struct Adjacencies
   Tile left;
   Tile right;
 
-  Adjacencies(Tile const& src);
-  Tiles clockwise(Tile const& src);
-  Tiles counterclockwise(Tile const& src);
+  template<typename T>
+  Adjacencies(T&& src);
+  Tiles from_left();
+  Tiles from_right();
 };
 
-Adjacencies::Adjacencies(Tile const& src)
-  : up   (Tile{src.first  , src.second-1})
-  , down (Tile{src.first  , src.second+1})
-  , left (Tile{src.first-1, src.second})
-  , right(Tile{src.first  , src.second+1})
+template<typename T>
+Adjacencies::Adjacencies(T&& src)
+  : up   (Tile{src.first   , src.second-1})
+  , down (Tile{src.first   , src.second+1})
+  , left (Tile{src.first-1 , src.second})
+  , right(Tile{src.first+1 , src.second})
 {};
 
-Tiles Adjacencies::clockwise(Tile const& src)
+Tiles Adjacencies::from_left()
 {
-  return Tiles{up,left,down,right};
+  return Tiles{down,left,up};
 };
 
-Tiles Adjacencies::counterclockwise(Tile const& src)
+Tiles Adjacencies::from_right()
 {
-  return Tiles{up,right,down,left};
+  return Tiles{up,right,down};
 };
 // struct: Adjacencies }}}
 
-// fn: adjacent tiles {{{
-Tiles adjacent_tiles(Tile const& src, Rotation const& r)
+// fn: place_intersection {{{
+[[nodiscard]] Placement place_intersection(Ops const& ops,
+  Range auto&& nodes,
+  Range auto&& cycles,
+  Partition r)
 {
-  static const Tiles clockwise         {{0,-1},{1,0},{0,-1},{-1,0}};
-  static const Tiles counterclockwise  {{0,-1},{-1,0},{0,1},{1,0}};
+  // Positions for nodes nodes
+  Placement p;
 
-  auto sum_tiles = [](Tile const& t1, Tile const& t2)
+  // Check if intersection is not empty
+  err(! nodes.empty())("Intersection must not not be empty");
+
+  // Set predecessor as nodes[0]
+  Node pred{nodes.at(0)};
+
+  // Place it in (0,0)
+  p[pred] = {0,0};
+
+  // Perform placement of next nodes
+  for (auto it{std::next(nodes.begin())}; it != nodes.end(); ++it)
   {
-    return std::make_pair(t1.first + t2.first, t1.second + t2.second);
-  }; // lamb: sum_tiles
+    // Get current node
+    auto u{*it};
 
-  if( r == Rotation::CLOCKWISE )
+    // Get adjacent tiles from predecessor position
+    Adjacencies adj{p[pred]};
+
+    // Check if there are predecessors of u contained in cycles,
+    // if no, and is last, position it to the right
+    // else up
+    auto u_preds{fp::keep_if(
+      [&](Node v)
+      {
+        return rg::contains(cycles,v);
+      }
+      ,ops.preds(u)
+    )};
+
+    // Go up if is not last, otherwise left/right based on partition
+    p[u] = (! u_preds.empty())? adj.up : (r == Partition::R)? adj.right : adj.left;
+  } // for
+
+  return p;
+} // function: place_intersection }}}
+
+// fn: place_cycle {{{
+void place_cycle(Ops const& ops
+  , Placement& p
+  , Range auto&& cycle
+  , Range auto&& inter
+  , std::map<Node,Annotations> const& m_node_m_a
+  , std::map<Edge,Weight> m_edge_weight
+  , Partition r)
+{
+  // Check if a tile is occupied
+  auto f_is_occupied = [&](Tile const& t){ return rg::contains(rv::values(p),t); };
+
+  // TODO: Replace this O(n^2) function
+  auto path{fp::nub(cycle)};
+
+  // Helper to indicate if an element v is present in a range r
+  auto has = [](Range auto&& r, Node v){ return rg::contains(r,v); };
+
+  // It is desirable to start from the intersection nodes in the cycle,
+  // therefore:
+  // - Find first occurrence of a node from inter in path
+  // - Shift the path left, until the intersection elements are the first ones
+  rg::rotate(path, rg::find_first_of(path,inter) );
+
+  // Create subrange for first partition
+  auto slice{rv::slice(path,std::distance(path.begin(),path.begin()+inter.size()),path.size())};
+
+  // Keep a map with a list of possible tiles, for backtracking
+  std::map<Node,Tiles> m_backtrack;
+
+  // Keep track of unplaced and placed elements
+  std::stack<Node> placed, unplaced;
+
+  // Try with reverse path if fails
+  bool b_reversed{false};
+
+  // Fill stack with unplaced elements
+  rg::for_each(rv::reverse(slice), [&](Node v){ unplaced.push(v); });
+
+  // Helper to reverse path if current fails
+  auto f_try_reverse_path = [&]
   {
-    return fp::transform([&](Tile const& t){ return sum_tiles(t,src); }, clockwise);
-  } // if
+    err(! b_reversed)("Failure to find a feasible solution");
+    m_backtrack.clear();
+    unplaced = std::stack<Node>{};
+    placed = std::stack<Node>{};
+    b_reversed = true;
+    rg::for_each(slice, [&](Node v){ p.erase(v); });
+    rg::for_each(slice, [&](Node v){ unplaced.push(v); });
+  };
 
-  return fp::transform([&](Tile const& t){ return sum_tiles(t,src); }, counterclockwise);
-} // function: adjacent_tiles }}}
+  while( ! unplaced.empty() )
+  {
+    // Get current node
+    auto u{unplaced.top()}; unplaced.pop();
 
-// // fn: place_intersection {{{
-// Placement place_intersection(ns_graph::Ops const& ops,
-//   Nodes const& i,
-//   std::map<Node,Annotations> const& m_node_m_a,
-//   Rotation r)
-// {
-//   Placement p;
-//
-//   // Check if intersection is not empty
-//   assertm(! i.empty(),
-//     fmt::format("{}@{} Intersection must not not be empty", __FILE__, __LINE__)
-//   );
-//
-//   // Get nodes in i that are in p
-//   auto f_i_placed = [&](Node v) -> Nodes
-//   {
-//     auto placed{fp::keep_if([&](Node w){ return p.contains(w); },i)};
-//
-//     assertm( ! placed.empty(),
-//       fmt::format("{}@{} No placed nodes before {}"
-//         , __FILE__
-//         , __LINE__
-//         , v
-//     ));
-//
-//     return placed;
-//   };
-//
-//   // Set predecessor as i[0]
-//   Node pred{i.at(0)};
-//
-//   // Place it in (0,0)
-//   p[pred] = {0,0};
-//
-//   // Perform placement of next nodes
-//   for (auto it{std::next(i.begin())}; it != i.end(); ++it)
-//   {
-//     // Get current node
-//     auto u{*it};
-//
-//     // Get potential positions from previous node
-//     Tiles tiles{adjacent_tiles(p[pred],r)};
-//
-//     // Get nodes placed before u
-//     auto i_placed{f_i_placed(u)};
-//
-//     // Keep tile t1, if it is at a annotated distance of tile t2 of v
-//     fmt::print("Pred: {}\nCurrent node: {}\nPlaced nodes: {}\n", pred, u, i_placed);
-//     tiles = fp::keep_if([&](Tile const& t1)
-//     {
-//       return rg::all_of(i_placed,[&](Node v)
-//       {
-//         Tile t2{p.at(v)};
-//         auto dist{ns_heuristics::manhattan::run(t1,t2)};
-//         auto allowed_dists{m_node_m_a.at(v).at(u)};
-//         return rg::find(allowed_dists,dist) != rg::end(allowed_dists);
-//       });
-//     },tiles);
-//     fmt::print("Viable positions: {}\n", tiles);
-//
-//     // Check if there are viable positions for u
-//     assertm(! tiles.empty() ,fmt::format("No viable positions for node {}\n",u));
-//
-//     // Prefer second position if has number of predecessors equal to 2
-//     if( ops.preds(u).size() > 1 && tiles.size() > 1 )
-//     {
-//       p[u] = tiles.at(1);
-//     } // if
-//     else
-//     {
-//       p[u] = tiles.at(0);
-//     } // else
-//
-//   } // for
-//
-//   return p;
-// } // function: place_intersection }}}
+    // Skip if placed
+    if( p.contains(u) ){ continue; }
 
-// // fn: place_cycle {{{
-// Placement place_cycle(ns_graph::Ops ops,
-//   Range auto&& i, // Intersection
-//   Range auto&& cycle, // Full cycle
-//   std::map<Node,Annotations> const& m_node_m_a,
-//   Rotation r,
-//   Placement& p
-//   )
-// {
-//   // Keep track of placed nodes
-//   std::set<Node> s_visited;
-//
-//   // Helper that checks is range r has node v
-//   auto contains = []<Range R>(R&& r, Node v){ return rg::find(r,v) != rg::end(r); };
-//
-//   // Set cycle to start at intersection
-//   auto it{rg::partition(cycle,[&](Node v){ return contains(i,v); })};
-//
-//   fmt::print("Placing partitions:\n\t{}\n\t{}\n"
-//     , rg::subrange(rg::begin(cycle),it)
-//     , rg::subrange(it,rg::end(cycle))
-//   );
-//
-//   // Place intersection
-//   {
-//     auto rng_i{rg::subrange(rg::begin(cycle),it)};
-//
-//     // Check if not empty subrange
-//     assertm( ! rng_i.empty(), "Intersection must not be empty");
-//
-//     // Place first element at position (0,0)
-//     p[rng_i.at(0)] = {0,0};
-//
-//     Node pred{rng_i.at(0)};
-//
-//     for (auto it{rng_i.begin()}; it != rng_i.end(); ++it)
-//     {
-//
-//     } // for
-//   }
-//
-//   for (Node pred{}; auto u : rg::subrange(rg::begin(cycle),it))
-//   {
-//     // Handle first case
-//     if( p.empty() )
-//     {
-//       pred = u;
-//       p[u] = {0,0};
-//       s_visited.insert(u);
-//       continue;
-//     }
-//
-//     // Check if node is already placed
-//     if( s_visited.contains(u) ){ continue; }
-//
-//     // If node has 2 predecessors or sucessors, reverse rotation
-//     auto is_in_cycle = [&](Node v){ return contains(cycle,v); };
-//     auto neighbor_count = [&]<typename F>(F&& f, Node v)
-//     {
-//       return fp::keep_if([&](Node w) { return is_in_cycle(w); }, f(v) ).size();
-//     };
-//
-//     if( (neighbor_count(ops.preds, u) > 1) or (neighbor_count(ops.succs,u) > 1) )
-//     {
-//       fmt::print("Reversed rotation for node {}\n", u);
-//       r = (r == Rotation::CLOCKWISE)? Rotation::COUNTERCLOCKWISE : Rotation::CLOCKWISE;
-//     } // if
-//
-//     // Get rotation based tiles
-//     assertm(p.contains(pred), "Predecessor must be already in a tile");
-//     // Tiles tiles{  }
-//   } // for
-//
-//   return p;
-//
-// } // function: place_cycle }}}
+    // Get all neighbors
+    auto f_neighbors = [&](Node v){ return fp::append(ops.preds(v),ops.succs(v)); };
 
-// // enum: Priority {{{
-// enum class Priority
-// {
-//   LOW,
-//   HIGH,
-// };
-// // }}}
+    // Filter nodes that are not positioned
+    auto neighbors_positioned{
+      fp::keep_if([&](Node v){ return p.contains(v); },f_neighbors(u))
+    };
 
-// // fn: Priority {{{
-// Priority get_priority(i64 degree)
-// {
-//   return (degree <= 2)? Priority::LOW : Priority::HIGH;
-// };
-// // }}}
+    // Get all possible positions adjacent to positions of neighbors
+    Tiles candidates;
 
-// // fun: tiles_from_annotations {{{
-// std::optional<Tiles> tiles_from_annotations(
-//   Node src,
-//   Node dest,
-//   ns_graph::Ops const& ops,
-//   Annotations const& a,
-//   Placement const& placement)
-// {
-//   // fmt::print("Placement: {}\n", placement); // TODO remove
-//
-//   // Set search offsets
-//   static const std::vector<Tile> high_offsets {{0,1},{1,0},{0,-1},{-1,0}};
-//   static const std::vector<Tile> low_offsets  {{0,-1},{-1,0},{1,0},{0,1}};
-//
-//   // Obtain degree priority of 'dest'
-//   auto [preds,succs] = std::make_pair(ops.preds(dest),ops.succs(dest));
-//
-//   // Degree
-//   auto degree{preds.size()+succs.size()};
-//
-//   // Priority
-//   auto priority{get_priority(degree)};
-//
-//   // Check if for every cycle node k, there distance restriction for dest
-//   std::vector<std::pair<Node,Distance>> dest_constraints;
-//   for (auto [k,v] : a)
-//   {
-//     // Ignore self-distance
-//     if( k == dest ){ continue; }
-//
-//     // Save all distances required to place 'dest' in respect to other nodes
-//     auto constraints{fw::apply(v
-//       , fw::keep_if([&](auto e){ return e.first == dest; })
-//       , fw::map_to_pairs()
-//       , fw::transform([&,k=k](auto e){ return std::make_pair(k,e.second); })
-//     )};
-//
-//     // Insert in constraints container
-//     rg::copy(constraints,std::back_inserter(dest_constraints));
-//
-//   } // for
-//
-//   // fmt::print("Annotations of {}: {}\n", dest, dest_constraints); // TODO remove
-//
-//   // Keep tiles that respect 'dest' annotations
-//   auto f_sum_tiles =
-//   [](Tile a, Tile b)
-//   {
-//     return std::make_pair(a.first+b.first,a.second+b.second);
-//   };
-//
-//   // Canditate tiles sorted by priority
-//   auto src_tile{placement.at(src)};
-//   auto dest_tiles
-//   {
-//     (priority == Priority::HIGH)?
-//       fp::transform([&](Tile t){ return f_sum_tiles(src_tile,t); },high_offsets)
-//     :
-//       fp::transform([&](Tile t){ return f_sum_tiles(src_tile,t); },low_offsets)
-//   };
-//
-//   // Verify which tiles adhere to annotations
-//   dest_tiles = fp::keep_if(
-//     [&](Tile const& dest_tile)
-//     {
-//       for (auto [node,dist] : dest_constraints)
-//       {
-//         auto target_tile{placement.at(node)};
-//         auto target_dist{ns_heuristics::manhattan::run(dest_tile,target_tile)};
-//         if( target_dist != dist ){ return false; }
-//       } // for
-//       return true;
-//     },dest_tiles);
-//
-//   // Remove occupied positions
-//   auto filtered_dest_tiles {fw::apply(dest_tiles
-//     , fw::keep_if([&](auto&& t)
-//       {
-//         return ! fp::is_elem_of(t,fp::get_map_values(placement));
-//       })
-//   )};
-//
-//
-//   // fmt::print("dest_tiles: {}\n", dest_tiles); // TODO remove
-//   //
-//   // fmt::print("filtered_dest_tiles: {}\n", filtered_dest_tiles); // TODO remove
-//   //
-//
-//   // If not viable position was found, return null
-//   if( filtered_dest_tiles.empty() ) { return std::nullopt; } // if
-//
-//   return filtered_dest_tiles;
-//
-//
-// } // function: tiles_from_annotations }}}
+    if( ! m_backtrack.contains(u) )
+    {
 
-// // fun: place {{{
-// decltype(auto) place(ns_graph::Ops const& ops, GridPath const& m_p, Cycles const& v_c, Annotations const& m_a)
-// {
-//   //
-//   // Pick a random cycle node
-//   //
-//   assertm(! v_c.empty(), "Cycle vector must not be empty!");
-//
-//   auto f_rand_index =
-//   [](auto const& c)
-//   {
-//     std::uniform_int_distribution<Node> dist(0,c.size());
-//     std::mt19937 gen{std::random_device{}()};
-//     return dist(gen);
-//   };
-//
-//   //
-//   // Create ownership table
-//   //
-//   using Tile = std::pair<i64,i64>;
-//   std::map<Tile,Node> ot;
-//
-//
-//   //
-//   // Degree matcher
-//   //
-//   auto f_filter_positions =
-//   [&](Node u, Tile const& t, i64 degree)
-//   {
-//     // Positions
-//     auto f_left  = [](Tile const& t) -> Tile { return std::make_pair(t.first-1,t.second); };
-//     auto f_right = [](Tile const& t) -> Tile { return std::make_pair(t.first+1,t.second); };
-//     auto f_up    = [](Tile const& t) -> Tile { return std::make_pair(t.first,t.second-1); };
-//     auto f_down  = [](Tile const& t) -> Tile { return std::make_pair(t.first,t.second+1); };
-//
-//     // Get priority
-//     Priority p{get_priority(degree)};
-//
-//     // Populate positions based on priority
-//     std::vector<Tile> positions;
-//
-//     auto emplace_back = [&]<typename... T>(T&&... t){ (positions.emplace_back(std::forward<T>(t)),...); };
-//
-//     if(p == Priority::LOW)
-//     {
-//       emplace_back(f_up(t),f_left(t),f_right(t),f_down(t));
-//     } // if
-//     else
-//     {
-//       emplace_back(f_down(t),f_right(t),f_up(t),f_left(t));
-//     } // else
-//
-//     // Filter invalid positions
-//     // Valid position:
-//     // cond1: is free?
-//     // cond2: is owner adjacent to u? (u → v) or (v → u)
-//     // cond3: TODO Are available positions enough for u?
-//     // Must consider: (cond1 or cond2) and cond3
-//     auto is_valid_pos =
-//     [&](Tile const& t) -> bool
-//     {
-//       return
-//           ( ! ot.contains(t) )? true
-//         : ( ops.adj(u,ot.at(t)) or ops.adj(ot.at(t),u) )? true
-//         : false;
-//     };
-//
-//     return fp::keep_if(is_valid_pos,positions);
-//   }; // lamb: f_filter_positions
-//
-//   //
-//   // Get preferred position by annotations
-//   //
-//   auto f_get_position =
-//   [&](Node u)
-//   {
-//     using Requirements = std::map<Node,Dist>;
-//
-//     Requirements req;
-//
-//     // Get requirements
-//     for (Node c : v_c)
-//     {
-//       auto e_rng{m_a.equal_range(c)};
-//
-//       for (auto it{e_rng.first}; it != e_rng.second; ++it)
-//       {
-//
-//       } // for
-//     } // for
-//
-//     // Get valid positions relative to required distances from cycle nodes
-//   };
-//
-//   //
-//   // Place node and update ownership table
-//   //
-//   auto place_and_reserve =
-//   [&](Node p, Node u)
-//   {
-//     // Get nodes adjacent to u
-//     auto preds{ops.preds(u)};
-//     auto succs{ops.succs(u)};
-//
-//     // Get u's priority
-//     Priority priority{get_priority(preds.size() + succs.size())};
-//
-//     // Get preferred tile by annotations
-//
-//     // Get positions ordered by priority and filtered by degree
-//     // auto positions{f_get_positions(u,tile,)};
-//
-//   };
-//
-//   // Position initial node
-//   Node u{f_rand_index(v_c)};
-//
-//   for (auto e : m_p)
-//   {
-//
-//   } // for
-//
-// } // function: place }}}
+      using F = typename std::function<Tiles(Tile)>;
+
+      auto f_get_candidates = ( r == Partition::R )?
+          F([&](Tile const& t) { return Adjacencies{t}.from_left(); })
+       :  F([&](Tile const& t) { return Adjacencies{t}.from_right(); });
+
+      for (auto v : neighbors_positioned)
+      {
+        rg::copy(f_get_candidates(p[v]),std::back_inserter(candidates));
+      } // for
+
+      // Filter out occupied positions
+      candidates = fp::keep_if([&](Tile t){ return ! f_is_occupied(t); }, candidates);
+
+      // For each tile in candidates
+      rg::sort(candidates,{},[&](Tile t)
+      {
+        // Count how many distance constraints from intersection it adheres, and
+        // use this as a method for sorting best positions
+        return - rg::count_if(inter,
+        [&](Node v)
+        {
+          auto const& annotations{m_node_m_a.at(v).at(u)};
+          auto dist{ns_heuristics::manhattan::run(t,p[v])};
+          return has(annotations,dist);
+        });
+      });
+
+      // For each tile in candidates, prioritise all that adhere to edge
+      // constraints.
+      candidates = fp::keep_if([&](Tile t)
+      {
+        // Count how many distance constraints from intersection it adheres, and
+        // use this as a method for sorting best positions
+        return rg::all_of(neighbors_positioned,
+        [&](Node v)
+        {
+          i64 req_dist = ( m_edge_weight.contains({u,v}) )?
+            m_edge_weight.at({u,v}) : m_edge_weight.at({v,u});
+
+          auto cur_dist{ns_heuristics::manhattan::run(t,p.at(v))};
+
+          return req_dist == cur_dist;
+        });
+      }, candidates);
+
+    } // if
+    else
+    {
+      candidates = m_backtrack.at(u);
+    } // else
+
+    // Check if candidates are empty, if so, backtrack
+    if (candidates.empty())
+    {
+      // Revert changes made by u
+      // Move it back to unplaced stack
+      unplaced.push(u);
+      // Remove its positions in m_backtrack, this is due to them being
+      // invalidated, since it is based on neighbors positions, which will now
+      // change
+      if( m_backtrack.contains(u) ){ m_backtrack.erase(u); }
+      // Try reverse path
+      if( placed.empty() ){ f_try_reverse_path(); continue; };
+      // Remove previous node from placed stack
+      auto v{placed.top()}; placed.pop();
+      // Remove previous node from placement map
+      if( p.contains(v) ){ p.erase(v); }
+      // Include previous node in unplaced stack
+      unplaced.push(v);
+
+      continue;
+    } // if
+
+    // Save node u in most promissing position
+    p[u] = candidates.front();
+
+    // Erase used position
+    candidates.erase(candidates.begin());
+
+    // Save other positions to backtracking map
+    m_backtrack[u] = candidates;
+
+    // Update placed stack
+    placed.push(u);
+  } // while
+
+
+} // function: place_cycle }}}
 
 // fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
@@ -859,7 +664,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   auto f_u = [&g](auto e){ g.erase(e); };
 
   // Create ops
-  ns_graph::Ops ops(f_p, f_s, f_a, f_l, f_u);
+  Ops ops(f_p, f_s, f_a, f_l, f_u);
 
   // Get outputs
   std::vector<i64> outputs;
@@ -897,7 +702,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   fmt::print("------\n");
 
   // 4. Annotate with eBFS
-  std::map<Node,Annotations> m_annotations;
+  std::map<Node,Annotations> m_n_m_a;
   fmt::print("eBFS:\n");
   for (Node r : intersection)
   {
@@ -905,47 +710,55 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
     auto annotations{e_bfs(ops,r)};
 
-    m_annotations[r] = annotations;
+    m_n_m_a[r] = annotations;
 
     for (auto&& [k,v] : annotations)
     {
       fmt::print("-- {} → {}\n", k,v);
     } // for
   } // for
+  fmt::print("------\n");
 
   // 5. Annotated edges with e_bfs
-  fmt::print("------\n");
   fmt::print("Edge Weights:\n");
-  auto weights{edge_weight(ops,intersection,m_annotations)};
+  auto m_edge_weight{edge_weight(ops,intersection,m_n_m_a)};
 
-  for (auto [k,v] : weights)
+  for (auto [k,v] : m_edge_weight)
   {
     fmt::print("{} → {}\n", k ,v);
   } // for
-
   fmt::print("------\n");
 
   // 6. Place intersection
-  fmt::print("------\n");
-  // Placement placement{
-  //   place_intersection(ops,
-  //     fp::convert_container<std::vector<Node>>(intersection),
-  //     m_annotations,
-  //     Rotation::COUNTERCLOCKWISE
-  // )};
-  // fmt::print("Placement of intersection: {}\n", placement);
+  Placement placement{place_intersection(ops
+    , intersection
+    , rv::concat(paths.at(2),paths.at(0))
+    , Partition::R
+  )};
+
+  fmt::print("Placement of intersection: {}\n", placement);
   fmt::print("------\n");
 
   // 7. Place each cycle separately
-  fmt::print("------\n");
-  // Placement p;
-  // place_cycle(ops
-  //   , intersection
-  //   , paths.at(2)
-  //   , m_annotations
-  //   , Rotation::COUNTERCLOCKWISE
-  //   , p
-  // );
+  place_cycle(ops
+    , placement
+    , paths.at(2)
+    , intersection
+    , m_n_m_a
+    , m_edge_weight
+    , Partition::L
+  );
+
+  place_cycle(ops
+    , placement
+    , paths.at(0)
+    , intersection
+    , m_n_m_a
+    , m_edge_weight
+    , Partition::R
+  );
+
+  fmt::print("Placement of cycles: {}\n", placement);
   fmt::print("------\n");
 
   // 8. Merge Cycles

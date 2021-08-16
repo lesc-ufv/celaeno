@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <concepts>
 #include <type_traits>
 #include <iterator>
@@ -41,6 +42,16 @@
 // namespace celaeno::concepts {{{
 namespace celaeno::concepts
 {
+
+template<typename... P>
+concept Printable =
+requires(P&&... p)
+{
+  ((std::cout << std::forward<P>(p)), ...);
+};
+
+template<typename T, typename U = std::decay_t<T>>
+concept Boolean = std::same_as<T,bool>;
 
 template<typename T, typename U = std::decay_t<T>>
 concept Integral = std::integral<U>;
