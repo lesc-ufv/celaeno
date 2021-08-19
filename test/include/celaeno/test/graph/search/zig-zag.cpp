@@ -433,7 +433,7 @@ Tiles Adjacencies::from_left()
 
 Tiles Adjacencies::from_right()
 {
-  return Tiles{up,right,down};
+  return Tiles{down,right,up};
 };
 // struct: Adjacencies }}}
 
@@ -564,8 +564,8 @@ void place_cycle(Ops const& ops
       // Get all candidate positions from previously positioned neighbors
       // Remove occupied positions
       candidates = fn::fn(nodes_placed)
-        .as([&](Node v){ return f_get_candidates(p[v]); })
-        .squash()
+        .as([&](Node v){ return f_get_candidates(p[v]); }) // nodes → tiles
+        .squash() // merge [[tiles],[tiles]...] → [tiles]
         .drop([&](Tile t){ return ! f_is_free(t); })
         .template into<Tiles>();
 
@@ -595,23 +595,21 @@ void place_cycle(Ops const& ops
           : m_edge_weight.at({v,u});
       };
 
-      auto f_dist = [&](Tile a, Tile b)
-      {
-        return ns_heuristics::manhattan::run(a,b);
-      };
+      auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::manhattan::run(a,b); };
 
       // Keep a candidate if it satisfies edges constraints to all its placed
       // neighbors
       candidates = fn::fn(candidates)
-        .keep([&](Tile t) {
-            return fn::fn(nodes_placed)
-              .all([&](Node v){ return f_target(u,v) == f_dist(t,p.at(v)); }); })
+        .keep_if_all(nodes_placed,
+            [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); })
         .template into<Tiles>();
     } // if
     else
     {
       candidates = m_backtrack.at(u);
     } // else
+
+    fmt::print("{} - Candidates: {}\n", u, candidates);
 
     // Check if candidates are empty, if so, backtrack
     if (candidates.empty())
