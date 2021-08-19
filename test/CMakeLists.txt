@@ -74,6 +74,7 @@ function(add_test target)
   target_link_libraries(${target}
     PRIVATE
       celaeno
+      argparse::argparse
       spdlog::spdlog
       doctest::doctest
       functionalplus::functionalplus
@@ -88,6 +89,9 @@ function(add_test target)
 endfunction(add_test)
 
 # Tests
+
+# Main
+# add_test(main "include/celaeno/test/celaeno.cpp")
 
 # ## Search
 # add_test(g_search_bfs "include/celaeno/test/graph/search/bfs.cpp")

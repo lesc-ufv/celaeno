@@ -43,6 +43,7 @@
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/fun/fun.hpp>
+#include <celaeno/err/err.hpp>
 #include <celaeno/heuristics/manhattan.hpp>
 #include <celaeno/heuristics/chebyshev.hpp>
 #include <celaeno/graph/graph.hpp>
@@ -57,6 +58,7 @@ using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{
+namespace err = celaeno::err;
 namespace fn = celaeno::fun;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
@@ -69,21 +71,6 @@ namespace ns_heuristics = celaeno::heuristics;
 namespace ns_reader = celaeno::graph::reader::verilog;
 namespace ns_search = celaeno::graph::search;
 // }}}
-
-// Error Handlers {{{
-template<typename... C>
-[[nodiscard]] auto err(C&&... conds)
-{
-  return
-  [passed=(conds && ...)]<String S, Printable... Args>(S&& msg, Args&&... args)
-  {
-    if( ! passed )
-    {
-      spdlog::error(std::forward<S>(msg), std::forward<Args>(args)...);
-      exit(1);
-    } // if
-  };
-} // function: check_if }}}
 
 // Aliases {{{
 using Ops = ns_graph::Ops;
@@ -170,11 +157,7 @@ void print_stack(Stack s)
       while( ! contains(i,u) )
       {
         // Check for errors
-        if( stack_i.empty() )
-        {
-          spdlog::error("{}@{} Stack must never be empty", __FILE__,__LINE__);
-          exit(1);
-        } // if
+        err::err( stack_i.empty() )( "Stack must never be empty" );
 
         stack_i.pop();
 
@@ -364,7 +347,7 @@ template<typename F = std::function<void(Edge)>>
       auto w_a{u_annotations.at(w)};
 
       // Check for errors
-      err( ! v_a.empty(), ! w_a.empty()) ("v_a and w_a must not be empty");
+      err::err( ! v_a.empty(), ! w_a.empty()) ("v_a and w_a must not be empty");
 
       // Get max elements of v_a
       auto v_a_max {rg::max_element(v_a)};
@@ -447,7 +430,7 @@ Tiles Adjacencies::from_right()
   Placement p;
 
   // Check if intersection is not empty
-  err(! nodes.empty())("Intersection must not not be empty");
+  err::err(! nodes.empty())("Intersection must not not be empty");
 
   // Set predecessor as nodes[0]
   Node pred{nodes.at(0)};

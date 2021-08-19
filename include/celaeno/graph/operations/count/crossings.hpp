@@ -42,6 +42,9 @@
 
 #include <celaeno/concepts.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/graph/graph.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
+#include <celaeno/graph/views/depth.hpp>
 
 // namespace celaeno::graph::operations::count::crossings {{{
 namespace celaeno::graph::operations::count::crossings
@@ -55,11 +58,19 @@ namespace celaeno::graph::operations::count::crossings
 namespace rg = ranges;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
+
+namespace ns_graph = celaeno::graph;
+namespace ns_views = celaeno::graph::views;
+namespace ns_operations = celaeno::graph::operations;
 // }}}
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
+// }}}
+
+// Using declarations {{{
+using Ops = ns_graph::Ops;
 // }}}
 
 // function: run {{{
@@ -132,6 +143,32 @@ T run(R&& l1, R&& l2, S&& f_succ)
 
   return crossings;
 
+} // function: run }}}
+
+// fn: run {{{
+template<SignedIntegral T = i64>
+T run(T root, Ops const& ops)
+{
+  // Balance paths
+  ns_operations::balance::paths::run(root,ops);
+
+  // Create a depth view
+  auto ln{ns_views::depth::run(root,ops.preds,ops.succs).ln};
+
+  // Count crossings between each layer
+  T count{};
+
+  auto layers{fp::overlapping_pairs(fp::numbers({},ln.size()))};
+
+  for (auto [i,j] : layers)
+  {
+    auto const& n1{ln.at(i)};
+    auto const& n2{ln.at(j)};
+
+    count += run(n1,n2,ops.succs);
+  } // for
+
+  return count;
 } // function: run }}}
 
 } // celaeno::graph::operations::count::crossings }}}

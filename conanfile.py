@@ -47,6 +47,7 @@ class CelaenoConan(ConanFile):
     self.requires('fmt/6.0.0@bincrafters/stable')
     self.requires('functionalplus/v0.2.13-p0@dobiasd/stable')
     self.requires('range-v3/0.11.0@ericniebler/stable')
+    self.requires('argparse/2.1')
 
   def source(self):
     # Remove examples

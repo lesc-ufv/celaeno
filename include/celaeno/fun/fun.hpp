@@ -214,6 +214,18 @@ struct Fun
     return this->keep([&](auto e){ return ! f(e); });
   }
 
+  //
+  // Keep only elements that are true for every element of r by f
+  //
+  template<Range R, typename F>
+  [[nodiscard]] auto keep_if_all(R&& r, F&& f)
+  {
+    return this->keep([&](auto&& a)
+    {
+      return rg::all_of(r,[&](auto&& b){ return f(a,b); } );
+    });
+  }
+
   [[nodiscard]] auto unique()
   {
     return make_view(rv::unique(view));

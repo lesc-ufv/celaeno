@@ -42,6 +42,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
 
 # External libraries
+if(NOT argparse_FOUND)
+  find_package(argparse REQUIRED)
+endif()
+
 if(NOT spdlog_FOUND)
   find_package(spdlog REQUIRED)
 endif()
