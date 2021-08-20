@@ -75,6 +75,7 @@ function(add_test target)
     PRIVATE
       celaeno
       argparse::argparse
+      fmt::fmt
       spdlog::spdlog
       doctest::doctest
       functionalplus::functionalplus

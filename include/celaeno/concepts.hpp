@@ -50,8 +50,9 @@ requires(P&&... p)
   ((std::cout << std::forward<P>(p)), ...);
 };
 
+// Basic Types {{{
 template<typename T, typename U = std::decay_t<T>>
-concept Boolean = std::same_as<T,bool>;
+concept Boolean = std::same_as<std::decay_t<T>,bool>;
 
 template<typename T, typename U = std::decay_t<T>>
 concept Integral = std::integral<U>;
@@ -65,48 +66,19 @@ concept Float = std::floating_point<U>;
 template<typename T, typename U = std::decay_t<T>>
 concept String =
 requires(U u) { { std::string{u} } -> std::same_as<std::string>; };
+// }}}
 
+// Ranges {{{
 template<typename T>
 concept Range = std::ranges::range<T>;
 
-template<typename T, typename U>
-concept SameAs = std::same_as<T,U>;
+template<typename M, typename R = typename std::decay_t<M>::value_type::value_type>
+concept Matrix = Range<M> && Range<R>;
+// }}}
 
-template<typename T, typename U>
-concept ConvertibleTo = std::convertible_to<std::decay_t<T>,std::decay_t<U>>;
+// Type Traits {{{
 
-template<typename T, typename F, typename... Args>
-concept Returns =
-requires(F f, Args... args)
-{
-  { f(args...) } -> std::same_as<T>;
-};
-
-template<typename T, typename U>
-concept IsPairOf =
-requires(U u)
-{
-  {u.first} -> std::convertible_to<std::decay_t<T>>;
-  {u.second} -> std::convertible_to<std::decay_t<T>>;
-};
-
-template<typename T, typename... U>
-concept IsPairsOf =
-requires(U... u)
-{
-  { ((u.first),...) } -> std::convertible_to<std::decay_t<T>>;
-  { ((u.second),...) } -> std::convertible_to<std::decay_t<T>>;
-};
-
-template<typename F, typename... V>
-concept CallableWith = requires(F f, V... v) { f(std::forward<V>(v)...); };
-
-template<typename T, typename U = std::decay_t<T>>
-concept Iterable = requires{ std::input_iterator<U> && std::incrementable<U>; };
-
-template<typename T, typename U = std::decay_t<T>>
-concept ForwardIterator = std::forward_iterator<U>;
-
+// Trait {{{
 template<typename T, typename U = std::decay_t<T>>
 concept Arithmetic =
 requires(U u)
@@ -124,13 +96,62 @@ requires
   typename std::decay_t<T>::key_type;
   typename std::decay_t<T>::mapped_type;
 };
+// }}}
 
-template<typename V>
-concept Vector =
-Iterable<V> && requires(V&& v){ typename std::decay_t<V>::value_type; };
+// Relationship {{{
 
-template<typename M>
-concept Matrix =
-Vector<M> && Iterable<typename std::decay_t<M>::value_type::value_type>;
+//
+// Check if decayed types are the same
+//
+template<typename T, typename U>
+concept SameAs = std::same_as<std::decay_t<T>,std::decay_t<U>>;
+
+//
+// Check if T is convertible to U
+//
+template<typename T, typename U>
+concept ConvertibleTo = std::convertible_to<std::decay_t<T>,std::decay_t<U>>;
+
+//
+// Check if  U is a pair (T,T)
+//
+template<typename T, typename U>
+concept IsPairOf = requires(U u)
+{
+  {u.first} -> std::convertible_to<std::decay_t<T>>;
+  {u.second} -> std::convertible_to<std::decay_t<T>>;
+};
+
+//
+// Check if  U is a pair ((T,T),(T,T),...)
+//
+template<typename T, typename... U>
+concept IsPairsOf = requires(U... u)
+{
+  { ((u.first),...) } -> std::convertible_to<std::decay_t<T>>;
+  { ((u.second),...) } -> std::convertible_to<std::decay_t<T>>;
+};
+// }}}
+
+// Function {{{
+
+//
+// Check if a function F is callable with arguments Args...
+//
+template<typename F, typename... Args>
+concept CallableWith =
+  requires(F f, Args&&... args) { f(std::forward<Args>(args)...); };
+
+//
+// Check if a value T, is returned from a function F, with arguments Args...
+//
+template<typename T, typename F, typename... Args>
+concept Returns = requires(F f, Args&&... args)
+{
+  { f(std::forward<Args>(args)...) } -> std::same_as<std::decay_t<T>>;
+};
+// }}}
+
+// }}}
 
 } // namespace celaeno::concepts }}}

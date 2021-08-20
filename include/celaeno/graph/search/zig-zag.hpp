@@ -45,14 +45,11 @@
 
 #include <celaeno/concepts.hpp>
 #include <celaeno/aliases.hpp>
+#include <celaeno/err/err.hpp>
 #include <celaeno/graph/graph.hpp>
 
 namespace celaeno::graph::search::zig_zag
 {
-// Macros {{{
-#define assertm(exp, msg) assert(((void)msg, exp))
-// }}}
-
 // Using declarations {{{
 using Ops = celaeno::graph::Ops;
 // }}}
@@ -84,7 +81,7 @@ std::vector<T> run(T root,
   C&& f_cb = [](auto){ return false; }
 )
 {
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
+#if defined(DEBUG) && defined(DEBUG_SHOW_ALG)
   spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::search::zig_zag");
 #endif

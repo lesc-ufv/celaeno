@@ -63,7 +63,6 @@ namespace fn = celaeno::fun;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 namespace rg = ranges;
-namespace ra = ranges::actions;
 namespace rv = ranges::views;
 
 namespace ns_graph = celaeno::graph;
@@ -105,6 +104,35 @@ void print_stack(Stack s)
   fmt::print("\n");
 } // function: print_stack }}}
 
+// fn: minimal_basis {{{
+[[nodiscard]] GraphPaths minimal_basis(Ops const& ops)
+{
+  // Get outputs
+  std::vector<i64> outputs;
+  ns_search::bfs::run(0, ops,
+  [&](auto e)
+  {
+    if( ops.succs(e).size() == 0 ){ outputs.push_back(e); }
+    return false;
+  });
+
+  err::err({}, ! outputs.empty() )( "Not outputs in input graph?" );
+
+  [[maybe_unused]] GridPath zz_p; // Path
+  Cycles zz_c; // Cycles
+
+  // 1. Run zig-zag
+  auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c
+  , [&](auto)
+    {
+      return ! zz_c.empty();
+    }
+  )};
+
+  fmt::print("Cycles by zz: {}\n", zz_c);
+  fmt::print("Path by zz: {}\n", zz_p);
+} // fn: minimal_basis }}}
+
 // fn: cyclic_paths {{{
 //
 // Given nodes that are part of cycles
@@ -113,14 +141,11 @@ void print_stack(Stack s)
 [[nodiscard]] GraphPaths cyclic_paths(Ops const& ops, Cycles const& cycles)
 {
   // Novel intersection cycles
-  std::vector<GraphPaths> out;
+  GraphPaths graph_paths;
 
   // Find out the greatest tree
   for (auto r : cycles)
   {
-    // Current cyclic paths
-    GraphPaths graph_paths;
-
     // Current path
     std::deque<Node> deque_path;
 
@@ -157,7 +182,7 @@ void print_stack(Stack s)
       while( ! contains(i,u) )
       {
         // Check for errors
-        err::err( stack_i.empty() )( "Stack must never be empty" );
+        err::err({}, ! stack_i.empty() )( "Stack must never be empty" );
 
         stack_i.pop();
 
@@ -240,15 +265,10 @@ void print_stack(Stack s)
 
     } // while
 
-    out.emplace_back(graph_paths);
   } // for
 
 
-  // Choose the result with largest paths
-  auto f_largest = [](Range auto&& r){ return fn::fn(r).as(rg::size).max(); };
-
-  // Return largest generated paths
-  return fn::fn(out).max({},[&](auto&& e){ return f_largest(e); });
+  return graph_paths;
 } // function: cyclic_paths }}}
 
 // fn: e_bfs {{{
@@ -347,7 +367,7 @@ template<typename F = std::function<void(Edge)>>
       auto w_a{u_annotations.at(w)};
 
       // Check for errors
-      err::err( ! v_a.empty(), ! w_a.empty()) ("v_a and w_a must not be empty");
+      err::err({}, ! v_a.empty(), ! w_a.empty()) ("v_a and w_a must not be empty");
 
       // Get max elements of v_a
       auto v_a_max {rg::max_element(v_a)};
@@ -430,7 +450,7 @@ Tiles Adjacencies::from_right()
   Placement p;
 
   // Check if intersection is not empty
-  err::err(! nodes.empty())("Intersection must not not be empty");
+  err::err({},! nodes.empty())("Intersection must not be empty");
 
   // Set predecessor as nodes[0]
   Node pred{nodes.at(0)};
@@ -502,7 +522,7 @@ void place_cycle(Ops const& ops
   // Helper to reverse path if current fails
   auto f_try_reverse_path = [&]
   {
-    err(! b_reversed)("Failure to find a feasible solution");
+    err::err({},! b_reversed)("Failure to find a feasible solution");
     m_backtrack.clear();
     unplaced = std::stack<Node>{};
     placed = std::stack<Node>{};
@@ -650,6 +670,11 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u);
 
+  for (auto [u,v] : g.data())
+  {
+    fmt::print("{} → {}\n", u, v);
+  } // for
+
   // Get outputs
   std::vector<i64> outputs;
   ns_search::bfs::run(0, ops,
@@ -663,7 +688,17 @@ int main([[maybe_unused]] int argc, char const* argv[])
   Cycles zz_c; // Cycles
 
   // 1. Run zig-zag
-  auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c)};
+  auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c
+  , [&](auto)
+    {
+      return ! zz_c.empty();
+    }
+  )};
+
+  fmt::print("Cycles by zz: {}\n", zz_c);
+  fmt::print("Path by zz: {}\n", zz_p);
+
+  zz_o = ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c);
 
   // 2. Get cyclic paths
   auto paths{cyclic_paths(ops,zz_c)};

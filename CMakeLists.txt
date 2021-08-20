@@ -42,8 +42,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
 
 # External libraries
-if(NOT argparse_FOUND)
-  find_package(argparse REQUIRED)
+if(NOT doctest_FOUND)
+  find_package(doctest REQUIRED)
 endif()
 
 if(NOT spdlog_FOUND)
@@ -54,21 +54,18 @@ if(NOT fmt_FOUND)
   find_package(fmt REQUIRED)
 endif()
 
-if(NOT doctest_FOUND)
-  find_package(doctest REQUIRED)
-endif()
-
-if(NOT spdlog_FOUND)
-  find_package(spdlog REQUIRED)
+if(NOT functionalplus_FOUND)
+  find_package(functionalplus REQUIRED)
 endif()
 
 if(NOT range-v3_FOUND)
   find_package(range-v3 REQUIRED)
 endif()
 
-if(NOT functionalplus_FOUND)
-  find_package(functionalplus REQUIRED)
+if(NOT argparse_FOUND)
+  find_package(argparse REQUIRED)
 endif()
+
 
 # Source files
 add_subdirectory(include)

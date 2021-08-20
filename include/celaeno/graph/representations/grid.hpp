@@ -54,7 +54,6 @@ namespace celaeno::graph::representations::grid
 
 // Macros {{{
 #define assertm(exp, msg) assert(((void)msg, exp))
-#define DEBUG ! NDEBUG
 // }}}
 
 // enum class: TileType {{{

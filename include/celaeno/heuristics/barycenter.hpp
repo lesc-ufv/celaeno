@@ -45,13 +45,20 @@ using namespace celaeno::concepts;
 // }}}
 
 // Algorithm {{{
-template<Vector V>
-[[nodiscard]] auto run(V&& v)
+
+//
+// Calculates the barycenter of a range of boolean values, the calculation
+// equals (sum of all indices of elements equal to 1) / (sum of all elements)
+//
+// @param r: A range of boolean values
+//
+template<Range R>
+[[nodiscard]] auto run(R&& r)
 {
   auto f = [i=1](auto&& acc, auto&& curr) mutable { return acc + curr*i++; };
 
-  auto a { std::accumulate(v.begin(), v.end(), 0, f) };
-  auto b { std::reduce(std::execution::par_unseq, v.begin(), v.end(), 0) };
+  auto a { std::accumulate(r.begin(), r.end(), 0, f) };
+  auto b { std::reduce(std::execution::par_unseq, r.begin(), r.end(), 0) };
 
   return (b != 0)? static_cast<double>(a)/b : 0;
 } // function: run }}}

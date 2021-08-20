@@ -44,12 +44,15 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/err/err.hpp>
 
 // celaeno::graph::reader::verilog {{{
 namespace celaeno::graph::reader::verilog
 {
 
 // Namespaces {{{
+namespace err = celaeno::err;
+
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::actions;
@@ -61,25 +64,8 @@ using namespace celaeno::aliases;
 // }}}
 
 // Enum Type {{{
-enum class GateType{INPUT,AND,NAND,OR,NOR,XOR,XNOR,MAJ3,};
+enum class GateType{INPUT,NOT,AND,NAND,OR,NOR,XOR,XNOR,MAJ3,};
 // }}}
-
-// Parsing error exception {{{
-class ParseError : std::exception
-{
-  private:
-    std::string const error_msg;
-
-  public:
-    template<String S>
-    ParseError(S&& str)
-      : error_msg(std::forward<S>(str))
-    {}
-    virtual const char* what() const noexcept override
-    {
-      return this->error_msg.c_str();
-    };
-}; // class: ParseError : std::exception }}}
 
 // class Reader {{{
 template<typename T>
@@ -146,11 +132,7 @@ Reader<T>::Reader(S&& _filename, T _callback)
 
   std::ifstream ifile{_filename};
 
-  if (! ifile.good())
-  {
-    spdlog::error("{}@{} Invalid input file {}", __FILE__, __LINE__,_filename);
-    exit(1);
-  } // if ! ifile.good()
+  err::err({}, ifile.good())("Invalid input file {}", _filename);
 
   std::string input;
 
@@ -164,7 +146,7 @@ Reader<T>::Reader(S&& _filename, T _callback)
 
     if( std::regex_match(_line,m,r) )
     {
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
+#if defined(DEBUG) && defined(DEBUG_SHOW_HDL)
       spdlog::debug(msg);
 #endif
       return true;
@@ -179,34 +161,34 @@ Reader<T>::Reader(S&& _filename, T _callback)
   {
     std::string _line(rng.begin(),rng.end());
 
-    // Newline
-    if (not (eval_regex(_line,"^$","Newline")
-    // Comment
-    || eval_regex(_line,"^//.*$",fmt::format("Comment: {}",_line))
-    // Module
-    || eval_regex(_line,
+    if (not
+      (// Newline
+        eval_regex(_line,"^$","Newline")
+      // Comment
+      || eval_regex(_line,"^//.*$",fmt::format("Comment: {}",_line))
+      // Module
+      || eval_regex(_line,
         fmt::format("module{}.*",expr_id),
         fmt::format("Module: {}",_line))
-    // Endmodule
-    || eval_regex(_line,"endmodule","Endmodule")
-    // Inputs/Outputs
-    || eval_regex(_line,
+      // Endmodule
+      || eval_regex(_line,"endmodule","Endmodule")
+      // Inputs/Outputs
+      || eval_regex(_line,
         fmt::format("((input)|(output))({}[,;]?)+",expr_id),
         fmt::format("IO: {}",_line))
-    // Wire declarations
-    || eval_regex(_line,
-            fmt::format("(wire)?({}[,;]?)+",expr_id),
-            fmt::format("Wire: {}",_line))
-    // Assigns
-    || this->on_assign(_line)
-    // And gates
-    || this->on_and(_line)
-    // Or gates
-    || this->on_or(_line))
-    // Error on parsing
-    ){
-      spdlog::error("{}@{}: Did not match: {}\n",__FILE__,__LINE__,_line);
-      throw ParseError(fmt::format("Error on parsing expression: {}", _line));
+      // Wire declarations
+      || eval_regex(_line,
+        fmt::format("(wire)?({}[,;]?)+",expr_id),
+        fmt::format("Wire: {}",_line))
+      // Assigns
+      || this->on_assign(_line)
+      // And gates
+      || this->on_and(_line)
+      // Or gates
+      || this->on_or(_line))
+    )
+    {
+      err::err({})("Did not match: {}\n", _line);
     }
   }
 
@@ -232,6 +214,8 @@ std::map<i64,GateType> const& Reader<T>::data() const noexcept
 // }}}
 
 // Modifiers {{{
+
+// fn: on_assign {{{
 template<typename T>
 bool Reader<T>::on_assign( std::string const& _line ) const
 {
@@ -240,15 +224,17 @@ bool Reader<T>::on_assign( std::string const& _line ) const
   std::smatch m;
   if( std::regex_match(_line,m,r) )
   {
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
+#if defined(DEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Assign: ({}) Input: ({})",
       std::string(m[1]), std::string(m[2])));
 #endif
+    this->update(m[1],GateType::NOT,m[2]);
     return true;
   }
   return false;
-}
+} // fn: on_assign }}}
 
+// fn: on_and {{{
 template<typename T>
 bool Reader<T>::on_and( std::string const& _line ) const
 {
@@ -257,7 +243,7 @@ bool Reader<T>::on_and( std::string const& _line ) const
   std::smatch m;
   if( std::regex_match(_line,m,r) )
   {
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
+#if defined(DEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Gate: ({}) Inputs: ({}) & ({})",
       std::string(m[1]), std::string(m[2]), std::string(m[3])));
 #endif
@@ -265,8 +251,9 @@ bool Reader<T>::on_and( std::string const& _line ) const
     return true;
   }
   return false;
-}
+} // fn: on_and }}}
 
+// fn: on_or {{{
 template<typename T>
 bool Reader<T>::on_or( std::string const& _line ) const
 {
@@ -275,7 +262,7 @@ bool Reader<T>::on_or( std::string const& _line ) const
   std::smatch m;
   if( std::regex_match(_line,m,r) )
   {
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_HDL)
+#if defined(DEBUG) && defined(DEBUG_SHOW_HDL)
     spdlog::debug(fmt::format("Gate: ({}) Inputs: ({}) | ({})",
       std::string(m[1]), std::string(m[2]), std::string(m[3])));
 #endif
@@ -283,8 +270,9 @@ bool Reader<T>::on_or( std::string const& _line ) const
     return true;
   }
   return false;
-}
+} // fn: on_or }}}
 
+// fn: update {{{
 template<typename T>
 void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
 {
@@ -323,6 +311,8 @@ void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
 
   }(std::forward<decltype(_ops)>(_ops)...);
 
-} // }}}
+} // fn: update }}}
+
+// Modifiers }}}
 
 } // namespace celaeno::graph::reader::verilog }}}

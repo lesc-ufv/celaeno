@@ -43,8 +43,8 @@ class CelaenoConan(ConanFile):
 
   def requirements(self):
     self.requires('doctest/2.4.1')
-    self.requires('spdlog/1.4.2@bincrafters/stable')
-    self.requires('fmt/6.0.0@bincrafters/stable')
+    self.requires('spdlog/1.5.0')
+    self.requires('fmt/6.2.1')
     self.requires('functionalplus/v0.2.13-p0@dobiasd/stable')
     self.requires('range-v3/0.11.0@ericniebler/stable')
     self.requires('argparse/2.1')

@@ -5,13 +5,16 @@
 // @created     : Thursday Aug 19, 2021 12:35:25 UTC
 //
 
+#pragma once
+
 #include <spdlog/spdlog.h>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 
-#define DEBUG (! NDEBUG)
+#define DEBUG (!NDEBUG)
 
+// namespace celaeno::err {{{
 namespace celaeno::err
 {
 
@@ -20,21 +23,67 @@ using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
-// Error Handlers {{{
-template<typename... C>
-[[nodiscard]] auto err(C&&... conds)
+// class: Location {{{
+class Location
 {
-  return
-  [passed=(conds && ...)]<String S, Printable... Args>(S&& msg, Args&&... args)
+  private:
+  // Private members {{{
+    char const* str_file=__builtin_FILE();
+    u32 str_line=__builtin_LINE();
+    char const* str_fun=__builtin_FUNCTION();
+  // }}}
+
+  public:
+  // Constructors {{{
+    Location(
+        char const* str_file = __builtin_FILE()
+      , u32 str_line = __builtin_LINE()
+      , char const* str_fun = __builtin_FUNCTION()
+    )
+      : str_file(str_file)
+      , str_line(str_line)
+      , str_fun(str_fun)
+    {}
+  // }}}
+
+  // public member functions {{{
+  auto get() const
+  {
+    return fmt::format("{}:{} `{}`: ",str_file,str_line,str_fun);
+  }
+  // }}}
+
+}; // class: Location }}}
+
+// fn: err {{{
+
+//
+// Given a default argument {} and comma-separated boolean values C..., aborts
+// the program if any argument of C is false, with a message passed with the ()
+// operator.
+//
+// @param loc: Must be initialized with {}
+// @param conds: Comma-separated boolean values
+//
+// @e.g: err({}, ! c.empty()) ("Error on iteration {}, empty container", i)
+//
+template<Boolean... C>
+[[nodiscard]] auto err(
+    [[maybe_unused]] Location const& loc
+  , [[maybe_unused]] C&&... conds )
+{
+  return [&]<String M, Printable... Args>(
+      [[maybe_unused]] M&& m
+    , [[maybe_unused]] Args&&... args )
   {
 #ifdef DEBUG
-    if( ! passed )
+    if( ! (conds && ...) || (sizeof...(conds) == 0) )
     {
-      spdlog::error(std::forward<S>(msg), std::forward<Args>(args)...);
+      spdlog::error(loc.get() + std::forward<M>(m), std::forward<Args>(args)...);
       exit(1);
     } // if
-  };
 #endif // DEBUG
-} // function: check_if }}}
+  }; // anonymous lambda
+} // fn: err }}}
 
-} // namespace celaeno::err
+} // namespace celaeno::err }}}
