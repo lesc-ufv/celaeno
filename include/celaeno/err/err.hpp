@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <set>
+
 #include <spdlog/spdlog.h>
 
 #include <celaeno/aliases.hpp>
@@ -58,26 +60,23 @@ class Location
 // fn: err {{{
 
 //
-// Given a default argument {} and comma-separated boolean values C..., aborts
-// the program if any argument of C is false, with a message passed with the ()
-// operator.
+// Given a brace enclosed list of boolean values, aborts the program if any
+// argument of C is false, with a message passed with the () operator.
 //
-// @param loc: Must be initialized with {}
 // @param conds: Comma-separated boolean values
 //
-// @e.g: err({}, ! c.empty()) ("Error on iteration {}, empty container", i)
+// @e.g: err({! c.empty()}) ("Error on iteration {}, empty container", i)
 //
-template<Boolean... C>
-[[nodiscard]] auto err(
-    [[maybe_unused]] Location const& loc
-  , [[maybe_unused]] C&&... conds )
+[[nodiscard]] decltype(auto) err(
+    [[maybe_unused]] std::set<bool> const& conds = {}
+  , [[maybe_unused]] Location const& loc = {})
 {
   return [&]<String M, Printable... Args>(
       [[maybe_unused]] M&& m
     , [[maybe_unused]] Args&&... args )
   {
 #ifdef DEBUG
-    if( ! (conds && ...) || (sizeof...(conds) == 0) )
+    if( conds.contains(false) || conds.empty() )
     {
       spdlog::error(loc.get() + std::forward<M>(m), std::forward<Args>(args)...);
       exit(1);

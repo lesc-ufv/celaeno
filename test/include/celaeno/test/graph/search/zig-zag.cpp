@@ -116,7 +116,7 @@ void print_stack(Stack s)
     return false;
   });
 
-  err::err({}, ! outputs.empty() )( "Not outputs in input graph?" );
+  err::err({! outputs.empty()})( "Not outputs in input graph?" );
 
   [[maybe_unused]] GridPath zz_p; // Path
   Cycles zz_c; // Cycles
@@ -182,7 +182,7 @@ void print_stack(Stack s)
       while( ! contains(i,u) )
       {
         // Check for errors
-        err::err({}, ! stack_i.empty() )( "Stack must never be empty" );
+        err::err({! stack_i.empty()})( "Stack must never be empty" );
 
         stack_i.pop();
 
@@ -367,7 +367,7 @@ template<typename F = std::function<void(Edge)>>
       auto w_a{u_annotations.at(w)};
 
       // Check for errors
-      err::err({}, ! v_a.empty(), ! w_a.empty()) ("v_a and w_a must not be empty");
+      err::err({! v_a.empty(), ! w_a.empty()}) ("v_a and w_a must not be empty");
 
       // Get max elements of v_a
       auto v_a_max {rg::max_element(v_a)};
@@ -450,7 +450,7 @@ Tiles Adjacencies::from_right()
   Placement p;
 
   // Check if intersection is not empty
-  err::err({},! nodes.empty())("Intersection must not be empty");
+  err::err({! nodes.empty()})("Intersection must not be empty");
 
   // Set predecessor as nodes[0]
   Node pred{nodes.at(0)};
@@ -522,7 +522,7 @@ void place_cycle(Ops const& ops
   // Helper to reverse path if current fails
   auto f_try_reverse_path = [&]
   {
-    err::err({},! b_reversed)("Failure to find a feasible solution");
+    err::err({! b_reversed})("Failure to find a feasible solution");
     m_backtrack.clear();
     unplaced = std::stack<Node>{};
     placed = std::stack<Node>{};

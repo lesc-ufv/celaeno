@@ -132,7 +132,7 @@ Reader<T>::Reader(S&& _filename, T _callback)
 
   std::ifstream ifile{_filename};
 
-  err::err({}, ifile.good())("Invalid input file {}", _filename);
+  err::err({ifile.good()})("Invalid input file {}", _filename);
 
   std::string input;
 
@@ -161,9 +161,9 @@ Reader<T>::Reader(S&& _filename, T _callback)
   {
     std::string _line(rng.begin(),rng.end());
 
-    if (not
-      (// Newline
-        eval_regex(_line,"^$","Newline")
+    err::err({
+      // Newline
+      eval_regex(_line,"^$","Newline")
       // Comment
       || eval_regex(_line,"^//.*$",fmt::format("Comment: {}",_line))
       // Module
@@ -185,11 +185,8 @@ Reader<T>::Reader(S&& _filename, T _callback)
       // And gates
       || this->on_and(_line)
       // Or gates
-      || this->on_or(_line))
-    )
-    {
-      err::err({})("Did not match: {}\n", _line);
-    }
+      || this->on_or(_line)
+    })("Did not match: {}", _line);
   }
 
   // Set non-gate ids as inputs
