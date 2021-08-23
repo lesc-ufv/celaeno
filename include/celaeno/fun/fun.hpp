@@ -258,6 +258,16 @@ struct Fun
     return make_view<Out>(view | rv::drop_while(f));
   } // fn: drop_while }}}
 
+  // fn: first {{{
+  //
+  // Takes only the first element of current view
+  //
+  template<typename Out = void>
+  decltype(auto) first()
+  {
+    return make_view(view | rv::take(1));
+  } // fn: first }}}
+
   // fn: in {{{
   //
   // Keeps all elements that are in current view and r
@@ -330,6 +340,16 @@ struct Fun
   {
     return make_view<Out>(view | rv::reverse);
   } // fn: rev }}}
+
+  // fn: sliding {{{
+  //
+  // Places a sliding window of size n in current view
+  //
+  template<typename Out = void>
+  [[nodiscard]] auto sliding(int n)
+  {
+    return make_view<Out>(view | rv::sliding(n));
+  } // fn: sliding }}}
 
   // fn: squash {{{
   //
