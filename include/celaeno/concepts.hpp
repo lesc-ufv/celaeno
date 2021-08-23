@@ -90,12 +90,20 @@ requires(U u)
 };
 
 template<typename T>
+concept Set =
+requires
+{
+  typename std::decay_t<T>::key_type;
+};
+
+template<typename T>
 concept Map =
 requires
 {
   typename std::decay_t<T>::key_type;
   typename std::decay_t<T>::mapped_type;
 };
+
 // }}}
 
 // Relationship {{{
@@ -134,6 +142,15 @@ concept IsPairsOf = requires(U... u)
 // }}}
 
 // Function {{{
+
+//
+// Check if Predicate P can be called with arguments of type Args...
+//
+template<typename F, typename... Args>
+concept Predicate = std::predicate<F,Args...>;
+
+template<typename F, typename Arg>
+concept UnaryPredicate = std::predicate<F,Arg>;
 
 //
 // Check if a function F is callable with arguments Args...

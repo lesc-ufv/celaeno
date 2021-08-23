@@ -104,33 +104,284 @@ void print_stack(Stack s)
   fmt::print("\n");
 } // function: print_stack }}}
 
-// fn: minimal_basis {{{
-[[nodiscard]] GraphPaths minimal_basis(Ops const& ops)
+// fn: e_bfs {{{
+template<typename F = std::function<bool(Edge)>>
+[[nodiscard]] Annotations e_bfs(Ops const& ops
+  , Node r
+  , F&& f = [](Edge) -> bool { return false; }
+)
+  requires Returns<bool,F,Edge>
 {
-  // Get outputs
-  std::vector<i64> outputs;
-  ns_search::bfs::run(0, ops,
-  [&](auto e)
+  // Empty node queue
+  std::queue<Node> q;
+
+  // Push initial element
+  q.push(r);
+
+  // Visited Nodes
+  std::set<Node> vn;
+
+  // Visited edges
+  std::set<Edge> ve;
+
+  // Annotations
+  Annotations h;
+
+  // Push initial distance
+  h[r] = {0};
+
+  while (! q.empty())
   {
-    if( ops.succs(e).size() == 0 ){ outputs.push_back(e); }
-    return false;
-  });
+    // Get next node from queue front
+    Node u{q.front()}; q.pop();
 
-  err::err({! outputs.empty()})( "Not outputs in input graph?" );
+    // If node has been visited, skip iteration
+    if( vn.contains(u) ){ continue; }
 
-  [[maybe_unused]] GridPath zz_p; // Path
+    // Else visit node
+    vn.insert(u);
+
+    // Helper to retrieve neighboring vertices of a vertex 'v'
+    auto neighbors = [&](Node v){ return fp::append(ops.preds(v),ops.succs(v)); };
+
+    // Helper to check if a set of edges has been visited
+    auto contains = []<Range R, typename... E>(R&& r, E&&... e)
+      requires IsPairsOf<Node,E...> // Edges must be node pairs
+    {
+      return (r.contains(e) or ...);
+    };
+
+    // Retrieve neighbors of 'u', remove ones that form visited edges
+    auto targets{fp::keep_if(
+      [&](Node v){ return ! contains(ve, Edge{u,v}, Edge{v,u}); }, neighbors(u)
+    )};
+
+    // Iterate throught target edge nodes
+    bool stop{false};
+    for (auto v : targets)
+    {
+      // Apply callback
+      stop = f(Edge{u,v})? true : stop;
+      // Inherit distances from u to v
+      rg::for_each(h[u],[&,v=v](auto d){ h[v].insert(d+1); });
+      // Visit edge
+      ve.emplace(u,v);
+      // Enqueue v if not visited
+      if( ! vn.contains(v) ){ q.push(v); }
+    } // for
+
+    if( stop ){ break; }
+
+  } // while: ! q.empty()
+
+  return h;
+} // function: e_bfs }}}
+
+// fn: map_to_path {{{
+Nodes map_to_path(std::map<Node,Node> m, Edge e, Nodes dest)
+{
+  // Resulting path
+  Nodes path;
+
+  // Add first element
+  path.emplace_back(e.first);
+
+  // Keep updating current edge, until one of dest is reached
+  while( ! fn::fn(dest).has(e.second) )
+  {
+    // Check if next edge exists
+    err::err({ m.contains(e.second) })("Broken path");
+    // Go to next edge
+    e.first = std::exchange(e.second,m[e.second]);
+    // Add next element
+    path.emplace_back(e.first);
+  } // while
+
+  while ( fn::fn(dest).has(e.second) )
+  {
+    // Check if next edge exists
+    if( ! m.contains(e.second) ){ break; }
+    // Go to next edge
+    e.first = std::exchange(e.second,m[e.second]);
+    // Add next element
+    path.emplace_back(e.first);
+  } // while
+
+  path.emplace_back(e.second);
+
+  return path;
+} // fn: map_to_path }}}
+
+// fn: p_bfs {{{
+template<typename F>
+Nodes p_bfs(Edge src, F f_adjacent)
+{
+  // Queue of unvisited edges
+  std::queue<Edge> q;
+
+  // Enqueue initial edge
+  q.push(src);
+
+  // Edges hash table
+  std::map<Node,Node> m_e;
+
+  // Visited edges
+  std::set<Edge> v_e;
+
+  // Visited destination nodes
+  std::set<Node> v_d;
+
+  Edge fst_endpoint{}, snd_endpoint{};
+
+  while( ! q.empty() )
+  {
+    auto e{q.front()}; q.pop();
+
+    if( ! v_e.contains(e) )
+    {
+      v_e.insert(e);
+      v_e.insert(Edge{e.second,e.first});
+    } // if
+    else
+    {
+      continue;
+    } // else
+
+    if( v_d.contains(e.second) )
+    {
+      m_e.emplace(e.second,e.first);
+
+      fst_endpoint = Edge{e.second,e.first};
+
+      snd_endpoint = Edge{e.second,m_e.at(e.second)};
+
+      break;
+    } // if
+    else
+    {
+      v_d.insert(e.second);
+    } // else
+
+    m_e.emplace(e.second,e.first);
+
+    auto edges = fn::fn(f_adjacent(e))
+      .template keep<Edges>(
+        [&](Edge e)
+        {
+          return ! v_e.contains(e);
+        }
+      );
+
+    for( auto f : edges ){ q.push(f); }
+
+  } // while
+
+ return fn::fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
+    .rev()
+    .chain(map_to_path(m_e,snd_endpoint,Nodes{src.first,src.second}))
+    .unique<Nodes>();
+
+} // fn: p_bfs }}}
+
+// fn: minimal_basis {{{
+template<SignedIntegral I>
+[[nodiscard]] GraphPaths minimal_basis(I root, Ops const& ops)
+{
+  [[maybe_unused]] GridPath ipath; // Path
   Cycles zz_c; // Cycles
 
-  // 1. Run zig-zag
-  auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c
-  , [&](auto)
-    {
-      return ! zz_c.empty();
-    }
+  // Run zig-zag
+  auto zz_o{ns_search::zig_zag::run(root,ops,ipath,zz_c
+    , [&](auto){ return ! zz_c.empty(); }
   )};
 
-  fmt::print("Cycles by zz: {}\n", zz_c);
-  fmt::print("Path by zz: {}\n", zz_p);
+  // Get first incident cycle
+  using Path = decltype(ipath);
+
+  ipath = fn::fn(ipath)
+    .template drop_while<Path>([&](auto e){ return e.first != zz_c.at(0); });
+
+  // Keep track of visited edges
+  std::set<Edge> visited;
+
+  // Set initial cycle edges as visited
+  for( auto&& e : ipath )
+  {
+    visited.insert(e);
+    visited.insert(Edge{e.second,e.first});
+  } // for
+
+  // Check if an edge is in visited set
+  auto f_contains =
+  [&]<typename... E>(E&&... e) -> bool
+  {
+    return (visited.contains(e) || ...);
+  };
+
+  // Get neighboring edges, given a node u
+  auto f_neighbors = [&](Node u) -> Nodes
+  {
+    return fn::fn(ops.preds(u))
+      .template chain<Nodes>(ops.succs(u));
+  };
+
+  // Given an edge e, returns adjacent edges not in visited, if both endpoints
+  // [u,v] have unvisited edges
+  auto f_adjacent = [&](Edge e) -> Edges
+  {
+    auto [u,v] = e;
+
+    auto r1{fn::fn(f_neighbors(u))
+      .as([u=u](Node w){ return Edge{u,w}; })
+      .template keep<Edges>([&](Edge f){ return ! f_contains(f); })
+    };
+
+    if( r1.empty() ){ return {}; }
+
+    auto r2{fn::fn(f_neighbors(v))
+      .as([v=v](Node w){ return Edge{v,w}; })
+      .template keep<Edges>([&](Edge f){ return ! f_contains(f); })
+    };
+
+    if( r2.empty() ){ return {}; }
+
+    return fn::fn(r1).template chain<Edges>(r2);
+  };
+
+  // For the cycle, keep only edges with adjacent unvisited neighbors
+  auto adjacent{fn::fn(ipath)
+    .template keep<Edges>([&](Edge e){ return f_adjacent(e).size() != 0; })
+  };
+
+  Edges result;
+
+  // Find new path from each pair [u,v] in adjacent
+  for (auto e : adjacent)
+  {
+    result = fp::overlapping_pairs(p_bfs(e,f_adjacent));
+  } // for
+
+  fmt::print("Result: {}\n", result);
+
+  for( auto e : result )
+  {
+    visited.insert(e);
+    visited.insert(Edge{e.second,e.first});
+  };
+
+  // For the cycle, keep only edges with adjacent unvisited neighbors
+  adjacent = fn::fn(result)
+    .template keep<Edges>([&](Edge e){ return f_adjacent(e).size() != 0; });
+
+  fmt::print("Adjacent: {}\n", adjacent);
+
+  for (auto e : adjacent)
+  {
+    p_bfs(e,f_adjacent);
+  } // for
+
+
+  return {};
 } // fn: minimal_basis }}}
 
 // fn: cyclic_paths {{{
@@ -271,76 +522,6 @@ void print_stack(Stack s)
   return graph_paths;
 } // function: cyclic_paths }}}
 
-// fn: e_bfs {{{
-template<typename F = std::function<void(Edge)>>
-[[nodiscard]] Annotations e_bfs(Ops const& ops
-  , Node r
-  , F&& f = [](Edge) -> void {}
-)
-  requires Returns<void,F,Edge>
-{
-  // Empty node queue
-  std::queue<Node> q;
-
-  // Push initial element
-  q.push(r);
-
-  // Visited Nodes
-  std::set<Node> vn;
-
-  // Visited edges
-  std::set<Edge> ve;
-
-  // Annotations
-  Annotations h;
-
-  // Push initial distance
-  h[r] = {0};
-
-  while (! q.empty())
-  {
-    // Get next node from queue front
-    Node u{q.front()}; q.pop();
-
-    // If node has been visited, skip iteration
-    if( vn.contains(u) ){ continue; }
-
-    // Else visit node
-    vn.insert(u);
-
-    // Helper to retrieve neighboring vertices of a vertex 'v'
-    auto neighbors = [&](Node v){ return fp::append(ops.preds(v),ops.succs(v)); };
-
-    // Helper to check if a set of edges has been visited
-    auto contains = []<Range R, typename... E>(R&& r, E&&... e)
-      requires IsPairsOf<Node,E...> // Edges must be node pairs
-    {
-      return (r.contains(e) or ...);
-    };
-
-    // Retrieve neighbors of 'u', remove ones that form visited edges
-    auto targets{fp::keep_if(
-      [&](Node v){ return ! contains(ve, Edge{u,v}, Edge{v,u}); }, neighbors(u)
-    )};
-
-    // Iterate throught target edge nodes
-    for (auto v : targets)
-    {
-      // Apply callback
-      f(Edge{u,v});
-      // Inherit distances from u to v
-      rg::for_each(h[u],[&,v=v](auto d){ h[v].insert(d+1); });
-      // Visit edge
-      ve.emplace(u,v);
-      // Enqueue v if not visited
-      if( ! vn.contains(v) ){ q.push(v); }
-    } // for
-
-  } // while: ! q.empty()
-
-  return h;
-} // function: e_bfs }}}
-
 // fn: edge_weights {{{
 [[nodiscard]] std::map<Edge,Weight> edge_weight(Ops const& ops,
   Range auto&& nodes,
@@ -353,7 +534,7 @@ template<typename F = std::function<void(Edge)>>
   for (Node u : nodes)
   {
     (void) e_bfs(ops,u,
-    [&](Edge e) -> void
+    [&](Edge e) -> bool
     {
       // Decompose edge
       auto [v,w] = e;
@@ -394,6 +575,7 @@ template<typename F = std::function<void(Edge)>>
         out[e] = best;
       } // else
 
+      return false;
     }); // e_bfs
   } // for
 
@@ -489,13 +671,13 @@ void place_cycle(Ops const& ops
   , Partition r)
 {
   // Check if a tile is occupied
-  auto f_is_free = [&](Tile const& t){ return ! rg::contains(rv::values(p),t); };
+  auto f_is_free = [&](Tile const& t){ return ! fn::fn(p).val().has(t); };
 
   // TODO: Replace this O(n^2) function
   auto path{fp::nub(cycle)};
 
   // Helper to indicate if an element v is present in a range r
-  auto has = [](Range auto&& r, Node v){ return rg::contains(r,v); };
+  auto has = [](Range auto&& r, Node v){ return fn::fn(r).has(v); };
 
   // It is desirable to start from the intersection nodes in the cycle,
   // therefore:
@@ -503,9 +685,8 @@ void place_cycle(Ops const& ops
   // - Shift the path left, until the intersection elements are the first ones
   // - Create subrange for second partition
   auto slice = fn::fn(path)
-    .rotate(rg::find_first_of(path,inter))
-    .cut(inter.size(),path.size())
-    .template into<Nodes>();
+    .rot(fn::fn(path).find_first_of(inter))
+    .template cut<Nodes>(inter.size(),path.size());
 
   // Keep a map with a list of possible tiles, for backtracking
   std::map<Node,Tiles> m_backtrack;
@@ -517,7 +698,7 @@ void place_cycle(Ops const& ops
   bool b_reversed{false};
 
   // Fill stack with unplaced elements
-  fn::fn(slice).reverse().every([&](Node v){ unplaced.push(v); });
+  fn::fn(slice).rev().ply([&](Node v){ unplaced.push(v); });
 
   // Helper to reverse path if current fails
   auto f_try_reverse_path = [&]
@@ -527,7 +708,7 @@ void place_cycle(Ops const& ops
     unplaced = std::stack<Node>{};
     placed = std::stack<Node>{};
     b_reversed = true;
-    fn::fn(slice).every([&](Node v){ p.erase(v); unplaced.push(v); });
+    fn::fn(slice).ply([&](Node v){ p.erase(v); unplaced.push(v); });
   };
 
   while( ! unplaced.empty() )
@@ -541,16 +722,11 @@ void place_cycle(Ops const& ops
     // Get all neighbors
     auto f_neighbors = [&](Node v)
     {
-      return fn::fn(ops.preds(v)).add(ops.succs(v)).into<Nodes>();
+      return fn::fn(ops.preds(v)).chain(ops.succs(v)).into<Nodes>();
     };
 
     // Filter nodes that are not positioned
-    Nodes nodes_placed
-    {
-      fn::fn(f_neighbors(u))
-        .keep([&](Node v){ return p.contains(v); })
-        .template into<Nodes>()
-    };
+    Nodes nodes_placed{fn::fn(f_neighbors(u)).template in<Nodes>(p)};
 
     // Get all possible positions adjacent to positions of neighbors
     Tiles candidates;
@@ -569,8 +745,7 @@ void place_cycle(Ops const& ops
       candidates = fn::fn(nodes_placed)
         .as([&](Node v){ return f_get_candidates(p[v]); }) // nodes → tiles
         .squash() // merge [[tiles],[tiles]...] → [tiles]
-        .drop([&](Tile t){ return ! f_is_free(t); })
-        .template into<Tiles>();
+        .template drop<Tiles>([&](Tile t){ return ! f_is_free(t); });
 
       // Define the quality of a tiles based on annotations
       auto f_quality = [&](Tile t)
@@ -602,10 +777,9 @@ void place_cycle(Ops const& ops
 
       // Keep a candidate if it satisfies edges constraints to all its placed
       // neighbors
-      candidates = fn::fn(candidates)
-        .keep_if_all(nodes_placed,
-            [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); })
-        .template into<Tiles>();
+      candidates = fn::fn(candidates).template in_all<Tiles>(nodes_placed,
+        [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v));
+      });
     } // if
     else
     {
@@ -670,11 +844,6 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u);
 
-  for (auto [u,v] : g.data())
-  {
-    fmt::print("{} → {}\n", u, v);
-  } // for
-
   // Get outputs
   std::vector<i64> outputs;
   ns_search::bfs::run(0, ops,
@@ -688,6 +857,8 @@ int main([[maybe_unused]] int argc, char const* argv[])
   Cycles zz_c; // Cycles
 
   // 1. Run zig-zag
+  fmt::print("------\n");
+
   auto zz_o{ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c
   , [&](auto)
     {
@@ -695,96 +866,101 @@ int main([[maybe_unused]] int argc, char const* argv[])
     }
   )};
 
-  fmt::print("Cycles by zz: {}\n", zz_c);
-  fmt::print("Path by zz: {}\n", zz_p);
+  fmt::print("Revisited node: {}\n", zz_c);
+  fmt::print("Incident cycle: {}\n", zz_p);
 
   zz_o = ns_search::zig_zag::run(outputs.at(0),ops,zz_p,zz_c);
 
-  // 2. Get cyclic paths
-  auto paths{cyclic_paths(ops,zz_c)};
-
   fmt::print("------\n");
 
-  for (i64 i{}; auto&& path : paths){ fmt::print("Path {}: {}\n", i++, path); } // for
+  auto basis{minimal_basis(i64{},ops)};
 
-  fmt::print("------\n");
-
-  // 3. Get intersection of two smallest inner sub-cycles if they exist
-  auto intersection{fw::apply(paths
-    , fw::transform([](auto e){ return fp::trim(7,e); })
-    , fw::sort_by([](auto a, auto b){ return a.size() < b.size(); })
-    , fw::take_exact(2)
-    , fw::sets_intersection()
-  )};
-
-  fmt::print("Intersection: {}\n", intersection);
-  fmt::print("------\n");
-
-  // 4. Annotate with eBFS
-  std::map<Node,Annotations> m_n_m_a;
-  fmt::print("eBFS:\n");
-  for (Node r : intersection)
-  {
-    fmt::print("- Table for {}:\n", r);
-
-    auto annotations{e_bfs(ops,r)};
-
-    m_n_m_a[r] = annotations;
-
-    for (auto&& [k,v] : annotations)
-    {
-      fmt::print("-- {} → {}\n", k,v);
-    } // for
-  } // for
-  fmt::print("------\n");
-
-  // 5. Annotated edges with e_bfs
-  fmt::print("Edge Weights:\n");
-  auto m_edge_weight{edge_weight(ops,intersection,m_n_m_a)};
-
-  for (auto [k,v] : m_edge_weight)
-  {
-    fmt::print("{} → {}\n", k ,v);
-  } // for
-  fmt::print("------\n");
-
-  // 6. Place intersection
-  Placement placement{place_intersection(ops
-    , intersection
-    , rv::concat(paths.at(2),paths.at(0))
-    , Partition::R
-  )};
-
-  fmt::print("Placement of intersection: {}\n", placement);
-  fmt::print("------\n");
-
-  // 7. Place each cycle separately
-  place_cycle(ops
-    , placement
-    , paths.at(2)
-    , intersection
-    , m_n_m_a
-    , m_edge_weight
-    , Partition::L
-  );
-
-  place_cycle(ops
-    , placement
-    , paths.at(0)
-    , intersection
-    , m_n_m_a
-    , m_edge_weight
-    , Partition::R
-  );
-
-  fmt::print("Placement of cycles: {}\n", placement);
-  fmt::print("------\n");
-
-  // 8. Merge Cycles
-  fmt::print("------\n");
-  fmt::print("------\n");
+  // // 2. Get cyclic paths
+  // auto paths{cyclic_paths(ops,zz_c)};
+  //
+  // fmt::print("------\n");
+  //
+  // for (i64 i{}; auto&& path : paths){ fmt::print("Path {}: {}\n", i++, path); } // for
+  //
+  // fmt::print("------\n");
+  //
+  // // 3. Get intersection of two smallest inner sub-cycles if they exist
+  // auto intersection{fw::apply(paths
+  //   , fw::transform([](auto e){ return fp::trim(7,e); })
+  //   , fw::sort_by([](auto a, auto b){ return a.size() < b.size(); })
+  //   , fw::take_exact(2)
+  //   , fw::sets_intersection()
+  // )};
+  //
+  // fmt::print("Intersection: {}\n", intersection);
+  // fmt::print("------\n");
+  //
+  // // 4. Annotate with eBFS
+  // std::map<Node,Annotations> m_n_m_a;
+  // fmt::print("eBFS:\n");
+  // for (Node r : intersection)
+  // {
+  //   fmt::print("- Table for {}:\n", r);
+  //
+  //   auto annotations{e_bfs(ops,r)};
+  //
+  //   m_n_m_a[r] = annotations;
+  //
+  //   for (auto&& [k,v] : annotations)
+  //   {
+  //     fmt::print("-- {} → {}\n", k,v);
+  //   } // for
+  // } // for
+  // fmt::print("------\n");
+  //
+  // // 5. Annotated edges with e_bfs
+  // fmt::print("Edge Weights:\n");
+  // auto m_edge_weight{edge_weight(ops,intersection,m_n_m_a)};
+  //
+  // for (auto [k,v] : m_edge_weight)
+  // {
+  //   fmt::print("{} → {}\n", k ,v);
+  // } // for
+  // fmt::print("------\n");
 
 
-  fmt::print("⊂ and ⊄\n");
+  // // 6. Place intersection
+  // Placement placement{place_intersection(ops
+  //   , intersection
+  //   , rv::concat(paths.at(2),paths.at(0))
+  //   , Partition::R
+  // )};
+  //
+  // fmt::print("Placement of intersection: {}\n", placement);
+  // fmt::print("------\n");
+  //
+  // // 7. Place each cycle separately
+  // place_cycle(ops
+  //   , placement
+  //   , paths.at(2)
+  //   , intersection
+  //   , m_n_m_a
+  //   , m_edge_weight
+  //   , Partition::L
+  // );
+  //
+  // place_cycle(ops
+  //   , placement
+  //   , paths.at(0)
+  //   , intersection
+  //   , m_n_m_a
+  //   , m_edge_weight
+  //   , Partition::R
+  // );
+  //
+  // fmt::print("Placement of cycles: {}\n", placement);
+  // fmt::print("------\n");
+  //
+  // // 8. Merge Cycles
+  // fmt::print("------\n");
+  // fmt::print("------\n");
+  //
+  //
+  // fmt::print("⊂ and ⊄\n");
   return EXIT_SUCCESS;
 } // main }}}

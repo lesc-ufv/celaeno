@@ -58,15 +58,13 @@ struct Fun
 
   Fun(V v) : view(v) {}
 
-  // Helpers
-  template<typename E>
-  [[nodiscard]] auto make_view(E e)
-  {
-    using Type = decltype(e);
-    return Fun<Type>(e);
-  }
-
   // Terminators
+  template<Range R>
+  decltype(auto) find_first_of(R&& r)
+  {
+    return rg::find_first_of(view,r);
+  } // function: first_of
+
   template<typename T>
   [[nodiscard]] bool has(T&& t)
   {
@@ -126,7 +124,7 @@ struct Fun
     return *this;
   }
 
-  [[nodiscard]] auto rotate(int n)
+  [[nodiscard]] auto rot(int n)
   {
     rg::rotate(view,std::next(view.begin(),n));
 
@@ -134,7 +132,7 @@ struct Fun
   }
 
   template<typename It>
-  [[nodiscard]] auto rotate(It it)
+  [[nodiscard]] auto rot(It it)
   {
     rg::rotate(view,it);
 
@@ -142,94 +140,254 @@ struct Fun
   }
 
   template<typename F>
-  decltype(auto) every(F&& f)
+  decltype(auto) ply(F&& f)
   {
     rg::for_each(view,f);
     return *this;
-  } // function: every
+  } // function: ply
 
+  // Views {{{
+
+  // fn: make_view {{{
+  template<typename Out = void, typename E>
+  [[nodiscard]] auto make_view(E e)
+  {
+    using Type = decltype(e);
+
+    if constexpr ( SameAs<Out,void> )
+    {
+      return Fun<Type>(e);
+    } // if
+    else
+    {
+      return e | rg::to<Out>;
+    } // else
+  } // fn: make_view }}}
+
+  // fn: as {{{
   //
-  // Views
+  // Transforms the elements of a type from another, given a transformation
+  // unary predicate f
   //
-  template<Range R>
-  [[nodiscard]] decltype(auto) add(R&& r)
-  {
-    return make_view(rv::concat(view,r));
-  } // function: add
-
-  [[nodiscard]] decltype(auto) reverse()
-  {
-    return make_view(view | rv::reverse);
-  } // function: reverse
-
-  template<typename... Args>
-  [[nodiscard]] decltype(auto) cut(Args&&... args)
-  {
-    return make_view(view | rv::slice(std::forward<Args>(args)...));
-  } // function: cut
-
-  template<Range R>
-  [[nodiscard]] auto in(R&& r)
-  {
-    return this->keep([&](auto&& u) { return rg::contains(r,u); });
-  }
-
-  template<typename F>
+  // @param f: Transformation unary predicate
+  //
+  // Synonyms: transform, apply
+  //
+  template<typename Out = void, typename F>
   [[nodiscard]] auto as(F&& f)
   {
-    return make_view(view | rv::transform(f));
-  }
+    return make_view<Out>(view | rv::transform(f));
+  } // fn: as }}}
 
-  [[nodiscard]] auto squash()
+  // fn: chain {{{
+  //
+  // Adds all elements of range r to the end of the current
+  // e.g.: [1,2,3].chain([4,5]) == [1,2,3,4,5]
+  //
+  // @param r: A range to chain current one with
+  //
+  // Synonyms: Concat, Append
+  //
+  template<typename Out = void, Range R>
+  [[nodiscard]] decltype(auto) chain(R&& r)
   {
-    return make_view(ra::join(view));
-  }
+    return make_view<Out>(rv::concat(view,r));
+  } // fn: chain }}}
 
-  [[nodiscard]] auto enumerate()
+  // fn: cut {{{
+  //
+  // Patitions the sequence, given initial and final positions
+  //
+  // @param from: Start of the cut
+  // @param to: End of the cut
+  //
+  // Synonyms: partition, slice
+  //
+  template<typename Out = void, typename... Args>
+  [[nodiscard]] decltype(auto) cut(Args&&... args)
   {
-    return make_view(view | rv::enumerate);
-  }
+    return make_view<Out>(view | rv::slice(std::forward<Args>(args)...));
+  } // fn: cut }}}
 
-  template<typename F>
-  [[nodiscard]] auto take_while(F&& f)
+  // fn: dif {{{
+  //
+  // Keeps all elements that are in current view and NOT in r
+  // e.g.: [1,2,3].dif([0,1,2,3,4]) == [0,4]
+  //
+  // @param r: Input range to compare elements to
+  //
+  // Synonyms: difference
+  //
+  template<typename Out = void, Range R>
+  [[nodiscard]] auto dif(R&& r)
   {
-    return make_view(view | rv::take_while(f));
-  }
+    if constexpr ( Map<R> or Set<R> )
+    {
+      return this->keep<Out>([&](auto&& u) { return ! r.contains(u); });
+    } // if
+    else
+    {
+      return this->keep<Out>([&](auto&& u) { return ! rg::contains(r,u); });
+    } // else
 
-  template<typename F>
-  [[nodiscard]] auto drop_while(F&& f)
-  {
-    return make_view(view | rv::drop_while(f));
-  }
+  } // fn: dif }}}
 
-  template<typename F>
-  [[nodiscard]] auto keep(F&& f)
-  {
-    return make_view(view | rv::filter(f));
-  }
-
-  template<typename F>
+  // fn: drop {{{
+  //
+  // Drop all elements of current view that satisfy F
+  //
+  // @param f: Unary predicate
+  //
+  // Synonyms: filter
+  //
+  template<typename Out = void, typename F>
   [[nodiscard]] auto drop(F&& f)
   {
-    return this->keep([&](auto e){ return ! f(e); });
-  }
+    return this->keep<Out>([&](auto&& e){ return ! f(e); });
+  } // fn: drop }}}
 
+  // fn: drop_while {{{
+  //
+  // Drop elements of current view while a unary predicate is true
+  //
+  // @param f: A unary predicate
+  //
+  template<typename Out = void, typename F>
+  [[nodiscard]] auto drop_while(F&& f)
+  {
+    return make_view<Out>(view | rv::drop_while(f));
+  } // fn: drop_while }}}
+
+  // fn: in {{{
+  //
+  // Keeps all elements that are in current view and r
+  // e.g.: [1,2,3].dif([0,1,2,3,4]) == [1,2,3]
+  //
+  // @param r: Input range to compare elements to
+  //
+  // Synonyms: keep, intersection
+  //
+  template<typename Out = void, Range R>
+  [[nodiscard]] auto in(R&& r)
+  {
+    if constexpr ( Map<R> or Set<R> )
+    {
+      return this->keep<Out>([&](auto&& u) { return r.contains(u); });
+    } // if
+    else
+    {
+      return this->keep<Out>([&](auto&& u) { return rg::contains(r,u); });
+    } // else
+
+  } // fn: in }}}
+
+  // fn: in_all {{{
   //
   // Keep only elements that are true for every element of r by f
   //
-  template<Range R, typename F>
-  [[nodiscard]] auto keep_if_all(R&& r, F&& f)
+  // @param r: A range of which to compare every element to
+  // @param f: An unary predicate to apply on each element of r
+  //
+  template<typename Out = void, Range R, typename F>
+  [[nodiscard]] auto in_all(R&& r, F&& f)
   {
-    return this->keep([&](auto&& a)
+    return this->keep<Out>([&](auto&& a)
     {
       return rg::all_of(r,[&](auto&& b){ return f(a,b); } );
     });
-  }
+  } // fn: in_all }}}
 
+  // fn: keep {{{
+  //
+  // Keep all elements of current view that satisfy F
+  //
+  // @param f: Unary predicate
+  //
+  // Synonyms: filter
+  //
+  template<typename Out = void, typename F>
+  [[nodiscard]] auto keep(F&& f)
+  {
+    return make_view<Out>(view | rv::filter(f));
+  } // fn: keep }}}
+
+  // fn: key {{{
+  //
+  // Returns all keys of a map type sequence
+  //
+  template<typename Out = void>
+  [[nodiscard]] decltype(auto) key()
+  {
+    return make_view<Out>(rv::keys(view));
+  } // fn: key }}}
+
+  // fn: rev {{{
+  //
+  // Reverses current sequence
+  //
+  template<typename Out = void>
+  [[nodiscard]] decltype(auto) rev()
+  {
+    return make_view<Out>(view | rv::reverse);
+  } // fn: rev }}}
+
+  // fn: squash {{{
+  //
+  // Merges a list of lists into a single list
+  //
+  // Synonyms: flatten, merge, join
+  template<typename Out = void>
+  [[nodiscard]] auto squash()
+  {
+    return make_view<Out>(ra::join(view));
+  } // fn: squash }}}
+
+  // fn: take_while {{{
+  //
+  // Keeps taking elements of current range while the unary predicate is true
+  //
+  // @param f: A unary predicate
+  //
+  template<typename Out = void, typename F>
+  [[nodiscard]] auto take_while(F&& f)
+  {
+    return make_view<Out>(view | rv::take_while(f));
+  } // fn: take_while }}}
+
+  // fn: unique {{{
+  //
+  // Keeps only elements that are adjacently unique, i.e., previous and next
+  // elements are not equal. To have exclusively unique elements, sort before
+  // usage.
+  //
+  template<typename Out = void>
   [[nodiscard]] auto unique()
   {
-    return make_view(rv::unique(view));
-  }
+    return make_view<Out>(rv::unique(view));
+  } // fn: unique }}}
+
+  // fn: val {{{
+  //
+  // Returns all values of a map type sequence
+  //
+  template<typename Out = void>
+  [[nodiscard]] decltype(auto) val()
+  {
+    return make_view<Out>(rv::values(view));
+  } // fn: val }}}
+
+  // fn: enu {{{
+  //
+  // Enumerates a sequence
+  //
+  template<typename Out = void>
+  [[nodiscard]] auto enu()
+  {
+    return make_view<Out>(view | rv::enumerate);
+  } // fn: enu }}}
+
+  // Views }}}
+
 }; // class: fun }}}
 
 template<typename... Args>
