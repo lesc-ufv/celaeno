@@ -278,16 +278,10 @@ Nodes p_bfs(Edge src, F f_adjacent)
 {
   auto has_subcycle = [&](Nodes nodes)
   {
-    i64 cycles{};
-
-    for(auto u : fn::fn(nodes).sort().sliding(2).view )
-    {
-      if( u.at(0) == u.at(1) ){ ++cycles; }
-    } // for
-
-    fmt::print("Nodes:::: {}\n", nodes);
-
-    return cycles > 1;
+    return fn::fn(nodes)
+      .sort()
+      .sliding(2)
+      .count_if([](auto&& e){ return e.at(0) == e.at(1); }) > 1;
   };
 
   // Queue of unvisited edges
