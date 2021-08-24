@@ -104,6 +104,18 @@ void print_stack(Stack s)
   fmt::print("\n");
 } // function: print_stack }}}
 
+// fn: edges_to_nodes {{{
+Nodes edges_to_nodes(Edges const& edges)
+{
+  Nodes nodes;
+
+  for( auto&& e : edges ){ nodes.push_back(e.first); }
+
+  nodes.push_back(edges.back().second);
+
+  return nodes;
+} // fn: edges_to_nodes }}}
+
 // fn: e_bfs {{{
 template<typename F = std::function<bool(Edge)>>
 [[nodiscard]] Annotations e_bfs(Ops const& ops
@@ -264,6 +276,20 @@ Nodes map_to_path(std::map<Node,Node> m, Edge e, Nodes dest)
 template<typename F>
 Nodes p_bfs(Edge src, F f_adjacent)
 {
+  auto has_subcycle = [&](Nodes nodes)
+  {
+    i64 cycles{};
+
+    for(auto u : fn::fn(nodes).sort().sliding(2).view )
+    {
+      if( u.at(0) == u.at(1) ){ ++cycles; }
+    } // for
+
+    fmt::print("Nodes:::: {}\n", nodes);
+
+    return cycles > 1;
+  };
+
   // Queue of unvisited edges
   std::queue<Edge> q;
 
@@ -297,11 +323,22 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
     if( v_d.contains(e.second) )
     {
-      m_e.emplace(e.second,e.first);
+      err::info()("-- Final: {}\n", e);
 
       fst_endpoint = Edge{e.second,e.first};
 
       snd_endpoint = Edge{e.second,m_e.at(e.second)};
+
+      Nodes path{fn::fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
+          .rev()
+          .chain(map_to_path(m_e,snd_endpoint,Nodes{src.first,src.second}))
+          .unique<Nodes>()
+      };
+
+      if( has_subcycle(path) ){ continue; }
+
+
+      m_e.emplace(e.second,e.first);
 
       break;
     } // if
@@ -365,23 +402,6 @@ template<SignedIntegral I>
 
   fmt::print("-- Smallest found path: {}\n", ipath);
 
-  // Leaf nodes
-  std::set<Node> leaves;
-
-  // Populate leaves set
-  (void) ns_search::bfs::run(0,ops,
-  [&](auto u)
-  {
-    if( ops.preds(u).size() == 0 || ops.succs(u).size() == 0 )
-    {
-      leaves.insert(u);
-    } // if
-    return false;
-  });
-
-  // Check if both endpoints [u,v] are not leaves
-  auto f_nin_leaves = [&](Edge e) { return ! fn::fn(leaves).has(e.first,e.second); };
-
   // Keep track of visited edges
   std::set<Edge> visited;
 
@@ -408,31 +428,25 @@ template<SignedIntegral I>
 
   // Given an edge [u,v], if there are edges adjacent of u and v, such that they
   // are not in visited set, return them
-  auto f_adjacent = [&](Edge e) -> Edges
+  auto f_n_adjacent = [&]<typename F>(Node u, F f) -> Edges
   {
-    auto [u,v] = e;
-
-    auto r1{fn::fn(f_neighbors(u))
+    auto edges{fn::fn(f(u))
       .as([u=u](Node w){ return Edge{u,w}; })
       .template keep<Edges>([&](Edge f){ return ! f_contains(f); })
     };
 
-    // r1 = fn::fn(r1).template keep<Edges>([&](Edge e){ return f_nin_leaves(e); });
-
-    r1 = fn::fn(r1).template keep<Edges>(
+    return fn::fn(edges).template keep<Edges>(
       [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
     );
+  };
+
+  auto f_adjacent = [&](Edge e) -> Edges
+  {
+    auto r1{f_n_adjacent(e.first,f_neighbors)};
 
     if( r1.empty() ){ return {}; }
 
-    auto r2{fn::fn(f_neighbors(v))
-      .as([v=v](Node w){ return Edge{v,w}; })
-      .template keep<Edges>([&](Edge f){ return ! f_contains(f); })
-    };
-
-    r2 = fn::fn(r2).template keep<Edges>(
-      [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
-    );
+    auto r2{f_n_adjacent(e.second,f_neighbors)};
 
     if( r2.empty() ){ return {}; }
 
@@ -511,23 +525,30 @@ template<SignedIntegral I>
 
     err::info()("-- e: {}\n", e);
 
-    // Remove edges with unvisited preds or succs > 1
-    auto nodes{p_bfs(e,
-      [&](Edge e)
-      {
-        return fn::fn(f_adjacent(e)).keep(
-          [&](Edge f)
-          {
-            // Discover actual direction (input/output) or (output)/(input),
-            // reverse if necessary to make it always as (output)/(input)
-            f = fn::fn(ops.preds(f.first)).has(f.second)? f : Edge{f.second,f.first};
-            // Check valid count of edges for oi direction
-            fn::fn(f_adjacent(f))
-              .;
-          });
-      }
-    )};
-
+    // // Remove edges with unvisited preds or succs > 1
+    // auto nodes{p_bfs(e,
+    //   [&](Edge e)
+    //   {
+    //     return fn::fn(f_adjacent(e)).template keep<Edges>(
+    //     [&](Edge f)
+    //     {
+    //       // Discover actual direction (input/output) or (output)/(input),
+    //       bool oi {fn::fn(ops.preds(f.first)).has(f.second)};
+    //
+    //       // Check valid count of edges for oi direction
+    //       if( oi )
+    //       {
+    //         if(f_n_adjacent(f.second,ops.preds).size() > 1){ return false; }
+    //       } // if
+    //       else
+    //       {
+    //         if(f_n_adjacent(f.second,ops.succs).size() > 1){ return false; }
+    //       } // else
+    //
+    //       return true;
+    //     });
+    //   }
+    // )};
 
     // // Create pairs to check novel edges for unvisited neighbors
     // auto nodes{p_bfs(e,
@@ -538,9 +559,9 @@ template<SignedIntegral I>
     //       .template into<Edges>();
     //   }
     // )};
-    //
-    // // Create pairs to check novel edges for unvisited neighbors
-    // auto nodes{p_bfs(e,[&](Edge e){ return f_adjacent(e); })};
+
+    // Create pairs to check novel edges for unvisited neighbors
+    auto nodes{p_bfs(e,[&](Edge e){ return f_adjacent(e); })};
 
     err::info()("-- Result(n): {}\n", nodes);
 
