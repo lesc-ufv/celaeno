@@ -177,6 +177,54 @@ template<typename F = std::function<bool(Edge)>>
   return h;
 } // function: e_bfs }}}
 
+// fn: incident_cycle {{{
+decltype(auto) incident_cycle(Nodes const& nodes)
+{
+  // Sort with nlog(n) time
+  Nodes sorted{fn::fn(Nodes{nodes}).sort().into<Nodes>()};
+
+  Nodes delimiters{};
+
+  // If two adjacent elements are equal, they are cycle delimiters
+  for( auto e : fn::fn(sorted).sliding(2).view )
+  {
+    if( e.at(0) == e.at(1) )
+    {
+      delimiters.push_back(e.at(0));
+    } // if
+  } // for
+
+  // Get cycle size for each node that is a cycle delimiter
+  auto delimiters_size{fn::fn(delimiters)
+    .as<std::vector<std::pair<Node,size_t>>>([&](Node u)
+    {
+      auto it_beg{std::ranges::find(nodes,u)};
+      auto it_end{std::ranges::find(std::next(it_beg),nodes.end(),u)};
+
+      err::err({ it_beg != nodes.end(), it_end != nodes.end() })("Delimiter range error");
+
+      return std::make_pair(u,std::distance(it_beg,it_end));
+    })
+  };
+
+  // Sort by size
+  // Get delimiter with smallest distance, which is an incident cycle
+  auto u{fn::fn(delimiters_size)
+    .sort({},[](auto e){ return e.second; })
+    .first()
+    .template as<std::vector<size_t>>([](auto e){ return e.first; })
+    .at(0)
+  };
+
+  // Get cycle based on delimiter
+  auto it_beg{std::ranges::find(nodes,u)};
+  auto it_end{std::ranges::find(std::next(it_beg),nodes.end(),u)};
+
+  err::err({ it_beg != nodes.end(), it_end != nodes.end() })("Delimiter range error");
+
+  return Nodes{it_beg,std::next(it_end)};
+} // fn: incident_cycle }}}
+
 // fn: map_to_path {{{
 Nodes map_to_path(std::map<Node,Node> m, Edge e, Nodes dest)
 {
@@ -185,8 +233,6 @@ Nodes map_to_path(std::map<Node,Node> m, Edge e, Nodes dest)
 
   // Add first element
   path.emplace_back(e.first);
-
-  fmt::print("Path: {}\n", m);
 
   // Keep updating current edge, until one of dest is reached
   while( ! fn::fn(dest).has(e.second) )
@@ -274,6 +320,9 @@ Nodes p_bfs(Edge src, F f_adjacent)
         }
       );
 
+    err::info()("-- Curr: {}\n", e);
+    err::info()("-- Edges: {}\n", edges);
+
     for( auto f : edges ){ q.push(f); }
 
   } // while
@@ -285,61 +334,11 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
 } // fn: p_bfs }}}
 
-// fn: incident_cycle {{{
-decltype(auto) incident_cycle(Nodes const& nodes)
-{
-  // Sort with nlog(n) time
-  Nodes sorted{fn::fn(Nodes{nodes}).sort().into<Nodes>()};
-
-  Nodes delimiters{};
-
-  // If two adjacent elements are equal, they are cycle delimiters
-  for( auto e : fn::fn(sorted).sliding(2).view )
-  {
-    if( e.at(0) == e.at(1) )
-    {
-      delimiters.push_back(e.at(0));
-    } // if
-  } // for
-
-  // Get cycle size for each node that is a cycle delimiter
-  auto delimiters_size{fn::fn(delimiters)
-    .as<std::vector<std::pair<Node,size_t>>>([&](Node u)
-    {
-      auto it_beg{std::ranges::find(nodes,u)};
-      auto it_end{std::ranges::find(std::next(it_beg),nodes.end(),u)};
-
-      err::err({ ! (it_beg == nodes.end()), ! (it_end == nodes.end()) })
-        ("Delimiter range error");
-
-      return std::make_pair(u,std::distance(it_beg,it_end));
-    })
-  };
-
-  // Sort by size
-  // Get delimiter with smallest distance, which is an incident cycle
-  auto u{fn::fn(delimiters_size)
-    .sort({},[](auto e){ return e.second; })
-    .first()
-    .template as<std::vector<size_t>>([](auto e){ return e.first; })
-    .at(0)
-  };
-
-  // Get cycle based on delimiter
-  auto it_beg{std::ranges::find(nodes,u)};
-  auto it_end{std::ranges::find(std::next(it_beg),nodes.end(),u)};
-
-  err::err({ ! (it_beg == nodes.end()), ! (it_end == nodes.end()) })
-    ("Delimiter range error");
-
-  return Nodes{it_beg,std::next(it_end)};
-} // fn: incident_cycle }}}
-
 // fn: minimal_basis {{{
 template<SignedIntegral I>
-[[nodiscard]] GraphPaths minimal_basis(I root, Ops const& ops)
+[[nodiscard]] decltype(auto) minimal_basis(I root, Ops const& ops)
 {
-  [[maybe_unused]] GridPath ipath; // Path
+  Edges ipath; // Path
   Cycles zz_c; // Cycles
 
   // Run zig-zag
@@ -366,15 +365,25 @@ template<SignedIntegral I>
 
   fmt::print("-- Smallest found path: {}\n", ipath);
 
+  // Leaf nodes
+  std::set<Node> leaves;
+
+  // Populate leaves set
+  (void) ns_search::bfs::run(0,ops,
+  [&](auto u)
+  {
+    if( ops.preds(u).size() == 0 || ops.succs(u).size() == 0 )
+    {
+      leaves.insert(u);
+    } // if
+    return false;
+  });
+
+  // Check if both endpoints [u,v] are not leaves
+  auto f_nin_leaves = [&](Edge e) { return ! fn::fn(leaves).has(e.first,e.second); };
+
   // Keep track of visited edges
   std::set<Edge> visited;
-
-  // Set initial cycle edges as visited
-  for( auto&& e : ipath )
-  {
-    visited.insert(e);
-    visited.insert(Edge{e.second,e.first});
-  } // for
 
   // Check if an edge is in visited set
   auto f_contains =
@@ -390,8 +399,15 @@ template<SignedIntegral I>
       .template chain<Nodes>(ops.succs(u));
   };
 
-  // Given an edge e, returns adjacent edges not in visited, if both endpoints
-  // [u,v] have unvisited edges
+  // Return the degree of a node
+  auto f_degree =
+  [&](Node u) -> size_t
+  {
+    return fn::fn(ops.preds(u)).chain<Nodes>(ops.succs(u)).size();
+  };
+
+  // Given an edge [u,v], if there are edges adjacent of u and v, such that they
+  // are not in visited set, return them
   auto f_adjacent = [&](Edge e) -> Edges
   {
     auto [u,v] = e;
@@ -401,6 +417,12 @@ template<SignedIntegral I>
       .template keep<Edges>([&](Edge f){ return ! f_contains(f); })
     };
 
+    // r1 = fn::fn(r1).template keep<Edges>([&](Edge e){ return f_nin_leaves(e); });
+
+    r1 = fn::fn(r1).template keep<Edges>(
+      [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
+    );
+
     if( r1.empty() ){ return {}; }
 
     auto r2{fn::fn(f_neighbors(v))
@@ -408,69 +430,138 @@ template<SignedIntegral I>
       .template keep<Edges>([&](Edge f){ return ! f_contains(f); })
     };
 
+    r2 = fn::fn(r2).template keep<Edges>(
+      [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
+    );
+
     if( r2.empty() ){ return {}; }
 
     return fn::fn(r1).template chain<Edges>(r2);
   };
 
-  fmt::print("-- Result: {}\n\n", ipath);
+  // Remove edge from visited set
+  auto f_rm_visited = [&](Edge e)
+  {
+    visited.erase(e);
+    visited.erase(Edge{e.second,e.first});
+  };
+
+  // Add edge to visited set
+  auto f_add_visited = [&](Edge e)
+  {
+    visited.insert(e);
+    visited.insert(Edge{e.second,e.first});
+  };
+
+  // Conditionally visit edges, returns unvisited ones
+  auto f_visit = [&](Edges const& edges) -> Edges
+  {
+    err::info()("-- Visiting: {}\n", edges);
+
+    // Visit all edges
+    (void) fn::fn(edges).ply([&](Edge e){ f_add_visited(e); });
+
+
+    // Save unvisited
+    Edges unvisited;
+
+    // Unvisit edges with unvisited neighbors in both endpoints
+    (void) fn::fn(edges).ply([&](Edge e)
+    {
+      auto adjacent{f_adjacent(e)};
+
+      // Filter out leaves
+      adjacent = fn::fn(adjacent).template keep<Edges>(
+        [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
+      );
+
+      // At least one endpoint had no unvisited neighbors
+      if( adjacent.size() == 0 ){ return; }
+
+      // Unvisit edges [u,v] with unvisited neighboring edges
+      f_rm_visited(e);
+      unvisited.push_back(e);
+    });
+
+    return unvisited;
+  };
+
+  err::info()("-- Result: {}\n\n", ipath);
 
   // Use a queue to define the order to detect adjacent cycles
-  std::queue<Edge> q;
-
-  Edges enqueued = fn::fn(ipath)
-    .keep([&](Edge e){ return f_adjacent(e).size() != 0; })
-    .ply([&](Edge e){ q.push(e); visited.erase(e); })
-    .template into<Edges>();
+  std::deque<Edge> q;
 
   // Mark edges not in queue as visited
-  (void) fn::fn(ipath).dif(enqueued).ply([&](Edge e){ visited.insert(e); });
+  // (void) fn::fn(ipath).dif(enqueued).ply([&](Edge e){ visited.insert(e); });
+  for( auto e : f_visit(ipath) ){ q.push_back(e); }
 
-  fmt::print("Enqueued: {}\n", enqueued);
+  // Minimal basis paths
+  std::vector<Edges> basis;
+
+  // Push initial incident cycle to solution
+  basis.push_back(ipath);
 
   // Keep searching for cycles while q is not empty
   while( ! q.empty() )
   {
     // Search next cycle from edge e[u,v]
-    auto e{q.front()}; q.pop();
+    auto e{q.front()}; q.pop_front();
 
     if( visited.contains(e) ){ continue; }
 
-    fmt::print("-- e: {}\n", e);
+    err::info()("-- e: {}\n", e);
 
-    // Create pairs to check novel edges for unvisited neighbors
-    auto nodes{p_bfs(e,f_adjacent)};
+    // Remove edges with unvisited preds or succs > 1
+    auto nodes{p_bfs(e,
+      [&](Edge e)
+      {
+        return fn::fn(f_adjacent(e)).keep(
+          [&](Edge f)
+          {
+            // Discover actual direction (input/output) or (output)/(input),
+            // reverse if necessary to make it always as (output)/(input)
+            f = fn::fn(ops.preds(f.first)).has(f.second)? f : Edge{f.second,f.first};
+            // Check valid count of edges for oi direction
+            fn::fn(f_adjacent(f))
+              .;
+          });
+      }
+    )};
 
-    fmt::print("-- Result(n): {}\n", nodes);
+
+    // // Create pairs to check novel edges for unvisited neighbors
+    // auto nodes{p_bfs(e,
+    //   [&](Edge e)
+    //   {
+    //     return fn::fn(f_adjacent(e))
+    //       .sort({},[&](Edge f){ return f_adjacent(f).size(); })
+    //       .template into<Edges>();
+    //   }
+    // )};
+    //
+    // // Create pairs to check novel edges for unvisited neighbors
+    // auto nodes{p_bfs(e,[&](Edge e){ return f_adjacent(e); })};
+
+    err::info()("-- Result(n): {}\n", nodes);
 
     auto op{fp::overlapping_pairs(nodes)};
 
-    fmt::print("-- Result: {}\n", op);
-
-    fmt::print("-- op: {}\n", op);
+    // Include in solution
+    basis.push_back(op);
 
     // Mark cycle as visited
-    for( auto f : op )
-    {
-      fmt::print("-- Visiting: {}\n", f);
-      visited.insert(f);
-      visited.insert(Edge{f.second,f.first});
-    } // for
+    Edges next{f_visit(op)};
 
-    // Remove edges that are already part of a cycle
-    auto next = fn::fn(op)
-      .template keep<Edges>([&](Edge e){ return f_adjacent(e).size() != 0; });
-
-    fmt::print("-- next: {}\n", next);
+    err::info()("-- Next(n): {}\n", next);
 
     // Enqueue unvisited edges
-    for( auto f : next ){ q.push(f); }
+    for( auto f : next ){ q.push_back(f); }
 
     fmt::print("\n");
 
   } // while
 
-  return {};
+  return basis;
 } // fn: minimal_basis }}}
 
 // fn: cyclic_paths {{{
@@ -963,6 +1054,8 @@ int main([[maybe_unused]] int argc, char const* argv[])
   fmt::print("------\n");
 
   auto basis{minimal_basis(i64{},ops)};
+
+  for( auto&& b : basis ){ err::info()("Base: {}\n", b); }
 
   // // 2. Get cyclic paths
   // auto paths{cyclic_paths(ops,zz_c)};
