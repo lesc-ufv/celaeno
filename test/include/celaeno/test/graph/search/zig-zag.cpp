@@ -624,7 +624,7 @@ Tiles Adjacencies::from_right()
 
 // fn: place_intersection {{{
 [[nodiscard]] Placement place_intersection(Ops const& ops,
-  Range auto&& nodes,
+  Range auto nodes,
   Range auto&& cycles,
   Partition r)
 {
@@ -633,6 +633,14 @@ Tiles Adjacencies::from_right()
 
   // Check if intersection is not empty
   err::err({! nodes.empty()})("Intersection must not be empty");
+
+  if (  nodes.size() > 1 )
+  {
+    if( fn::fn(ops.succs(nodes.at(0))).has(nodes.at(1)) )
+    {
+      rg::reverse(nodes);
+    } // if
+  } // if
 
   // Set predecessor as nodes[0]
   Node pred{nodes.at(0)};
@@ -806,6 +814,17 @@ bool place_cycle(Ops const& ops
       candidates = fn::fn(candidates).template in_all<Tiles>(nodes_placed,
         [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); }
       );
+
+      // Sort resulting candidates by smalest chebyshev distance for all
+      // intersection nodes
+      rg::sort(candidates,{},
+      [&](Tile t)
+      {
+        return fn::fn(inter)
+          .as([&](Node v){ return ns_heuristics::chebyshev::run(t,p[v]); })
+          .sum();
+      });
+
     } // if
     else
     {
@@ -1005,29 +1024,29 @@ int main([[maybe_unused]] int argc, char const* argv[])
       //
       // Place first cycle
       //
-      bool b_left = place_cycle(ops
+      bool b_right = place_cycle(ops
         , placement
         , *it
         , intersection
         , m_n_m_a
         , weights_1
-        , Partition::L
+        , Partition::R
       );
 
-      if( ! b_left )
+      if( ! b_right )
       {
-        bool b_right = place_cycle(ops
+        bool b_left = place_cycle(ops
           , placement
           , *it
           , intersection
           , m_n_m_a
           , weights_1
-          , Partition::R
+          , Partition::L
         );
 
         fmt::print("Placement: {}\n", placement);
 
-        err::err({ b_right })("Failure to find a feasible solution");
+        err::err({ b_left })("Failure to find a feasible solution");
       } // if
 
       fmt::print("Placement: {}\n", placement);

@@ -71,6 +71,11 @@ struct Fun
     return (rg::contains(view,t) || ...);
   }
 
+  [[nodiscard]] auto sum()
+  {
+    return rg::accumulate(view,0);
+  }
+
   template<typename T>
   [[nodiscard]] size_t count(T&& t)
   {
