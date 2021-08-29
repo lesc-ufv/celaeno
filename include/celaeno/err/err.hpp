@@ -85,4 +85,17 @@ class Location
   }; // anonymous lambda
 } // fn: err }}}
 
+// fn: info {{{
+[[nodiscard]] decltype(auto) info([[maybe_unused]] Location const& loc = {})
+{
+  return [&]<String M, Printable... Args>(
+      [[maybe_unused]] M&& m
+    , [[maybe_unused]] Args&&... args )
+  {
+#ifdef DEBUG
+      spdlog::info(loc.get() + std::forward<M>(m), std::forward<Args>(args)...);
+#endif // DEBUG
+  }; // anonymous lambda
+} // fn: info }}}
+
 } // namespace celaeno::err }}}

@@ -76,8 +76,8 @@ enum class DIR
 template<SignedIntegral T, typename C = std::function<bool(i64)>>
 std::vector<T> run(T root,
   Ops ops,
-  std::vector<std::pair<T,T>>& path = {},
-  std::vector<T>& cycles = {},
+  Range auto& path = {},
+  Range auto& cycles = {},
   C&& f_cb = [](auto){ return false; }
 )
 {
@@ -114,9 +114,6 @@ std::vector<T> run(T root,
     {
       out.push_back(u);
     } // else
-
-    // Perform callback
-    if( f_cb(u) ){ break; }
 
     // Save curr edge to path
     if ( p != u ) { path.emplace_back(p,u); } // if
@@ -169,6 +166,9 @@ std::vector<T> run(T root,
       rg::for_each(preds,[&,u=u](auto e){ stack_unvisited.push({u,e}); });
       rg::for_each(succs,[&,u=u](auto e){ stack_unvisited.push({u,e}); });
     } // else
+
+    // Perform callback
+    if( f_cb(u) ){ break; }
 
   } // while
 

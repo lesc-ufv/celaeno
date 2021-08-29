@@ -37,6 +37,8 @@
 #include <type_traits>
 #include <iterator>
 #include <string>
+
+#include <fmt/ranges.h>
 #include <celaeno/aliases.hpp>
 
 // namespace celaeno::concepts {{{
@@ -47,7 +49,7 @@ template<typename... P>
 concept Printable =
 requires(P&&... p)
 {
-  ((std::cout << std::forward<P>(p)), ...);
+  ((fmt::print("{}",std::forward<P>(p))), ...);
 };
 
 // Basic Types {{{

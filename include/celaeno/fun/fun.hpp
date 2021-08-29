@@ -59,16 +59,16 @@ struct Fun
   Fun(V v) : view(v) {}
 
   // Terminators
-  template<Range R>
-  decltype(auto) find_first_of(R&& r)
+  template<Range R, typename F = std::equal_to<> >
+  decltype(auto) find_first_of(R&& r, F&& f = {})
   {
-    return rg::find_first_of(view,r);
+    return rg::find_first_of(view,r,f);
   } // function: first_of
 
-  template<typename T>
-  [[nodiscard]] bool has(T&& t)
+  template<typename... T>
+  [[nodiscard]] bool has(T&&... t)
   {
-    return rg::contains(view,t);
+    return (rg::contains(view,t) || ...);
   }
 
   template<typename T>
