@@ -815,6 +815,18 @@ bool place_cycle(Ops const& ops
         [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); }
       );
 
+      // auto lookahead = [&](Tile t)
+      // {
+      //   return f_get_candidates(t).size();
+      // };
+      //
+      // // Sort resulting candidates lookahead
+      // rg::sort(candidates,{},
+      // [&](Tile t)
+      // {
+      //   return - lookahead(t);
+      // });
+
       // Sort resulting candidates by smalest chebyshev distance for all
       // intersection nodes
       rg::sort(candidates,{},
