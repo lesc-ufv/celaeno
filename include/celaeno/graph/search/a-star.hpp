@@ -38,10 +38,14 @@
 #include <queue>
 #include <set>
 #include <vector>
-#include <celaeno/aliases.hpp>
-#include <celaeno/heuristics/manhattan.hpp>
+#include <optional>
+
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
+
+#include <celaeno/aliases.hpp>
+#include <celaeno/concepts.hpp>
+#include <celaeno/heuristics/manhattan.hpp>
 
 // TODO Remove
 #include <fmt/core.h>
@@ -58,14 +62,7 @@ namespace ns_heuristics = celaeno::heuristics;
 using namespace celaeno::aliases;
 // }}}
 
-//
-// Aliases
-//
-namespace fp = fplus;
-
-//
-// Concepts
-//
+// Concepts {{{
 template<typename T>
 concept SignedInt = std::signed_integral<T>;
 
@@ -81,10 +78,9 @@ requires (T t)
 {
   { t } -> std::signed_integral;
 };
+// }}}
 
-//
-// Helpers
-//
+// Helpers {{{
 
 // Compare distinct pairs of integrals
 template<SignedInt T1, SignedInt T2, SignedInt T3, SignedInt T4>
@@ -98,58 +94,53 @@ bool operator==(std::pair<T1,T2> a, std::pair<T3,T4> b)
   return (a.first == b.first) && (a.second == b.second);
 }
 
-//
-// Algorithm
-//
+// }}}
 
-template<typename Map, typename T>
-auto rebuild_path(Map& m, T curr)
+// fn: rebuild_path {{{
+template<typename T, typename Map>
+std::deque<T> rebuild_path(T start, T end, Map const& m)
 {
-  using Base = std::conditional_t<std::is_integral_v<T>, i64, std::pair<i64,i64>>;
+  std::deque<T> out;
 
-  m = fp::swap_keys_and_values(m);
-
-  std::deque<Base> final_path;
-
-  final_path.emplace_front(curr);
-
-  while( m.contains( curr ) )
+  while( m.contains( end ) )
   {
-    curr = m.at(curr);
-    final_path.emplace_front(curr);
-  }
+    out.emplace_front(end);
+    end = m.at(end);
+  } // while
 
-  return final_path;
-}
+  out.emplace_front(start);
 
-template<BaseType T, typename F1, typename F2>
-decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_constraints)
+  return out;
+} // fn: rebuild_path }}}
+
+// fn: run {{{
+template<typename T, typename F1, typename F2>
+std::optional<std::deque<T>>
+  run(T start, T end, F1&& f_neighbors, F2&& f_constraints)
 {
-  using Base = std::conditional_t<std::is_integral_v<T>, i64, std::pair<i64,i64> >;
-
   auto f_heuristic = [&](std::pair<i64,i64> n){ return ns_heuristics::manhattan::run(n,end); };
 
   // Open set in ascending order
-  std::multimap<f64,Base> open;
+  std::multimap<f64,T> open;
 
   // Closed set
-  std::set<Base> closed;
+  std::set<T> closed;
 
   // Heuristic cost
-  std::map<Base,f64> h_cost;
+  std::map<T,f64> h_cost;
 
   // Distance cost
-  std::map<Base,f64> d_cost;
+  std::map<T,f64> d_cost;
 
   // Paths memory
-  std::map<Base,Base> mem;
+  std::map<T,T> mem;
 
   // Initialize open set and costs
   open.emplace(f_heuristic(start), start);
   d_cost.emplace(start, 0);
 
-  // keep the previous vertex for final path
-  Base prev{start};
+  // Save manhattan dist begin/end
+  auto dist_be{ns_heuristics::manhattan::run(start,end)};
 
   // Main loop
   while( ! open.empty() )
@@ -159,28 +150,26 @@ decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_constraints)
     // c = current
     auto [cost, c]  { *open.cbegin()  }; open.erase(open.cbegin());
 
+    // Stop algorithm if distance is 2 times greater than dist_be
+    // TODO detect when algorithm is circlying around instead
+    if( ns_heuristics::manhattan::run(start,c) > dist_be*4 ){ break; }
+
     // fmt::print("Combined cost of {}: {}\n", c, cost);
 
-    // Update memory
-    if( c != start ) mem.emplace(prev,c);
-
     // If it is the goal, rebuild the path and return
-    if ( c == end ) return rebuild_path(mem,end);
+    if ( c == end ){ return rebuild_path(start,end,mem); }
 
     // Insert the vertex into the closed set
     closed.insert(c);
-
-    // Update previous vertex
-    prev = c;
 
     // For each neighbor of current vertex
     for (auto&& n : f_neighbors(c))
     {
       // Ignore constrained elements
-      if( f_constraints(n) ){ continue; }
+      if( f_constraints(n) && n != end ){ continue; }
 
       // Do not explore vertices in the closed set
-      if( closed.contains(n) ) continue;
+      if( closed.contains(n) ){ continue; }
 
       // Analyse the cost to goal
       auto n_cost {d_cost.at(c)+0};
@@ -190,16 +179,20 @@ decltype(auto) run(T start, T end, F1&& f_neighbors, F2&& f_constraints)
       // Update the score
       if ( ! d_cost.contains(n) || n_cost < d_cost.at(n) )
       {
+        // Save path c → n in path
+        mem[n] = c;
+
         // Update cost
         d_cost.emplace(n,n_cost);
+
         // Update combined cost
-        // fmt::print("Cost of {} to {}: {} + {}\n", n, end, n_cost, f_heuristic(n));
+        // fmt::print("-- Cost of {} to {}: {} + {}\n", n, end, n_cost, f_heuristic(n));
         open.emplace(n_cost+f_heuristic(n),n);
       } // if
-    } // for f_neighbors(c)
-  } // while ! open.empty()
+    } // for
+  } // while
 
-  return std::deque<Base>{};
-} // function: run
+  return std::nullopt;
+} // fn: run }}}
 
 } // namespace celaeno::graph::search::a_star

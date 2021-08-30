@@ -51,6 +51,7 @@
 #include <celaeno/graph/draw/svg.hpp>
 #include <celaeno/graph/search/zig-zag.hpp>
 #include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/graph/search/a-star.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
 // Using namespace {{{
@@ -613,12 +614,12 @@ Adjacencies::Adjacencies(T&& src)
 
 Tiles Adjacencies::from_left()
 {
-  return Tiles{down,left,up};
+  return Tiles{down,left,up,right};
 };
 
 Tiles Adjacencies::from_right()
 {
-  return Tiles{down,right,up};
+  return Tiles{down,right,up,left};
 };
 // struct: Adjacencies }}}
 
@@ -815,27 +816,50 @@ bool place_cycle(Ops const& ops
         [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); }
       );
 
-      // auto lookahead = [&](Tile t)
-      // {
-      //   return f_get_candidates(t).size();
-      // };
-      //
-      // // Sort resulting candidates lookahead
+      // // Sort resulting candidates by smalest chebyshev distance for all
+      // // intersection nodes
       // rg::sort(candidates,{},
       // [&](Tile t)
       // {
-      //   return - lookahead(t);
+      //   return fn::fn(inter)
+      //     .as([&](Node v){ return ns_heuristics::chebyshev::run(t,p[v]); })
+      //     .sum();
       // });
 
-      // Sort resulting candidates by smalest chebyshev distance for all
-      // intersection nodes
-      rg::sort(candidates,{},
-      [&](Tile t)
+      // Sort candidates by smallest A* distance
+      for (Node v : inter)
       {
-        return fn::fn(inter)
-          .as([&](Node v){ return ns_heuristics::chebyshev::run(t,p[v]); })
-          .sum();
-      });
+        for (Tile src : candidates)
+        {
+          auto result{ns_search::a_star::run(src
+            , p.at(v)
+            , [&](Tile dest) -> Tiles
+            {
+              return f_get_candidates(dest);
+            }
+            , [&](Tile dest) -> bool
+            {
+              return fn::fn(p).val().has(dest);
+            }
+          )};
+
+          if( result )
+          {
+            fmt::print("Path {} → {}, {} to {}: {}\n"
+              , u
+              , v
+              , src
+              , p.at(v)
+              , *result
+            );
+          } // if
+          else
+          {
+            fmt::print("Path {} → {}, {} to {} not found\n", u, v, src, p.at(v));
+          } // else
+
+        } // for
+      } // for
 
     } // if
     else
