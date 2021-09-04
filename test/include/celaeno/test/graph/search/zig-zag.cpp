@@ -35,38 +35,40 @@
 #include <ranges>
 #include <tuple>
 
+#include <fmt/core.h>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
-#include <fmt/core.h>
 #include <spdlog/spdlog.h>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/fun/fun.hpp>
 #include <celaeno/err/err.hpp>
-#include <celaeno/heuristics/manhattan.hpp>
-#include <celaeno/heuristics/chebyshev.hpp>
+#include <celaeno/fun/fun.hpp>
+
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/reader/verilog.hpp>
-#include <celaeno/graph/draw/svg.hpp>
-#include <celaeno/graph/search/zig-zag.hpp>
-#include <celaeno/graph/search/bfs.hpp>
-#include <celaeno/graph/search/a-star.hpp>
+
 #include <celaeno/graph/views/depth.hpp>
 
+#include <celaeno/graph/search/a-star.hpp>
+#include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/graph/search/zig-zag.hpp>
+
+#include <celaeno/heuristics/chebyshev.hpp>
+#include <celaeno/heuristics/manhattan.hpp>
+
 // Using namespace {{{
+using namespace celaeno::fun::fn;
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{
 namespace err = celaeno::err;
-namespace fn = celaeno::fun;
 namespace fp = fplus;
 namespace rg = ranges;
 
 namespace ns_graph = celaeno::graph;
-namespace ns_svg = celaeno::graph::draw::svg;
 namespace ns_heuristics = celaeno::heuristics;
 namespace ns_reader = celaeno::graph::reader::verilog;
 namespace ns_search = celaeno::graph::search;
@@ -83,6 +85,8 @@ using Weight = i64;
 using Distance = i64;
 using Distances = std::set<i64>;
 using Annotations = std::map<Node,Distances>;
+using MNodeMAnnotations = std::map<Node,Annotations>;
+using MEdgeWeight = std::map<Edge,Weight>;
 using Tile = std::pair<i64,i64>;
 using Tiles = std::vector<Tile>;
 using GraphPath = std::deque<Node>;
@@ -143,7 +147,7 @@ template<typename F = std::function<bool(Edge)>>
     vn.insert(u);
 
     // Helper to retrieve neighboring vertices of a vertex 'v'
-    auto neighbors = [&](Node v){ return fp::append(ops.preds(v),ops.succs(v)); };
+    auto neighbors = [&](Node v){ return fn(ops.preds(v)).chain(ops.succs(v)).vec(); };
 
     // Helper to check if a set of edges has been visited
     auto contains = []<Range R, typename... E>(R&& r, E&&... e)
@@ -182,12 +186,12 @@ template<typename F = std::function<bool(Edge)>>
 decltype(auto) incident_cycle(Nodes const& nodes)
 {
   // Sort with nlog(n) time
-  Nodes sorted{fn::fn(Nodes{nodes}).sort().into<Nodes>()};
+  Nodes sorted{fn(Nodes{nodes}).sort().vec()};
 
   Nodes delimiters{};
 
   // If two adjacent elements are equal, they are cycle delimiters
-  for( auto e : fn::fn(sorted).sliding(2).view )
+  for( auto e : fn(sorted).sliding(2).view )
   {
     if( e.at(0) == e.at(1) )
     {
@@ -196,7 +200,7 @@ decltype(auto) incident_cycle(Nodes const& nodes)
   } // for
 
   // Get cycle size for each node that is a cycle delimiter
-  auto delimiters_size{fn::fn(delimiters)
+  auto delimiters_size{fn(delimiters)
     .as<std::vector<std::pair<Node,size_t>>>([&](Node u)
     {
       auto it_beg{std::ranges::find(nodes,u)};
@@ -210,10 +214,11 @@ decltype(auto) incident_cycle(Nodes const& nodes)
 
   // Sort by size
   // Get delimiter with smallest distance, which is an incident cycle
-  auto u{fn::fn(delimiters_size)
+  auto u{fn(delimiters_size)
     .sort({},[](auto e){ return e.second; })
     .first()
-    .template as<std::vector<size_t>>([](auto e){ return e.first; })
+    .as([](auto e){ return e.first; })
+    .vec()
     .at(0)
   };
 
@@ -236,7 +241,7 @@ Nodes map_to_path(std::map<Node,Node> m, Edge e, Nodes dest)
   path.emplace_back(e.first);
 
   // Keep updating current edge, until one of dest is reached
-  while( ! fn::fn(dest).has(e.second) )
+  while( ! fn(dest).has(e.second) )
   {
     // Check if next edge exists
     err::err({ m.contains(e.second) })("Broken path");
@@ -246,7 +251,7 @@ Nodes map_to_path(std::map<Node,Node> m, Edge e, Nodes dest)
     path.emplace_back(e.first);
   } // while
 
-  while ( fn::fn(dest).has(e.second) )
+  while ( fn(dest).has(e.second) )
   {
     // Check if next edge exists
     if( ! m.contains(e.second) ){ break; }
@@ -267,7 +272,7 @@ Nodes p_bfs(Edge src, F f_adjacent)
 {
   auto has_subcycle = [&](Nodes nodes)
   {
-    return fn::fn(nodes)
+    return fn(nodes)
       .sort()
       .sliding(2)
       .count_if([](auto&& e){ return e.at(0) == e.at(1); }) > 1;
@@ -312,7 +317,7 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
       snd_endpoint = Edge{e.second,m_e.at(e.second)};
 
-      Nodes path{fn::fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
+      Nodes path{fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
           .rev()
           .chain(map_to_path(m_e,snd_endpoint,Nodes{src.first,src.second}))
           .unique<Nodes>()
@@ -325,20 +330,19 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
       break;
     } // if
-    else
-    {
-      v_d.insert(e.second);
-    } // else
+
+    v_d.insert(e.second);
 
     m_e.emplace(e.second,e.first);
 
-    auto edges = fn::fn(f_adjacent(e))
-      .template keep<Edges>(
+    auto edges = fn(f_adjacent(e))
+      .keep(
         [&](Edge e)
         {
           return ! v_e.contains(e);
         }
-      );
+      )
+      .vec();
 
     err::info()("-- Curr: {}\n", e);
     err::info()("-- Edges: {}\n", edges);
@@ -347,7 +351,7 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
   } // while
 
- return fn::fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
+ return fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
     .rev()
     .chain(map_to_path(m_e,snd_endpoint,Nodes{src.first,src.second}))
     .unique<Nodes>();
@@ -370,10 +374,11 @@ template<SignedIntegral I>
   fmt::print("-- Closing node: {}\n", zz_c);
 
   // Get first incident cycle
-  auto inodes{fn::fn(ipath)
+  auto inodes{fn(ipath)
     .as([](Edge e){ return e.first; })
     .chain(Nodes{ipath.back().second})
-    .template unique<Nodes>()
+    .unique()
+    .vec()
   };
 
   fmt::print("-- Nodes: {}\n", inodes);
@@ -398,29 +403,32 @@ template<SignedIntegral I>
   // Get neighboring edges, given a node u
   auto f_neighbors = [&](Node u) -> Nodes
   {
-    return fn::fn(ops.preds(u))
-      .template chain<Nodes>(ops.succs(u));
+    return fn(ops.preds(u))
+      .chain(ops.succs(u))
+      .vec();
   };
 
   // Return the degree of a node
   auto f_degree =
   [&](Node u) -> size_t
   {
-    return fn::fn(ops.preds(u)).chain<Nodes>(ops.succs(u)).size();
+    return fn(ops.preds(u)).chain<Nodes>(ops.succs(u)).size();
   };
 
   // Given an edge [u,v], if there are edges adjacent of u and v, such that they
   // are not in visited set, return them
   auto f_n_adjacent = [&]<typename F>(Node u, F f) -> Edges
   {
-    auto edges{fn::fn(f(u))
+    auto edges{fn(f(u))
       .as([u=u](Node w){ return Edge{u,w}; })
-      .template keep<Edges>([&](Edge f){ return ! f_contains(f); })
+      .keep([&](Edge f){ return ! f_contains(f); })
+      .vec()
     };
 
-    return fn::fn(edges).template keep<Edges>(
+    return fn(edges).keep(
       [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
-    );
+    )
+    .vec();
   };
 
   auto f_adjacent = [&](Edge e) -> Edges
@@ -433,7 +441,7 @@ template<SignedIntegral I>
 
     if( r2.empty() ){ return {}; }
 
-    return fn::fn(r1).template chain<Edges>(r2);
+    return fn(r1).chain(r2).vec();
   };
 
   // Remove edge from visited set
@@ -456,21 +464,21 @@ template<SignedIntegral I>
     err::info()("-- Visiting: {}\n", edges);
 
     // Visit all edges
-    (void) fn::fn(edges).ply([&](Edge e){ f_add_visited(e); });
+    (void) fn(edges).ply([&](Edge e){ f_add_visited(e); });
 
 
     // Save unvisited
     Edges unvisited;
 
     // Unvisit edges with unvisited neighbors in both endpoints
-    (void) fn::fn(edges).ply([&](Edge e)
+    (void) fn(edges).ply([&](Edge e)
     {
       auto adjacent{f_adjacent(e)};
 
       // Filter out leaves
-      adjacent = fn::fn(adjacent).template keep<Edges>(
+      adjacent = fn(adjacent).keep(
         [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
-      );
+      ).vec();
 
       // At least one endpoint had no unvisited neighbors
       if( adjacent.size() == 0 ){ return; }
@@ -524,7 +532,7 @@ template<SignedIntegral I>
     // Include in solution
     // If no intersection is found between current path and head, make previous
     // path the new head and add nodes
-    if( fn::fn(fp::nub(nodes)).template in<Nodes>(fp::nub(head)).size() < 2 )
+    if( fn(fp::nub(nodes)).in(fp::nub(head)).vec().size() < 2 )
     {
       do
       {
@@ -532,7 +540,7 @@ template<SignedIntegral I>
 
         head = q_heads.front(); q_heads.pop();
       } // do
-      while( fn::fn(fp::nub(nodes)).template in<Nodes>(fp::nub(head)).size() < 2 );
+      while( fn(fp::nub(nodes)).in(fp::nub(head)).vec().size() < 2 );
 
       basis.push_back({head});
 
@@ -572,7 +580,7 @@ template<SignedIntegral I>
   for (auto u : cycle )
   {
     // Add weight for placed neighbors of u and v
-    for (auto v : fn::fn(ops.preds(u)).template chain<Nodes>(ops.succs(u)))
+    for (auto v : fn(ops.preds(u)).chain(ops.succs(u)).vec())
     {
       auto weight {fp::abs_diff(view.at(u),view.at(v))};
       out.emplace(Edge{u,v},weight);
@@ -637,7 +645,7 @@ Tiles Adjacencies::from_right()
 
   if (  nodes.size() > 1 )
   {
-    if( fn::fn(ops.succs(nodes.at(0))).has(nodes.at(1)) )
+    if( fn(ops.succs(nodes.at(0))).has(nodes.at(1)) )
     {
       rg::reverse(nodes);
     } // if
@@ -661,7 +669,7 @@ Tiles Adjacencies::from_right()
     // Check if there are predecessors of u contained in cycles,
     // if no, and is last, position it to the right
     // else up
-    auto u_preds{fn::fn(ops.preds(u)).in(cycles).template into<Nodes>()};
+    auto u_preds{fn(ops.preds(u)).in(cycles).vec()};
 
     // Go up if is not last, otherwise left/right based on partition
     p[u] = (! u_preds.empty())? adj.up : (r == Partition::R)? adj.right : adj.left;
@@ -670,26 +678,42 @@ Tiles Adjacencies::from_right()
   return p;
 } // function: place_intersection }}}
 
+// struct: State {{{
+struct State
+{
+  // Save the placement state
+  Placement placement;
+  // Keep the partition the cycle was previously executed on
+  Partition partition;
+  // Keep a map with a list of possible tiles, for backtracking
+  std::map<Node,Tiles> m_backtrack;
+  // Keep track of unplaced and placed elements
+  std::stack<Node> placed, unplaced;
+  // Keep track if reversed path was attempted
+  bool b_reversed;
+} State;
+// struct: State }}}
+
 // fn: place_cycle {{{
 bool place_cycle(Ops const& ops
   , Placement& p
   , Range auto&& cycle
   , Range auto&& inter
-  , std::map<Node,Annotations> const& m_node_m_a
-  , std::map<Edge,Weight> m_edge_weight
+  , MNodeMAnnotations const& m_node_m_a
+  , MEdgeWeight m_edge_weight
   , Partition r)
 {
   // Save old state of p
   auto p_backup{p};
 
   // Check if a tile is occupied
-  auto f_is_free = [&](Tile const& t){ return ! fn::fn(p).val().has(t); };
+  auto f_is_free = [&](Tile const& t){ return ! fn(p).val().has(t); };
 
   // TODO: Replace this O(n^2) function
   auto path{fp::nub(cycle)};
 
   // Helper to indicate if an element v is present in a range r
-  auto has = [](Range auto&& r, Node v){ return fn::fn(r).has(v); };
+  auto has = [](Range auto&& r, Node v){ return fn(r).has(v); };
 
   fmt::print("++ Path: {}\n", path);
 
@@ -699,9 +723,7 @@ bool place_cycle(Ops const& ops
   // - Shift the path left, until the intersection elements are the first/last ones
   // - Remove intersection elements
   // - Create subrange
-  auto slice = fn::fn(path)
-    .rot(fn::fn(path).find_first_of(inter))
-    .template dif<Nodes>(inter);
+  auto slice = fn(path).rot(fn(path).find_first_of(inter)).dif(inter).vec();
 
   fmt::print("++ Slice: {}\n", slice);
 
@@ -717,19 +739,19 @@ bool place_cycle(Ops const& ops
   // Start with path as predecessor to successor
   if( slice.size() > 1)
   {
-    if( fn::fn(ops.preds(slice.at(0))).has(slice.at(1)) )
+    if( fn(ops.preds(slice.at(0))).has(slice.at(1)) )
     {
-      fn::fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
+      fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
     } // if
     else
     {
-      slice = fn::fn(slice).template rev<Nodes>();
-      fn::fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
+      slice = fn(slice).rev().vec();
+      fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
     } // else
   }
   else
   {
-    fn::fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
+    fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
   } // else
 
   // Helper to reverse path if current fails
@@ -741,7 +763,7 @@ bool place_cycle(Ops const& ops
     placed = std::stack<Node>{};
     b_reversed = true;
     p = p_backup;
-    fn::fn(slice).rev().ply([&](Node v){ unplaced.push(v); });
+    fn(slice).rev().ply([&](Node v){ unplaced.push(v); });
   };
 
   while( ! unplaced.empty() )
@@ -755,11 +777,13 @@ bool place_cycle(Ops const& ops
     // Get all neighbors
     auto f_neighbors = [&](Node v)
     {
-      return fn::fn(ops.preds(v)).chain(ops.succs(v)).into<Nodes>();
+      return fn(ops.preds(v)).chain(ops.succs(v)).vec();
     };
 
     // Filter nodes that are not positioned
-    Nodes nodes_placed{fn::fn(f_neighbors(u)).template in<Nodes>(p)};
+    Nodes nodes_placed{fn(f_neighbors(u)).in(p).vec()};
+
+    fmt::print("Neighbors({}) = {}\n", u, nodes_placed);
 
     // Get all possible positions adjacent to positions of neighbors
     Tiles candidates;
@@ -775,10 +799,11 @@ bool place_cycle(Ops const& ops
 
       // Get all candidate positions from previously positioned neighbors
       // Remove occupied positions
-      candidates = fn::fn(nodes_placed)
+      candidates = fn(nodes_placed)
         .as([&](Node v){ return f_get_candidates(p[v]); }) // nodes → tiles
         .squash() // merge [[tiles],[tiles]...] → [tiles]
-        .template drop<Tiles>([&](Tile t){ return ! f_is_free(t); });
+        .drop([&](Tile t){ return ! f_is_free(t); })
+        .vec();
 
       // Define the quality of a tiles based on annotations
       auto f_quality = [&](Tile t)
@@ -795,7 +820,7 @@ bool place_cycle(Ops const& ops
       };
 
       // Sort candidates by quality
-      candidates = fn::fn(candidates).sort({},f_quality).template into<Tiles>();
+      candidates = fn(candidates).sort({},f_quality).vec();
 
       fmt::print("{} - Int. Candidates: {}\n", u, candidates);
 
@@ -812,54 +837,91 @@ bool place_cycle(Ops const& ops
 
       // Keep a candidate if it satisfies edges constraints to all its placed
       // neighbors
-      candidates = fn::fn(candidates).template in_all<Tiles>(nodes_placed,
-        [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); }
-      );
+      candidates = fn(candidates)
+        .in_all(nodes_placed
+          , [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); })
+        .vec();
 
       // // Sort resulting candidates by smalest chebyshev distance for all
       // // intersection nodes
       // rg::sort(candidates,{},
       // [&](Tile t)
       // {
-      //   return fn::fn(inter)
+      //   return fn(inter)
       //     .as([&](Node v){ return ns_heuristics::chebyshev::run(t,p[v]); })
       //     .sum();
       // });
 
-      // Sort candidates by smallest A* distance
-      for (Node v : inter)
-      {
-        for (Tile src : candidates)
+      // Filter candidates by A*
+      // - For all neighbors [v1,v2,...,vn] of u that are placed
+      // - Keep only positions where the distance of u to all vn' is the same as
+      // the manhattan distance
+      candidates = fn(candidates)
+        .keep([&](Tile t)
         {
-          auto result{ns_search::a_star::run(src
-            , p.at(v)
-            , [&](Tile dest) -> Tiles
-            {
-              return f_get_candidates(dest);
-            }
-            , [&](Tile dest) -> bool
-            {
-              return fn::fn(p).val().has(dest);
-            }
-          )};
-
-          if( result )
+          for (auto v : nodes_placed)
           {
-            fmt::print("Path {} → {}, {} to {}: {}\n"
-              , u
-              , v
-              , src
+            auto d_manhattan{f_dist(t,p.at(v))};
+            auto d_astar{ns_search::a_star::run(t
               , p.at(v)
-              , *result
-            );
-          } // if
-          else
-          {
-            fmt::print("Path {} → {}, {} to {} not found\n", u, v, src, p.at(v));
-          } // else
+              , [&](Tile dest) -> Tiles
+              {
+                return f_get_candidates(dest);
+              }
+              , [&](Tile dest) -> bool
+              {
+                return fn(p).val().has(dest);
+              }
+            )};
 
-        } // for
-      } // for
+            if( d_astar )
+            {
+              if( static_cast<size_t>(d_manhattan+1) != d_astar->size() )
+              {
+                return false;
+              } // if
+              fmt::print("--- {} to {}: M({}) A({})\n", t, p.at(v), d_manhattan, d_astar->size());
+            }
+            else
+            {
+              fmt::print("--- {} to {}: M({}) nan\n", t, p.at(v), d_manhattan);
+              return false;
+            } // else
+
+          } // for
+          return true;
+        })
+        .vec();
+
+      // for (Tile t : candidates)
+      // {
+      //   for (auto v : nodes_placed)
+      //   {
+      //     auto d_manhattan{f_dist(t,p.at(v))};
+      //     auto d_astar{ns_search::a_star::run(t
+      //       , p.at(v)
+      //       , [&](Tile dest) -> Tiles
+      //       {
+      //         return f_get_candidates(dest);
+      //       }
+      //       , [&](Tile dest) -> bool
+      //       {
+      //         return fn(p).val().has(dest);
+      //       }
+      //     )};
+      //
+      //     if( d_astar )
+      //     {
+      //       fmt::print("--- {} to {}: M({}) A({})\n", t, p.at(v), d_manhattan, d_astar->size());
+      //     }
+      //     else
+      //     {
+      //       fmt::print("--- {} to {}: M({}) nan\n", t, p.at(v), d_manhattan);
+      //     } // else
+      //
+      //   } // for
+      //
+      // } // for
 
     } // if
     else
@@ -964,12 +1026,12 @@ int main([[maybe_unused]] int argc, char const* argv[])
       fmt::print("fst: {}\n", fst);
       fmt::print("snd: {}\n", snd);
 
-      auto its{fn::fn(fn::fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
+      auto its{fn(fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
 
       placement = place_intersection(ops
         , its
-        , fn::fn(fst).template chain<Nodes>(snd)
-        , Partition::R
+        , fn(fst).chain(snd).vec()
+        , Partition::L
       );
 
       //
@@ -1012,7 +1074,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
         , its
         , m_n_m_a
         , weights_1
-        , Partition::L
+        , Partition::R
       );
 
       fmt::print("Placement: \n");
@@ -1024,7 +1086,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
     for (auto it{std::next(sub.begin())}; it != sub.end(); ++it)
     {
-      auto intersection{fn::fn(fn::fn(head).in<Nodes>(*it)).sort().unique<Nodes>()};
+      auto intersection{fn(fn(head).in(*it).vec()).sort().unique().vec()};
 
       //
       // Annotate Based on intersection
@@ -1066,7 +1128,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
         , intersection
         , m_n_m_a
         , weights_1
-        , Partition::R
+        , Partition::L
       );
 
       if( ! b_right )
@@ -1077,7 +1139,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
           , intersection
           , m_n_m_a
           , weights_1
-          , Partition::L
+          , Partition::R
         );
 
         fmt::print("Placement: {}\n", placement);

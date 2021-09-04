@@ -107,17 +107,16 @@ struct Fun
     return std::tuple(view.begin(),it,view.end());
   }
 
-  template<typename T>
-  [[nodiscard]] auto into()
+  [[nodiscard]] auto vec()
   {
-    return view | rg::to<T>;
+    return view | rg::to<std::vector>;
   }
 
   // Print
   template<typename T>
   [[nodiscard]] auto print()
   {
-    fmt::print("-- {}\n", this->template into<T>());
+    fmt::print("-- {}\n", this->vec());
     return *this;
   }
 
@@ -422,10 +421,16 @@ template<typename... Args>
   { (std::forward<F>(f)(std::forward<Args>(args)),...); };
 } // function: apply
 
+// namespace: fn {{{
+namespace fn
+{
+
 template<Range R>
 [[nodiscard]] decltype(auto) fn(R&& r)
 {
   return Fun<decltype(rv::all(r))>{rv::all(r)};
 } // function: fn
+
+} // namespace: fn }}}
 
 } // namespace celaeno::fun }}}
