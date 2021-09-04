@@ -1,4 +1,4 @@
-// vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : zig-zag
@@ -683,15 +683,24 @@ struct State
 {
   // Save the placement state
   Placement placement;
-  // Keep the partition the cycle was previously executed on
-  Partition partition;
+  // Keep the slice the cycle was previously executed on
+  Nodes slice;
   // Keep a map with a list of possible tiles, for backtracking
   std::map<Node,Tiles> m_backtrack;
   // Keep track of unplaced and placed elements
   std::stack<Node> placed, unplaced;
   // Keep track if reversed path was attempted
   bool b_reversed;
-} State;
+  // Check if is initialized
+  bool b_backtracking;
+
+  State()
+    : b_reversed{false}
+    , b_backtracking{false}
+  {}
+};
+
+using State = struct State;
 // struct: State }}}
 
 // fn: place_cycle {{{
@@ -701,20 +710,20 @@ bool place_cycle(Ops const& ops
   , Range auto&& inter
   , MNodeMAnnotations const& m_node_m_a
   , MEdgeWeight m_edge_weight
-  , Partition r)
+  , Partition r
+  , State& state)
 {
+  // Restore state if backtracking
+  if( state.b_backtracking ){ p = state.placement; }
+
   // Save old state of p
-  auto p_backup{p};
+  Placement p_backup{p};
 
   // Check if a tile is occupied
   auto f_is_free = [&](Tile const& t){ return ! fn(p).val().has(t); };
 
   // TODO: Replace this O(n^2) function
   auto path{fp::nub(cycle)};
-
-  // Helper to indicate if an element v is present in a range r
-  auto has = [](Range auto&& r, Node v){ return fn(r).has(v); };
-
   fmt::print("++ Path: {}\n", path);
 
   // It is desirable to start from the intersection nodes in the cycle,
@@ -723,35 +732,40 @@ bool place_cycle(Ops const& ops
   // - Shift the path left, until the intersection elements are the first/last ones
   // - Remove intersection elements
   // - Create subrange
-  auto slice = fn(path).rot(fn(path).find_first_of(inter)).dif(inter).vec();
+  Nodes& slice = state.slice;
 
+  // Avoid recomputation if slice is already saved in state
+  if( ! state.b_backtracking )
+  {
+    slice = fn(path).rot(fn(path).find_first_of(inter)).dif(inter).vec();
+  } // if
   fmt::print("++ Slice: {}\n", slice);
 
   // Keep a map with a list of possible tiles, for backtracking
-  std::map<Node,Tiles> m_backtrack;
+  std::map<Node,Tiles>& m_backtrack = state.m_backtrack;
 
   // Keep track of unplaced and placed elements
-  std::stack<Node> placed, unplaced;
+  std::stack<Node>& placed = state.placed;
+  std::stack<Node>& unplaced = state.unplaced;
 
   // Try with reverse path if fails
-  bool b_reversed{false};
+  bool& b_reversed = state.b_reversed;
 
-  // Start with path as predecessor to successor
-  if( slice.size() > 1)
-  {
-    if( fn(ops.preds(slice.at(0))).has(slice.at(1)) )
-    {
-      fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
-    } // if
-    else
-    {
-      slice = fn(slice).rev().vec();
-      fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
-    } // else
-  }
-  else
+  // If not backtracking, push all nodes to the stack
+  if( ! state.b_backtracking )
   {
     fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  });
+  } // if
+  // Otherwise
+  // - Remove top of placed from placement map
+  // - Push top of placed to unplaced
+  // - Pop top of placed
+  else
+  {
+    Node u{placed.top()};
+    p.erase(u);
+    unplaced.push(u);
+    placed.pop();
   } // else
 
   // Helper to reverse path if current fails
@@ -775,10 +789,7 @@ bool place_cycle(Ops const& ops
     if( p.contains(u) ){ continue; }
 
     // Get all neighbors
-    auto f_neighbors = [&](Node v)
-    {
-      return fn(ops.preds(v)).chain(ops.succs(v)).vec();
-    };
+    auto f_neighbors = [&](Node v) { return fn(ops.preds(v)).chain(ops.succs(v)).vec(); };
 
     // Filter nodes that are not positioned
     Nodes nodes_placed{fn(f_neighbors(u)).in(p).vec()};
@@ -815,7 +826,7 @@ bool place_cycle(Ops const& ops
         {
           auto&& targets{m_node_m_a.at(v).at(u)};
           auto   dist{ns_heuristics::manhattan::run(t,p[v])};
-          return has(targets,dist);
+          return fn(targets).has(dist);
         });
       };
 
@@ -841,16 +852,6 @@ bool place_cycle(Ops const& ops
         .in_all(nodes_placed
           , [&](Tile t, Node v){ return f_target(u,v) == f_dist(t,p.at(v)); })
         .vec();
-
-      // // Sort resulting candidates by smalest chebyshev distance for all
-      // // intersection nodes
-      // rg::sort(candidates,{},
-      // [&](Tile t)
-      // {
-      //   return fn(inter)
-      //     .as([&](Node v){ return ns_heuristics::chebyshev::run(t,p[v]); })
-      //     .sum();
-      // });
 
       // Filter candidates by A*
       // - For all neighbors [v1,v2,...,vn] of u that are placed
@@ -893,35 +894,16 @@ bool place_cycle(Ops const& ops
         })
         .vec();
 
-      // for (Tile t : candidates)
-      // {
-      //   for (auto v : nodes_placed)
-      //   {
-      //     auto d_manhattan{f_dist(t,p.at(v))};
-      //     auto d_astar{ns_search::a_star::run(t
-      //       , p.at(v)
-      //       , [&](Tile dest) -> Tiles
-      //       {
-      //         return f_get_candidates(dest);
-      //       }
-      //       , [&](Tile dest) -> bool
-      //       {
-      //         return fn(p).val().has(dest);
-      //       }
-      //     )};
-      //
-      //     if( d_astar )
-      //     {
-      //       fmt::print("--- {} to {}: M({}) A({})\n", t, p.at(v), d_manhattan, d_astar->size());
-      //     }
-      //     else
-      //     {
-      //       fmt::print("--- {} to {}: M({}) nan\n", t, p.at(v), d_manhattan);
-      //     } // else
-      //
-      //   } // for
-      //
-      // } // for
+      // Sort resulting candidates by smalest chebyshev distance for all
+      // intersection nodes
+      rg::sort(candidates,{},
+      [&](Tile t)
+      {
+        return fn(inter)
+          .as([&](Node v){ return ns_heuristics::chebyshev::run(t,p[v]); })
+          .sum();
+      });
+
 
     } // if
     else
@@ -974,6 +956,59 @@ bool place_cycle(Ops const& ops
   return true;
 } // function: place_cycle }}}
 
+template<typename View>
+std::optional<State> place(Ops const& ops
+  , Placement& placement
+  , View const& depth_view
+  , Nodes const& intersection
+  , Nodes const& cycle)
+{
+  // Save the state of computation
+  State state;
+
+  // Annotate Based on intersection
+  std::map<Node,Annotations> m_n_m_a;
+  fmt::print("eBFS:\n");
+  for (Node r : intersection)
+  {
+    fmt::print("- Table for {}:\n", r);
+
+    auto annotations{e_bfs(ops,r)};
+
+    m_n_m_a[r] = annotations;
+
+    for (auto&& [k,v] : annotations)
+    {
+      fmt::print("-- {} → {}\n", k,v);
+    } // for
+  } // for
+  fmt::print("------\n");
+
+  // Get edge weights
+  fmt::print("Weights:\n");
+
+  auto weights_1{edge_weights(ops, cycle, depth_view)};
+
+  for( auto w : weights_1 ){ fmt::print("{} → {}\n", w.first, w.second); }
+
+  fmt::print("------\n");
+
+  // Perform placement
+  bool b_result = place_cycle(ops
+    , placement
+    , cycle
+    , intersection
+    , m_n_m_a
+    , weights_1
+    , Partition::L
+    , state
+  );
+
+  // Return the result if either succeeded
+  if( b_result ){ return state; } else { return std::nullopt; }
+
+} // function: place
+
 // fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
 {
@@ -1010,144 +1045,55 @@ int main([[maybe_unused]] int argc, char const* argv[])
   //
   auto depth_view{ns_views::depth::run(0,ops.preds,ops.succs).nl};
 
-  //
+  // Keep track of previous states
+  std::stack<State> stack_states;
+
+  // Place fist cycle
+  {
+    auto fst{basis.at(0).at(0)};
+    auto snd{basis.at(0).at(1)};
+
+    fmt::print("fst: {}\n", fst);
+    fmt::print("snd: {}\n", snd);
+
+    auto intersection{fn(fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
+
+    placement = place_intersection(ops
+      , intersection
+      , fn(fst).chain(snd).vec()
+      , Partition::L
+    );
+
+    auto result{place(ops,placement,depth_view,intersection,fst)};
+
+    if( ! result )
+    {
+      err::err()("Failure to find a feasible solution at first incident cycle");
+    } // if
+  }
+
   // For each subbset in basis
-  //
   for (auto&& sub : basis)
   {
-    //
-    // If placement is empty, place intersection between fst and snd
-    //
-    if( placement.empty() )
-    {
-      auto fst{sub.at(0)};
-      auto snd{sub.at(1)};
-
-      fmt::print("fst: {}\n", fst);
-      fmt::print("snd: {}\n", snd);
-
-      auto its{fn(fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
-
-      placement = place_intersection(ops
-        , its
-        , fn(fst).chain(snd).vec()
-        , Partition::L
-      );
-
-      //
-      // Annotate Based on intersection
-      //
-      std::map<Node,Annotations> m_n_m_a;
-      fmt::print("eBFS:\n");
-      for (Node r : its)
-      {
-        fmt::print("- Table for {}:\n", r);
-
-        auto annotations{e_bfs(ops,r)};
-
-        m_n_m_a[r] = annotations;
-
-        for (auto&& [k,v] : annotations)
-        {
-          fmt::print("-- {} → {}\n", k,v);
-        } // for
-      } // for
-      fmt::print("------\n");
-
-      //
-      // Get edge weights
-      //
-      fmt::print("Weights:\n");
-
-      auto weights_1{edge_weights(ops, fst, depth_view)};
-
-      for( auto w : weights_1 ){ fmt::print("{} → {}\n", w.first, w.second); }
-
-      fmt::print("------\n");
-
-      //
-      // Place first cycle
-      //
-      place_cycle(ops
-        , placement
-        , fst
-        , its
-        , m_n_m_a
-        , weights_1
-        , Partition::R
-      );
-
-      fmt::print("Placement: \n");
-      for( auto&& e : placement ){ fmt::print("{}\n", e); }
-      fmt::print("------\n");
-    } // if
-
     auto const& head{sub.at(0)};
 
     for (auto it{std::next(sub.begin())}; it != sub.end(); ++it)
     {
+      // Get intersection of head and current cycle
       auto intersection{fn(fn(head).in(*it).vec()).sort().unique().vec()};
 
-      //
-      // Annotate Based on intersection
-      //
-      std::map<Node,Annotations> m_n_m_a;
-      fmt::print("eBFS:\n");
-      for (Node r : intersection)
+      // Perform placement based on intersection
+      auto result{place(ops,placement,depth_view,intersection,*it)};
+
+      // Check if operation was successful
+      if( result )
       {
-        fmt::print("- Table for {}:\n", r);
-
-        auto annotations{e_bfs(ops,r)};
-
-        m_n_m_a[r] = annotations;
-
-        for (auto&& [k,v] : annotations)
-        {
-          fmt::print("-- {} → {}\n", k,v);
-        } // for
-      } // for
-      fmt::print("------\n");
-
-      //
-      // Get edge weights
-      //
-      fmt::print("Weights:\n");
-
-      auto weights_1{edge_weights(ops, *it, depth_view)};
-
-      for( auto w : weights_1 ){ fmt::print("{} → {}\n", w.first, w.second); }
-
-      fmt::print("------\n");
-
-      //
-      // Place first cycle
-      //
-      bool b_right = place_cycle(ops
-        , placement
-        , *it
-        , intersection
-        , m_n_m_a
-        , weights_1
-        , Partition::L
-      );
-
-      if( ! b_right )
-      {
-        bool b_left = place_cycle(ops
-          , placement
-          , *it
-          , intersection
-          , m_n_m_a
-          , weights_1
-          , Partition::R
-        );
-
         fmt::print("Placement: {}\n", placement);
-
-        err::err({ b_left })("Failure to find a feasible solution");
       } // if
-
-      fmt::print("Placement: {}\n", placement);
+      else
+      {
+        err::err()("Failure to find a feasible solution");
+      } // else
 
     } // for
 
