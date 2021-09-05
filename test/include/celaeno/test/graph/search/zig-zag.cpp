@@ -67,6 +67,7 @@ using namespace celaeno::aliases;
 namespace err = celaeno::err;
 namespace fp = fplus;
 namespace rg = ranges;
+namespace rv = ranges::views;
 
 namespace ns_graph = celaeno::graph;
 namespace ns_heuristics = celaeno::heuristics;
@@ -681,8 +682,6 @@ Tiles Adjacencies::from_right()
 // struct: State {{{
 struct State
 {
-  // Save the placement state
-  Placement placement;
   // Keep the slice the cycle was previously executed on
   Nodes slice;
   // Keep a map with a list of possible tiles, for backtracking
@@ -713,11 +712,12 @@ bool place_cycle(Ops const& ops
   , Partition r
   , State& state)
 {
-  // Restore state if backtracking
-  if( state.b_backtracking ){ p = state.placement; }
-
   // Save old state of p
   Placement p_backup{p};
+
+  fmt::print("-- is_backtracking: {}\n", state.b_backtracking);
+
+  fmt::print("-- Inner placement: {}\n", p );
 
   // Check if a tile is occupied
   auto f_is_free = [&](Tile const& t){ return ! fn(p).val().has(t); };
@@ -762,6 +762,7 @@ bool place_cycle(Ops const& ops
   // - Pop top of placed
   else
   {
+    fmt::print("-- Using current state stacks\n");
     Node u{placed.top()};
     p.erase(u);
     unplaced.push(u);
@@ -881,11 +882,9 @@ bool place_cycle(Ops const& ops
               {
                 return false;
               } // if
-              fmt::print("--- {} to {}: M({}) A({})\n", t, p.at(v), d_manhattan, d_astar->size());
             }
             else
             {
-              fmt::print("--- {} to {}: M({}) nan\n", t, p.at(v), d_manhattan);
               return false;
             } // else
 
@@ -893,6 +892,9 @@ bool place_cycle(Ops const& ops
           return true;
         })
         .vec();
+
+      // Remove duplicate positions in candidates
+      candidates = fn(candidates).sort().unique().vec();
 
       // Sort resulting candidates by smalest chebyshev distance for all
       // intersection nodes
@@ -956,58 +958,37 @@ bool place_cycle(Ops const& ops
   return true;
 } // function: place_cycle }}}
 
+// fn: place {{{
 template<typename View>
-std::optional<State> place(Ops const& ops
+bool place(Ops const& ops
   , Placement& placement
   , View const& depth_view
   , Nodes const& intersection
-  , Nodes const& cycle)
+  , Nodes const& cycle
+  , State& state)
 {
-  // Save the state of computation
-  State state;
-
   // Annotate Based on intersection
   std::map<Node,Annotations> m_n_m_a;
-  fmt::print("eBFS:\n");
   for (Node r : intersection)
   {
-    fmt::print("- Table for {}:\n", r);
-
     auto annotations{e_bfs(ops,r)};
-
     m_n_m_a[r] = annotations;
-
-    for (auto&& [k,v] : annotations)
-    {
-      fmt::print("-- {} → {}\n", k,v);
-    } // for
   } // for
-  fmt::print("------\n");
 
   // Get edge weights
-  fmt::print("Weights:\n");
-
-  auto weights_1{edge_weights(ops, cycle, depth_view)};
-
-  for( auto w : weights_1 ){ fmt::print("{} → {}\n", w.first, w.second); }
-
-  fmt::print("------\n");
+  auto weights{edge_weights(ops, cycle, depth_view)};
 
   // Perform placement
-  bool b_result = place_cycle(ops
+  return place_cycle(ops
     , placement
     , cycle
     , intersection
     , m_n_m_a
-    , weights_1
+    , weights
     , Partition::L
     , state
   );
-
-  // Return the result if either succeeded
-  if( b_result ){ return state; } else { return std::nullopt; }
-
-} // function: place
+} // fn: place }}}
 
 // fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
@@ -1045,9 +1026,6 @@ int main([[maybe_unused]] int argc, char const* argv[])
   //
   auto depth_view{ns_views::depth::run(0,ops.preds,ops.succs).nl};
 
-  // Keep track of previous states
-  std::stack<State> stack_states;
-
   // Place fist cycle
   {
     auto fst{basis.at(0).at(0)};
@@ -1064,7 +1042,9 @@ int main([[maybe_unused]] int argc, char const* argv[])
       , Partition::L
     );
 
-    auto result{place(ops,placement,depth_view,intersection,fst)};
+    State state;
+
+    auto result{place(ops,placement,depth_view,intersection,fst, state)};
 
     if( ! result )
     {
@@ -1072,34 +1052,99 @@ int main([[maybe_unused]] int argc, char const* argv[])
     } // if
   }
 
-  // For each subbset in basis
-  for (auto&& sub : basis)
+  // Maintain a stacks of unfinished and finished sub-basis
+  std::stack<std::pair<Nodes,Nodes>> unfinished, finished;
+
+  // Maintain a stack of previous states of placed cycles
+  std::stack<State> stack_states;
+
+  // Maintain a stack of previous solutions
+  std::stack<Placement> stack_placement;
+
+  stack_placement.push(placement);
+
+  // Move values to unfinished
+  for (auto it1{basis.begin()}; it1 != basis.end(); ++it1)
   {
-    auto const& head{sub.at(0)};
-
-    for (auto it{std::next(sub.begin())}; it != sub.end(); ++it)
+    for (auto it2{std::next(it1->begin())}; it2 != it1->end(); ++it2)
     {
-      // Get intersection of head and current cycle
-      auto intersection{fn(fn(head).in(*it).vec()).sort().unique().vec()};
-
-      // Perform placement based on intersection
-      auto result{place(ops,placement,depth_view,intersection,*it)};
-
-      // Check if operation was successful
-      if( result )
-      {
-        fmt::print("Placement: {}\n", placement);
-      } // if
-      else
-      {
-        err::err()("Failure to find a feasible solution");
-      } // else
-
+      // Calculate intersection with head cycle
+      Nodes intersection{fn(fn(it1->at(0)).in(*it2).vec()).sort().unique().vec()};
+      // Place intersection and cycle in stack
+      unfinished.push(std::make_pair(intersection, *it2));
     } // for
-
   } // for
 
-  fmt::print("Placement: \n");
+  // Reverse unfinished stack
+  {
+    std::stack<std::pair<Nodes,Nodes>> stack_rev;
+    while( ! unfinished.empty() ){ stack_rev.push(unfinished.top()); unfinished.pop(); }
+    unfinished = stack_rev;
+  }
+
+  bool b_backtracking{false};
+
+  while( ! unfinished.empty() )
+  {
+    // Get next element
+    auto sub{unfinished.top()};
+
+    // Get intersection
+    auto const& intersection{sub.first};
+
+    // Get cycle
+    auto const& cycle{sub.second};
+
+    // Generate a new state for possible backtracking
+    State state;
+
+    if( b_backtracking )
+    {
+      fmt::print("-- Backtracking...\n");
+      state = stack_states.top();
+      stack_states.pop();
+      state.b_backtracking = true;
+      placement = stack_placement.top();
+      stack_placement.pop();
+    } // if
+    else
+    {
+      stack_placement.push(placement);
+    } // else
+
+    fmt::print("-- Befor Placement: {}\n", placement);
+
+    // Perform placement based on intersection
+    auto result{place(ops,placement,depth_view,intersection,cycle,state)};
+
+    // If operation was successful
+    // - Include top of unfinished stack in finished stack
+    // - Pop unfinished stack
+    // - Add state to stack of states
+    // - Set backtracking flag to false
+    if( result )
+    {
+      finished.push(sub);
+      unfinished.pop();
+      stack_states.push(std::move(state));
+      b_backtracking = false;
+    }
+    // Otherwise, backtrack
+    // - Pop current placement from stack
+    // - Include top of finished stack in unfinished
+    // - Pop finished stack
+    // - Set b_backtracking to true
+    else
+    {
+      err::err({ ! finished.empty() })("Failure to find a feasible solution");
+      stack_placement.pop();
+      unfinished.push(finished.top());
+      finished.pop();
+      b_backtracking = true;
+    } // else
+    fmt::print("-- After Placement: {}\n", placement);
+  } // while
+
   for( auto&& e : placement ){ fmt::print("{}\n", e); }
   fmt::print("------\n");
 
