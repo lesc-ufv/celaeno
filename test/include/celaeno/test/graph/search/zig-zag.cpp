@@ -633,50 +633,37 @@ Tiles Adjacencies::from_right()
 // struct: Adjacencies }}}
 
 // fn: place_intersection {{{
-[[nodiscard]] Placement place_intersection(Ops const& ops,
-  Range auto nodes,
-  Range auto&& cycles,
-  Partition r)
+auto place_intersection(Range auto intersection, bool backtracking)
 {
-  // Positions for nodes nodes
-  Placement p;
+  // Initialize new placement
+  Placement placement;
 
   // Check if intersection is not empty
-  err::err({! nodes.empty()})("Intersection must not be empty");
+  err::err({! intersection.empty()})("Intersection must not be empty");
 
-  if (  nodes.size() > 1 )
+  // Intersection must have size of exactly 2
+  err::err({ intersection.size() == 2 })("Intersection must have size 2");
+
+  // Placement must be empty
+  err::err({ placement.empty()})("Intersection must not be empty");
+
+  // Update placement
+  if( ! backtracking )
   {
-    if( fn(ops.succs(nodes.at(0))).has(nodes.at(1)) )
+    for (i64 i{}; auto u : intersection)
     {
-      rg::reverse(nodes);
-    } // if
+      placement[u] = std::make_pair(0,i++);
+    } // for
   } // if
-
-  // Set predecessor as nodes[0]
-  Node pred{nodes.at(0)};
-
-  // Place it in (0,0)
-  p[pred] = {0,0};
-
-  // Perform placement of next nodes
-  for (auto it{std::next(nodes.begin())}; it != nodes.end(); ++it)
+  else
   {
-    // Get current node
-    auto u{*it};
+    for (i64 i{}; auto u : intersection)
+    {
+      placement[u] = std::make_pair(0,i++);
+    } // for
+  } // else
 
-    // Get adjacent tiles from predecessor position
-    Adjacencies adj{p[pred]};
-
-    // Check if there are predecessors of u contained in cycles,
-    // if no, and is last, position it to the right
-    // else up
-    auto u_preds{fn(ops.preds(u)).in(cycles).vec()};
-
-    // Go up if is not last, otherwise left/right based on partition
-    p[u] = (! u_preds.empty())? adj.up : (r == Partition::R)? adj.right : adj.left;
-  } // for
-
-  return p;
+  return placement;
 } // function: place_intersection }}}
 
 // struct: State {{{
@@ -965,6 +952,7 @@ bool place(Ops const& ops
   , View const& depth_view
   , Nodes const& intersection
   , Nodes const& cycle
+  , Partition partition
   , State& state)
 {
   // Annotate Based on intersection
@@ -985,72 +973,22 @@ bool place(Ops const& ops
     , intersection
     , m_n_m_a
     , weights
-    , Partition::L
+    , partition
     , state
   );
 } // fn: place }}}
 
-// fun: main  {{{
-int main([[maybe_unused]] int argc, char const* argv[])
+// fn: global_backtracking {{{
+decltype(auto) global_backtracking(Ops const& ops)
 {
-  // Read graph
-  ns_graph::Graph<i64> g;
-  auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  auto metadata {ns_reader::Reader{argv[1],emplace}};
-
-  // Helpers
-  auto f_p = [&g](auto v){ return g.predecessors(v); };
-  auto f_s = [&g](auto v){ return g.successors(v); };
-  auto f_a = [&g](auto u, auto v){ return g.adjacent(u,v); };
-  auto f_l = [&g](auto e){ g.emplace(e); };
-  auto f_u = [&g](auto e){ g.erase(e); };
-
-  // Create ops
-  Ops ops(f_p, f_s, f_a, f_l, f_u);
-
+  // Solution
   Placement placement;
 
-  fmt::print("------\n");
-
-  //
   // Get minimal basis
-  //
   auto basis{minimal_basis(i64{},ops)};
 
-  for( auto&& b : basis ){ err::info()("Base: {}\n", b); }
-
-  fmt::print("------\n");
-
-  //
   // Calculate graph depth-view
-  //
   auto depth_view{ns_views::depth::run(0,ops.preds,ops.succs).nl};
-
-  // Place fist cycle
-  {
-    auto fst{basis.at(0).at(0)};
-    auto snd{basis.at(0).at(1)};
-
-    fmt::print("fst: {}\n", fst);
-    fmt::print("snd: {}\n", snd);
-
-    auto intersection{fn(fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
-
-    placement = place_intersection(ops
-      , intersection
-      , fn(fst).chain(snd).vec()
-      , Partition::L
-    );
-
-    State state;
-
-    auto result{place(ops,placement,depth_view,intersection,fst, state)};
-
-    if( ! result )
-    {
-      err::err()("Failure to find a feasible solution at first incident cycle");
-    } // if
-  }
 
   // Maintain a stacks of unfinished and finished sub-basis
   std::stack<std::pair<Nodes,Nodes>> unfinished, finished;
@@ -1061,6 +999,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Maintain a stack of previous solutions
   std::stack<Placement> stack_placement;
 
+  // Push initial empty solution to stack
   stack_placement.push(placement);
 
   // Move values to unfinished
@@ -1086,14 +1025,30 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   while( ! unfinished.empty() )
   {
+    if( placement.empty() )
+    {
+      auto fst{basis.at(0).at(0)};
+      auto snd{basis.at(0).at(1)};
+
+      auto intersection{fn(fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
+
+      placement = place_intersection(intersection, b_backtracking);
+
+      State state;
+
+      auto result{place(ops,placement,depth_view,intersection,fst,Partition::R,state)};
+
+      if( ! result )
+      {
+        err::err()("Failure to find a feasible solution at first incident cycle");
+      } // if
+    } // if
+
     // Get next element
     auto sub{unfinished.top()};
 
     // Get intersection
-    auto const& intersection{sub.first};
-
-    // Get cycle
-    auto const& cycle{sub.second};
+    auto const& [i,p] = std::tie(sub.first,sub.second);
 
     // Generate a new state for possible backtracking
     State state;
@@ -1115,7 +1070,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
     fmt::print("-- Befor Placement: {}\n", placement);
 
     // Perform placement based on intersection
-    auto result{place(ops,placement,depth_view,intersection,cycle,state)};
+    auto result{place(ops,placement,depth_view,i,p,Partition::L,state)};
 
     // If operation was successful
     // - Include top of unfinished stack in finished stack
@@ -1128,7 +1083,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
       unfinished.pop();
       stack_states.push(std::move(state));
       b_backtracking = false;
-    }
+    } // if
     // Otherwise, backtrack
     // - Pop current placement from stack
     // - Include top of finished stack in unfinished
@@ -1144,6 +1099,33 @@ int main([[maybe_unused]] int argc, char const* argv[])
     } // else
     fmt::print("-- After Placement: {}\n", placement);
   } // while
+
+  fmt::print("------\n");
+
+  return placement;
+} // function: global_backtracking
+
+// fn: global_backtracking }}}
+
+// fun: main  {{{
+int main([[maybe_unused]] int argc, char const* argv[])
+{
+  // Read graph
+  ns_graph::Graph<i64> g;
+  auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
+  auto metadata {ns_reader::Reader{argv[1],emplace}};
+
+  // Helpers
+  auto f_p = [&g](auto v){ return g.predecessors(v); };
+  auto f_s = [&g](auto v){ return g.successors(v); };
+  auto f_a = [&g](auto u, auto v){ return g.adjacent(u,v); };
+  auto f_l = [&g](auto e){ g.emplace(e); };
+  auto f_u = [&g](auto e){ g.erase(e); };
+
+  // Create ops
+  Ops ops(f_p, f_s, f_a, f_l, f_u);
+
+  Placement placement{global_backtracking(ops)};
 
   for( auto&& e : placement ){ fmt::print("{}\n", e); }
   fmt::print("------\n");
