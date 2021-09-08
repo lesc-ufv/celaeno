@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <ranges>
 #include <tuple>
+#include <optional>
 
 #include <fmt/core.h>
 #include <fplus/fplus.hpp>
@@ -67,7 +68,6 @@ using namespace celaeno::aliases;
 namespace err = celaeno::err;
 namespace fp = fplus;
 namespace rg = ranges;
-namespace rv = ranges::views;
 
 namespace ns_graph = celaeno::graph;
 namespace ns_heuristics = celaeno::heuristics;
@@ -279,6 +279,9 @@ Nodes p_bfs(Edge src, F f_adjacent)
       .count_if([](auto&& e){ return e.at(0) == e.at(1); }) > 1;
   };
 
+  // Result
+  Nodes out;
+
   // Queue of unvisited edges
   std::queue<Edge> q;
 
@@ -312,20 +315,17 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
     if( v_d.contains(e.second) )
     {
-      err::info()("-- Final: {}\n", e);
-
       fst_endpoint = Edge{e.second,e.first};
 
       snd_endpoint = Edge{e.second,m_e.at(e.second)};
 
-      Nodes path{fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
-          .rev()
-          .chain(map_to_path(m_e,snd_endpoint,Nodes{src.first,src.second}))
-          .unique<Nodes>()
-      };
+      out = fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
+        .rev()
+        .chain(map_to_path(m_e,snd_endpoint,Nodes{src.first,src.second}))
+        .unique()
+        .vec();
 
-      if( has_subcycle(path) ){ continue; }
-
+      if( has_subcycle(out) ){ out = {}; continue; }
 
       m_e.emplace(e.second,e.first);
 
@@ -336,26 +336,13 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
     m_e.emplace(e.second,e.first);
 
-    auto edges = fn(f_adjacent(e))
-      .keep(
-        [&](Edge e)
-        {
-          return ! v_e.contains(e);
-        }
-      )
-      .vec();
-
-    err::info()("-- Curr: {}\n", e);
-    err::info()("-- Edges: {}\n", edges);
+    auto edges = fn(f_adjacent(e)).keep([&](Edge e) { return ! v_e.contains(e); }).vec();
 
     for( auto f : edges ){ q.push(f); }
 
   } // while
 
- return fn(map_to_path(m_e,fst_endpoint,Nodes{src.first,src.second}))
-    .rev()
-    .chain(map_to_path(m_e,snd_endpoint,Nodes{src.first,src.second}))
-    .unique<Nodes>();
+ return out;
 
 } // fn: p_bfs }}}
 
@@ -363,16 +350,16 @@ Nodes p_bfs(Edge src, F f_adjacent)
 template<SignedIntegral I>
 [[nodiscard]] decltype(auto) minimal_basis(I root, Ops const& ops)
 {
-  Edges ipath; // Path
-  Cycles zz_c; // Cycles
+  // Initial path
+  Edges ipath;
 
-  // Run zig-zag
+  // Initial cycle
+  Cycles zz_c;
+
+  // Run zig-zag until it founds a cycle
   auto zz_o{ns_search::zig_zag::run(root,ops,ipath,zz_c
     , [&](auto){ return ! zz_c.empty(); }
   )};
-
-  fmt::print("-- Smallest found cycle: {}\n", ipath);
-  fmt::print("-- Closing node: {}\n", zz_c);
 
   // Get first incident cycle
   auto inodes{fn(ipath)
@@ -382,14 +369,11 @@ template<SignedIntegral I>
     .vec()
   };
 
-  fmt::print("-- Nodes: {}\n", inodes);
-
+  // Initial nodes
   inodes = incident_cycle(inodes);
-  fmt::print("-- Smallest found cycle: {}\n", inodes);
 
+  // Initial edges
   ipath = fp::overlapping_pairs(inodes);
-
-  fmt::print("-- Smallest found path: {}\n", ipath);
 
   // Keep track of visited edges
   std::set<Edge> visited;
@@ -418,7 +402,7 @@ template<SignedIntegral I>
 
   // Given an edge [u,v], if there are edges adjacent of u and v, such that they
   // are not in visited set, return them
-  auto f_n_adjacent = [&]<typename F>(Node u, F f) -> Edges
+  auto f_not_in_adjacent = [&]<typename F>(Node u, F f) -> Edges
   {
     auto edges{fn(f(u))
       .as([u=u](Node w){ return Edge{u,w}; })
@@ -432,13 +416,15 @@ template<SignedIntegral I>
     .vec();
   };
 
+  // Return adjacent edges if both endpoints of edge 'e', has adjacent edges such
+  // that they were not yet visited
   auto f_adjacent = [&](Edge e) -> Edges
   {
-    auto r1{f_n_adjacent(e.first,f_neighbors)};
+    auto r1{f_not_in_adjacent(e.first,f_neighbors)};
 
     if( r1.empty() ){ return {}; }
 
-    auto r2{f_n_adjacent(e.second,f_neighbors)};
+    auto r2{f_not_in_adjacent(e.second,f_neighbors)};
 
     if( r2.empty() ){ return {}; }
 
@@ -462,8 +448,6 @@ template<SignedIntegral I>
   // Conditionally visit edges, returns unvisited ones
   auto f_visit = [&](Edges const& edges) -> Edges
   {
-    err::info()("-- Visiting: {}\n", edges);
-
     // Visit all edges
     (void) fn(edges).ply([&](Edge e){ f_add_visited(e); });
 
@@ -491,8 +475,6 @@ template<SignedIntegral I>
 
     return unvisited;
   };
-
-  err::info()("-- Result: {}\n\n", ipath);
 
   // Use a queue to define the order to detect adjacent cycles
   std::deque<Edge> q;
@@ -523,12 +505,8 @@ template<SignedIntegral I>
 
     if( visited.contains(e) ){ continue; }
 
-    err::info()("-- e: {}\n", e);
-
     // Create pairs to check novel edges for unvisited neighbors
     auto nodes{p_bfs(e,[&](Edge e){ return f_adjacent(e); })};
-
-    err::info()("-- Result(n): {}\n", nodes);
 
     // Include in solution
     // If no intersection is found between current path and head, make previous
@@ -558,12 +536,8 @@ template<SignedIntegral I>
     // Mark cycle as visited
     Edges next{f_visit(fp::overlapping_pairs(nodes))};
 
-    // err::info()("-- Next(n): {}\n", next);
-
     // Enqueue unvisited edges
     for( auto f : next ){ q.push_back(f); v_edges.insert(f); }
-
-    fmt::print("\n");
 
   } // while
 
@@ -645,7 +619,7 @@ auto place_intersection(Range auto intersection, bool backtracking)
   err::err({ intersection.size() == 2 })("Intersection must have size 2");
 
   // Placement must be empty
-  err::err({ placement.empty()})("Intersection must not be empty");
+  err::err({ placement.empty()})("Placement must be empty");
 
   // Update placement
   if( ! backtracking )
@@ -702,16 +676,11 @@ bool place_cycle(Ops const& ops
   // Save old state of p
   Placement p_backup{p};
 
-  fmt::print("-- is_backtracking: {}\n", state.b_backtracking);
-
-  fmt::print("-- Inner placement: {}\n", p );
-
   // Check if a tile is occupied
   auto f_is_free = [&](Tile const& t){ return ! fn(p).val().has(t); };
 
   // TODO: Replace this O(n^2) function
   auto path{fp::nub(cycle)};
-  fmt::print("++ Path: {}\n", path);
 
   // It is desirable to start from the intersection nodes in the cycle,
   // therefore:
@@ -726,7 +695,6 @@ bool place_cycle(Ops const& ops
   {
     slice = fn(path).rot(fn(path).find_first_of(inter)).dif(inter).vec();
   } // if
-  fmt::print("++ Slice: {}\n", slice);
 
   // Keep a map with a list of possible tiles, for backtracking
   std::map<Node,Tiles>& m_backtrack = state.m_backtrack;
@@ -749,7 +717,6 @@ bool place_cycle(Ops const& ops
   // - Pop top of placed
   else
   {
-    fmt::print("-- Using current state stacks\n");
     Node u{placed.top()};
     p.erase(u);
     unplaced.push(u);
@@ -759,7 +726,6 @@ bool place_cycle(Ops const& ops
   // Helper to reverse path if current fails
   auto f_try_reverse_path = [&]
   {
-    fmt::print("### Reversing path {}\n", slice);
     m_backtrack.clear();
     unplaced = std::stack<Node>{};
     placed = std::stack<Node>{};
@@ -781,8 +747,6 @@ bool place_cycle(Ops const& ops
 
     // Filter nodes that are not positioned
     Nodes nodes_placed{fn(f_neighbors(u)).in(p).vec()};
-
-    fmt::print("Neighbors({}) = {}\n", u, nodes_placed);
 
     // Get all possible positions adjacent to positions of neighbors
     Tiles candidates;
@@ -820,8 +784,6 @@ bool place_cycle(Ops const& ops
 
       // Sort candidates by quality
       candidates = fn(candidates).sort({},f_quality).vec();
-
-      fmt::print("{} - Int. Candidates: {}\n", u, candidates);
 
       // For each tile in candidates, remove all that does not adhere to edge
       // constraints.
@@ -899,8 +861,6 @@ bool place_cycle(Ops const& ops
     {
       candidates = m_backtrack.at(u);
     } // else
-
-    fmt::print("{} - Candidates: {}\n", u, candidates);
 
     // Check if candidates are empty, if so, backtrack
     if (candidates.empty())
@@ -1055,7 +1015,6 @@ decltype(auto) global_backtracking(Ops const& ops)
 
     if( b_backtracking )
     {
-      fmt::print("-- Backtracking...\n");
       state = stack_states.top();
       stack_states.pop();
       state.b_backtracking = true;
@@ -1066,8 +1025,6 @@ decltype(auto) global_backtracking(Ops const& ops)
     {
       stack_placement.push(placement);
     } // else
-
-    fmt::print("-- Befor Placement: {}\n", placement);
 
     // Perform placement based on intersection
     auto result{place(ops,placement,depth_view,i,p,Partition::L,state)};
@@ -1097,10 +1054,7 @@ decltype(auto) global_backtracking(Ops const& ops)
       finished.pop();
       b_backtracking = true;
     } // else
-    fmt::print("-- After Placement: {}\n", placement);
   } // while
-
-  fmt::print("------\n");
 
   return placement;
 } // function: global_backtracking
@@ -1127,6 +1081,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   Placement placement{global_backtracking(ops)};
 
+  fmt::print("\n------\n");
   for( auto&& e : placement ){ fmt::print("{}\n", e); }
   fmt::print("------\n");
 
