@@ -51,6 +51,9 @@
 
 #include <celaeno/graph/views/depth.hpp>
 
+#include <celaeno/graph/draw/svg.hpp>
+#include <celaeno/graph/representations/grid.hpp>
+
 #include <celaeno/graph/search/a-star.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/graph/search/zig-zag.hpp>
@@ -70,6 +73,8 @@ namespace fp = fplus;
 namespace rg = ranges;
 
 namespace ns_graph = celaeno::graph;
+namespace ns_draw = celaeno::graph::draw;
+namespace ns_grid = celaeno::graph::representations::grid;
 namespace ns_heuristics = celaeno::heuristics;
 namespace ns_reader = celaeno::graph::reader::verilog;
 namespace ns_search = celaeno::graph::search;
@@ -372,6 +377,8 @@ template<SignedIntegral I>
   // Initial nodes
   inodes = incident_cycle(inodes);
 
+  err::info()("inodes: {}", inodes);
+
   // Initial edges
   ipath = fp::overlapping_pairs(inodes);
 
@@ -422,13 +429,19 @@ template<SignedIntegral I>
   {
     auto r1{f_not_in_adjacent(e.first,f_neighbors)};
 
-    if( r1.empty() ){ return {}; }
+    // if( r1.empty() ){ return {}; }
 
     auto r2{f_not_in_adjacent(e.second,f_neighbors)};
 
-    if( r2.empty() ){ return {}; }
+    // if( r2.empty() ){ return {}; }
 
-    return fn(r1).chain(r2).vec();
+    // Filter out ones in visited
+    // Filter out ones with leaves
+    return fn(r1)
+      .chain(r2)
+      .dif(visited)
+      .keep([&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); })
+      .vec();
   };
 
   // Remove edge from visited set
@@ -451,27 +464,31 @@ template<SignedIntegral I>
     // Visit all edges
     (void) fn(edges).ply([&](Edge e){ f_add_visited(e); });
 
-
     // Save unvisited
     Edges unvisited;
 
-    // Unvisit edges with unvisited neighbors in both endpoints
-    (void) fn(edges).ply([&](Edge e)
+    // Given an edge uv, save unvisited adjacent edges uw,vx
+    for( Edge e : edges )
     {
       auto adjacent{f_adjacent(e)};
 
-      // Filter out leaves
-      adjacent = fn(adjacent).keep(
-        [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
-      ).vec();
+      fmt::print("1. e: {} Adjacent: {}\n", e, adjacent);
+
+      fmt::print("2. e: {} Adjacent: {}\n", e, adjacent);
 
       // At least one endpoint had no unvisited neighbors
-      if( adjacent.size() == 0 ){ return; }
+      if( adjacent.size() == 0 ){ continue; }
 
-      // Unvisit edges [u,v] with unvisited neighboring edges
-      f_rm_visited(e);
-      unvisited.push_back(e);
-    });
+      // If both endpoints of e, uv, have unvisited edges, then e is unvisited
+      if( fn(adjacent).unique([&](Edge e1, Edge e2){ return e1.first == e2.first; }).vec().size() > 2 )
+      {
+        f_rm_visited(e);
+        unvisited.push_back(e);
+      } // if
+
+      // Save unvisited adjacent edges
+      for( Edge f : adjacent ){ unvisited.push_back(f); }
+    } // for
 
     return unvisited;
   };
@@ -485,17 +502,18 @@ template<SignedIntegral I>
   // Verify when to switch to next basis vector
   std::set<Edge> v_edges;
 
-  // Mark edges not in queue as visited
-  for( auto e : f_visit(ipath) ){ q.push_back(e); }
+  // Push unvisited edges to queue
+  for( auto e : f_visit(ipath) )
+  {
+    err::info()("Unvisited {}\n", e);
+    q.push_back(e);
+  }
 
   // Current head of subsolution
   Nodes head{inodes};
 
   // Next heads of subsolutions
   std::queue<Nodes> q_heads;
-
-  // Push initial incident cycle to solution
-  basis.push_back({inodes});
 
   // Keep searching for cycles while q is not empty
   while( ! q.empty() )
@@ -504,6 +522,8 @@ template<SignedIntegral I>
     auto e{q.front()}; q.pop_front();
 
     if( visited.contains(e) ){ continue; }
+
+    err::info()("Search from {} → {}\n", e.first, e.second);
 
     // Create pairs to check novel edges for unvisited neighbors
     auto nodes{p_bfs(e,[&](Edge e){ return f_adjacent(e); })};
@@ -515,8 +535,7 @@ template<SignedIntegral I>
     {
       do
       {
-        err::err({ ! q_heads.empty() })("q_heads must not be empty");
-
+        if( q_heads.empty() ){ break; }
         head = q_heads.front(); q_heads.pop();
       } // do
       while( fn(fp::nub(nodes)).in(fp::nub(head)).vec().size() < 2 );
@@ -615,11 +634,16 @@ auto place_intersection(Range auto intersection, bool backtracking)
   // Check if intersection is not empty
   err::err({! intersection.empty()})("Intersection must not be empty");
 
-  // Intersection must have size of exactly 2
-  err::err({ intersection.size() == 2 })("Intersection must have size 2");
-
   // Placement must be empty
   err::err({ placement.empty()})("Placement must be empty");
+
+  // Place single-node intersection
+  if( intersection.size() == 1 )
+  {
+    auto u{intersection.at(0)};
+    placement[u] = std::make_pair(0,0);
+    return placement;
+  } // if
 
   // Update placement
   if( ! backtracking )
@@ -804,40 +828,26 @@ bool place_cycle(Ops const& ops
         .vec();
 
       // Filter candidates by A*
-      // - For all neighbors [v1,v2,...,vn] of u that are placed
-      // - Keep only positions where the distance of u to all vn' is the same as
-      // the manhattan distance
       candidates = fn(candidates)
         .keep([&](Tile t)
         {
           for (auto v : nodes_placed)
           {
+            // Calculate manhattan distance
             auto d_manhattan{f_dist(t,p.at(v))};
+            // Calculate manhattan-based A* path
             auto d_astar{ns_search::a_star::run(t
               , p.at(v)
-              , [&](Tile dest) -> Tiles
-              {
-                return f_get_candidates(dest);
-              }
-              , [&](Tile dest) -> bool
-              {
-                return fn(p).val().has(dest);
-              }
+              , [&](Tile dest) -> Tiles { return f_get_candidates(dest); }
+              , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
             )};
-
-            if( d_astar )
-            {
-              if( static_cast<size_t>(d_manhattan+1) != d_astar->size() )
-              {
-                return false;
-              } // if
-            }
-            else
+            // Check if path exists, and it is eq to manhattan
+            if( ! d_astar || static_cast<size_t>(d_manhattan+1) != d_astar->size() )
             {
               return false;
-            } // else
-
+            } // if
           } // for
+
           return true;
         })
         .vec();
@@ -854,7 +864,6 @@ bool place_cycle(Ops const& ops
           .as([&](Node v){ return ns_heuristics::chebyshev::run(t,p[v]); })
           .sum();
       });
-
 
     } // if
     else
@@ -946,6 +955,11 @@ decltype(auto) global_backtracking(Ops const& ops)
 
   // Get minimal basis
   auto basis{minimal_basis(i64{},ops)};
+
+  for (auto const& base : basis)
+  {
+    fmt::print("-- Base: {}\n", base);
+  } // for
 
   // Calculate graph depth-view
   auto depth_view{ns_views::depth::run(0,ops.preds,ops.succs).nl};
@@ -1079,11 +1093,39 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u);
 
+  fmt::print("Graph:\n");
+  for (auto const& e : g.data())
+  {
+    fmt::print("-- {}\n", e);
+  } // for
+
+  // Perform placement
   Placement placement{global_backtracking(ops)};
+
+  // Offset coordinates to remove negative values
+  auto x_min{rg::min_element(placement,{},[](auto e){ return e.second.first; })->second.first};
+  auto y_min{rg::min_element(placement,{},[](auto e){ return e.second.second; })->second.second};
+
+  for (auto& [n,p] : placement)
+  {
+    auto& [x,y] = p;
+
+    x += std::abs(x_min);
+    y += std::abs(y_min);
+  } // for
+
 
   fmt::print("\n------\n");
   for( auto&& e : placement ){ fmt::print("{}\n", e); }
   fmt::print("------\n");
+
+  // Draw
+  ns_draw::svg::svg(fmt::format("{}.svg",argv[1])
+    , placement
+    , std::vector<std::vector<i64>>{}
+    , [](auto i){ return i; }
+  );
+
 
   return EXIT_SUCCESS;
 } // main }}}

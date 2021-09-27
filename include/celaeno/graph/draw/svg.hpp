@@ -157,36 +157,36 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
 
   //Get farthest vertices to build viewport
   auto view_box_x {rg::max_element(vertex_tile,{},
-  [](auto e) { return e.second.x; })->second.x};
+  [](auto e) { return e.second.first; })->second.first};
 
   auto view_box_y {rg::max_element(vertex_tile,{},
-  [](auto e) { return e.second.y; })->second.y};
+  [](auto e) { return e.second.second; })->second.second};
 
   // Adjust positions for drawing
   for (auto& [_,tile] : vertex_tile)
   {
-    tile.x = tile.x*tile_size+circle_offset;
-    tile.y = tile.y*tile_size+circle_offset;
+    tile.first = tile.first*tile_size+circle_offset;
+    tile.second = tile.second*tile_size+circle_offset;
   } // for
 
-  // Edge Routing
-  rg::for_each(paths, [&](auto&& e)
-  {
-    auto route{e.second};
-
-    for (auto it{route.begin()}; it != std::prev(route.end()); ++it)
-    {
-      auto [ux,uy] = *it;
-      auto [vx,vy] = *std::next(it);
-
-      ux = ux*tile_size+circle_offset;
-      uy = uy*tile_size+circle_offset;
-      vx = vx*tile_size+circle_offset;
-      vy = vy*tile_size+circle_offset;
-
-      edges << fmt::format(e_template, ux, uy, vx, vy);
-    } // for
-  });
+  // // Edge Routing
+  // rg::for_each(paths, [&](auto&& e)
+  // {
+  //   auto route{e.second};
+  //
+  //   for (auto it{route.begin()}; it != std::prev(route.end()); ++it)
+  //   {
+  //     auto [ux,uy] = *it;
+  //     auto [vx,vy] = *std::next(it);
+  //
+  //     ux = ux*tile_size+circle_offset;
+  //     uy = uy*tile_size+circle_offset;
+  //     vx = vx*tile_size+circle_offset;
+  //     vy = vy*tile_size+circle_offset;
+  //
+  //     edges << fmt::format(e_template, ux, uy, vx, vy);
+  //   } // for
+  // });
 
   // @ Stream/File writting
   header << fmt::format(h_template,view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);
@@ -195,7 +195,7 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
   // Vertices and labels
   for (auto [v,tile] : vertex_tile)
   {
-    auto [x,y] = std::make_pair(tile.x,tile.y);
+    auto [x,y] = std::make_pair(tile.first,tile.second);
     // Draw pseudo-nodes with black filling
     if (v < 0)
     {

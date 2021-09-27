@@ -1,8 +1,8 @@
 // Benchmark "decod" written by ABC on Wed Mar 10 23:12:53 2021
 
-module decod  
+module decod  (
     a, b, c, d, e,
-    f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u  ;
+    f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u  );
   input  a, b, c, d, e;
   output f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u;
   wire new_n22_, new_n23_, new_n24_, new_n26_, new_n27_, new_n29_, new_n30_,

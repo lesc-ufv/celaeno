@@ -50,7 +50,7 @@ namespace ra = ranges::actions;
 namespace rv = ranges::views;
 // }}}
 
-// Class: Fun {{{
+// class: Fun {{{
 template<typename V>
 struct Fun
 {
@@ -384,10 +384,10 @@ struct Fun
   // elements are not equal. To have exclusively unique elements, sort before
   // usage.
   //
-  template<typename Out = void>
-  [[nodiscard]] auto unique()
+  template<typename Out = void, typename F = std::equal_to<>>
+  [[nodiscard]] auto unique(F&& f = {})
   {
-    return make_view<Out>(rv::unique(view));
+    return make_view<Out>(rv::unique(view,f));
   } // fn: unique }}}
 
   // fn: val {{{
@@ -413,13 +413,6 @@ struct Fun
   // Views }}}
 
 }; // class: fun }}}
-
-template<typename... Args>
-[[nodiscard]] decltype(auto) apply(Args... args)
-{
-  return [&]<typename... F>(F&&... f)
-  { (std::forward<F>(f)(std::forward<Args>(args)),...); };
-} // function: apply
 
 // namespace: fn {{{
 namespace fn

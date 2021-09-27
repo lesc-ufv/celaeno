@@ -1,6 +1,6 @@
 // Benchmark "dalu" written by ABC on Wed Mar 10 23:12:53 2021
 
-module dalu  
+module dalu  (
     inA15, inA14, inA13, inA12, inA11, inA10, inA9, inA8, inA7, inA6, inA5,
     inA4, inA3, inA2, inA1, inA0, inB15, inB14, inB13, inB12, inB11, inB10,
     inB9, inB8, inB7, inB6, inB5, inB4, inB3, inB2, inB1, inB0, inC15,
@@ -8,7 +8,7 @@ module dalu
     inC3, inC2, inC1, inC0, inD15, inD14, inD13, inD12, inD11, inD10, inD9,
     inD8, inD7, inD6, inD5, inD4, inD3, inD2, inD1, inD0, opsel3, opsel2,
     opsel1, opsel0, musel4, musel3, musel2, musel1, sh2, sh1, sh0,
-    O15, O14, O13, O12, O11, O10, O9, O8, O7, O6, O5, O4, O3, O2, O1, O0  ;
+    O15, O14, O13, O12, O11, O10, O9, O8, O7, O6, O5, O4, O3, O2, O1, O0  );
   input  inA15, inA14, inA13, inA12, inA11, inA10, inA9, inA8, inA7,
     inA6, inA5, inA4, inA3, inA2, inA1, inA0, inB15, inB14, inB13, inB12,
     inB11, inB10, inB9, inB8, inB7, inB6, inB5, inB4, inB3, inB2, inB1,
