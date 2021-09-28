@@ -46,8 +46,8 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/err/err.hpp>
 
-// celaeno::graph::reader::verilog {{{
-namespace celaeno::graph::reader::verilog
+// celaeno::graph::io::verilog {{{
+namespace celaeno::graph::io::verilog
 {
 
 // Namespaces {{{
@@ -312,4 +312,4 @@ void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
 
 // Modifiers }}}
 
-} // namespace celaeno::graph::reader::verilog }}}
+} // namespace celaeno::graph::io::verilog }}}
