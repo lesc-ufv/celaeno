@@ -39,12 +39,16 @@
 #include <regex>
 #include <fstream>
 
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 #include <range/v3/all.hpp>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <celaeno/err/err.hpp>
+#include <celaeno/fun/fun.hpp>
+
+#include <celaeno/graph/search/bfs.hpp>
 
 // celaeno::graph::io::verilog {{{
 namespace celaeno::graph::io::verilog
@@ -56,15 +60,18 @@ namespace err = celaeno::err;
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::actions;
+
+namespace ns_search = celaeno::graph::search;
 // }}}
 
 // Using namespaces {{{
+using namespace celaeno::fun::fn;
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
-// Enum Type {{{
-enum class GateType{INPUT,NOT,AND,NAND,OR,NOR,XOR,XNOR,MAJ3,};
+// Enum GateType {{{
+enum class GateType{INPUT,NOT,AND,NAND,OR,NOR,XOR,XNOR,MAJ3,DUMMY,};
 // }}}
 
 // class Reader {{{
@@ -78,10 +85,10 @@ class Reader
     static std::string_view const expr_and;
     static std::string_view const expr_or;
 
-    mutable T callback;
+    mutable T f_callback;
     mutable i64 id_counter;
-    mutable std::map<std::string,i64> ids;
-    mutable std::map<i64,GateType> gate_type;
+    mutable std::map<std::string,i64> m_str_id;
+    mutable std::map<i64,GateType> m_id_type;
   // }}}
 
   // Constructors {{{
@@ -120,10 +127,10 @@ std::string_view const Reader<T>::expr_or = "assign({0})=~?({0}){1}~?({0})";
 template<typename T>
 template<typename S>
 Reader<T>::Reader(S&& _filename, T _callback)
-  : callback(_callback)
+  : f_callback(_callback)
   , id_counter()
-  , ids()
-  , gate_type()
+  , m_str_id()
+  , m_id_type()
 {
 
 #ifndef NDEBUG
@@ -189,14 +196,14 @@ Reader<T>::Reader(S&& _filename, T _callback)
     })("Did not match: {}", _line);
   }
 
-  // Set non-gate ids as inputs
-  rg::for_each(this->ids, [this](auto e)
+  // Set non-gate m_str_id as inputs
+  rg::for_each(this->m_str_id, [this](auto e)
   {
     auto id {e.second};
 
-    if( ! this->gate_type.contains(id) )
+    if( ! this->m_id_type.contains(id) )
     {
-      this->gate_type.emplace(id,GateType::INPUT);
+      this->m_id_type.emplace(id,GateType::INPUT);
     } // if
   });
 }
@@ -206,7 +213,7 @@ Reader<T>::Reader(S&& _filename, T _callback)
 template<typename T>
 std::map<i64,GateType> const& Reader<T>::data() const noexcept
 {
-  return this->gate_type;
+  return this->m_id_type;
 }
 // }}}
 
@@ -278,9 +285,9 @@ void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
   {
     auto inc = [this](auto&& arg)
     {
-      if( ! this->ids.contains(arg) )
+      if( ! this->m_str_id.contains(arg) )
       {
-        this->ids[arg] = this->id_counter++;
+        this->m_str_id[arg] = this->id_counter++;
       }
     };
 
@@ -289,19 +296,19 @@ void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
   }(std::forward<decltype(_ops)>(_ops)...);
 
   // Insert gate _type for _lhs
-  if( ! this->ids.contains(_lhs) )
+  if( ! this->m_str_id.contains(_lhs) )
   {
-    this->ids[_lhs] = this->id_counter;
-    this->gate_type[this->id_counter] = _type;
+    this->m_str_id[_lhs] = this->id_counter;
+    this->m_id_type[this->id_counter] = _type;
     ++this->id_counter;
   }
 
-  // Perform insertion callback
+  // Perform insertion f_callback
   [&_lhs,this]<typename... Args>(Args&&... args) -> void
   {
     auto link = [&_lhs,this](auto&& arg)
     {
-      this->callback(std::make_pair(this->ids[arg], this->ids[_lhs]));
+      this->f_callback(std::make_pair(this->m_str_id[arg], this->m_str_id[_lhs]));
     };
 
     (link(std::forward<Args>(args)),...);
@@ -311,5 +318,163 @@ void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
 } // fn: update }}}
 
 // Modifiers }}}
+
+// class Reader }}}
+
+class Writer
+{
+  private:
+    static constexpr std::string_view template_header
+    {
+      "module {}({},{});\n\n"
+    };
+    static constexpr std::string_view template_inputs
+    {
+      "  input {};\n"
+    };
+    static constexpr std::string_view template_outputs
+    {
+      "  output {};\n\n"
+    };
+    static constexpr std::string_view template_wires
+    {
+      "  wire {};\n\n"
+    };
+    static constexpr std::string_view template_assign
+    {
+      "  assign {} = {} {} {};\n"
+    };
+    static constexpr std::string_view template_footer
+    {
+      "\nendmodule"
+    };
+  public:
+    Writer(std::map<i64,GateType> m_id_type
+      , auto&& f_pred
+      , auto&& f_succ
+      , String auto&& out);
+}; // class: Writer
+
+Writer::Writer( std::map<i64,GateType> m_id_type
+  , auto&& f_pred
+  , auto&& f_succ
+  , String auto&& out)
+{
+  // Read file
+  std::ofstream ofile{out};
+
+  // Check for erros
+  err::err({ ofile.good() })("Error to open file {}", out);
+
+  // Get all nodes through bfs
+  auto bfs{ns_search::bfs::run(0,f_pred,f_succ)};
+
+  // Save inputs/outputs
+  std::set<std::string> inputs;
+  std::set<std::string> outputs;
+  std::set<std::string> wires;
+
+  // Include a prefix in the node id
+  auto f_prefix = [](i64 u)
+  {
+    return (u < 0)? fmt::format("dummy_{}",std::abs(u))
+      : fmt::format("node_{}",u);
+  };
+
+  // Remove inputs from processing, save io to create input/output statements
+  // Transform each node into a range of assignments
+  auto assignments{fn(bfs)
+    .keep([&](i64 node)
+    {
+      if(f_pred(node).size() == 0)
+      {
+        inputs.insert(f_prefix(node));
+        // Ignore inputs
+        return false;
+      } // if
+      else if(f_succ(node).size() == 0)
+      {
+        outputs.insert(f_prefix(node));
+      } // else if
+      else
+      {
+        wires.insert(f_prefix(node));
+      } // else
+
+      return true;
+    })
+    .as([&,this](i64 node)
+    {
+      std::string op;
+
+      if( ! m_id_type.contains(node) )
+      {
+        m_id_type[node] = GateType::DUMMY;
+      } // if
+
+      switch(m_id_type.at(node))
+      {
+        case GateType::AND: op = "&"; break;
+        case GateType::OR: op = "|"; break;
+        case GateType::NAND: op = "~&"; break;
+        case GateType::NOR: op = "~|"; break;
+        case GateType::XOR: op = "^"; break;
+        case GateType::XNOR: op = "~^"; break;
+        case GateType::DUMMY: op = "&"; break;
+        case GateType::NOT: op = "~"; break;
+        default:
+          err::err()("Operation not supported for node {}", node);
+      } // switch
+
+      auto preds{f_pred(node)};
+
+      if( preds.size() == 2)
+      {
+        return fmt::format(this->template_assign
+          , f_prefix(node)
+          , f_prefix(preds.at(0))
+          , op
+          , f_prefix(preds.at(1))
+        );
+      } // if
+      else
+      {
+        return fmt::format(this->template_assign
+          , f_prefix(node)
+          , f_prefix(preds.at(0))
+          , ""
+          , ""
+        );
+      } // else
+
+
+      // return fmt::format(this->assign,);
+    })
+    .vec()
+  };
+
+  // I/O in module
+  ofile << fmt::format(template_header
+    , out
+    , fmt::join(inputs, ",")
+    , fmt::join(outputs, ",")
+  );
+
+  // I/O declarations
+  ofile << fmt::format(template_inputs, fmt::join(inputs, ","));
+  ofile << fmt::format(template_outputs, fmt::join(outputs, ","));
+  ofile << fmt::format(template_wires, fmt::join(wires, ","));
+
+  // Assignments
+  for (auto&& e : assignments)
+  {
+    ofile << fmt::format(e);
+  } // for
+
+  // Footer
+  ofile << fmt::format(template_footer);
+
+  ofile.close();
+}
 
 } // namespace celaeno::graph::io::verilog }}}

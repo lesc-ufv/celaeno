@@ -69,8 +69,8 @@ template<SignedIntegral T, typename P, typename S, typename L, typename U>
 void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   requires CallableWith<P,T>
   && CallableWith<S,T>
-  && CallableWith<L,std::pair<T,T>>
-  && CallableWith<U,std::pair<T,T>>
+  && CallableWith<L,T,T>
+  && CallableWith<U,T,T>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
@@ -113,7 +113,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
     if (successors.size() <= 2) { continue; }
 
     // Unlink all successors from node
-    rg::for_each(successors,[&](auto s){ f_unlink(std::make_pair(n,s)); });
+    rg::for_each(successors,[&](auto s){ f_unlink(n,s); });
 
     // Add novel successors to n, until the size is of a maximum of 2 nodes
     while (successors.size() > 2)
@@ -128,7 +128,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
       rg::for_each(chunks,[&](auto c)
       {
         // Link current chunk to novel node
-        rg::for_each(c, [&](auto s) { f_link(std::make_pair(idx,s)); });
+        rg::for_each(c, [&](auto s) { f_link(idx,s); });
         // Push current novel node id
         novel_successors.emplace_back(idx);
         // Create novel next node id
@@ -143,7 +143,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
     } // while
 
     // Update current successors of n
-    rg::for_each(successors, [&](auto s) { f_link(std::make_pair(n,s)); });
+    rg::for_each(successors, [&](auto s) { f_link(n,s); });
   } // for
 
 } // }}}

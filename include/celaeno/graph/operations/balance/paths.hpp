@@ -68,8 +68,8 @@ template<SignedIntegral T, typename P, typename S, typename L, typename U>
 void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
-  && CallableWith<L,std::pair<i64,i64>>
-  && CallableWith<U,std::pair<i64,i64>>
+  && CallableWith<L,T,T>
+  && CallableWith<U,T,T>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
@@ -118,8 +118,8 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
           // * -> * -> *
           //  \_______/
           //
-          f_link(std::make_pair(p,idx));
-          f_link(std::make_pair(idx,*it));
+          f_link(p,idx);
+          f_link(idx,*it);
           //
           // ↓         ↓
           // A    C    B
@@ -131,7 +131,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
           // A    C    B
           // * -> * -> *
           //
-          f_unlink(std::make_pair(p,*it));
+          f_unlink(p,*it);
           //
           // ↓
           // A    C    B

@@ -47,7 +47,7 @@
 #include <celaeno/fun/fun.hpp>
 
 #include <celaeno/graph/graph.hpp>
-#include <celaeno/graph/reader/verilog.hpp>
+#include <celaeno/graph/io/verilog.hpp>
 
 #include <celaeno/graph/views/depth.hpp>
 
@@ -56,10 +56,18 @@
 
 #include <celaeno/graph/search/a-star.hpp>
 #include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/graph/search/kahn.hpp>
 #include <celaeno/graph/search/zig-zag.hpp>
+#include <celaeno/graph/search/aps.hpp>
 
 #include <celaeno/heuristics/chebyshev.hpp>
 #include <celaeno/heuristics/manhattan.hpp>
+
+#include <celaeno/graph/operations/balance/crossings.hpp>
+
+// TODO Remove
+#include <celaeno/graph/operations/balance/outgoing.hpp>
+#include <celaeno/graph/operations/count/crossings.hpp>
 
 // Using namespace {{{
 using namespace celaeno::fun::fn;
@@ -74,9 +82,8 @@ namespace rg = ranges;
 
 namespace ns_graph = celaeno::graph;
 namespace ns_draw = celaeno::graph::draw;
-namespace ns_grid = celaeno::graph::representations::grid;
 namespace ns_heuristics = celaeno::heuristics;
-namespace ns_reader = celaeno::graph::reader::verilog;
+namespace ns_io = celaeno::graph::io::verilog;
 namespace ns_search = celaeno::graph::search;
 namespace ns_views = celaeno::graph::views;
 // }}}
@@ -102,18 +109,6 @@ using Cycles = std::vector<Node>;
 using Placement = std::map<Node,Tile>;
 using Occupation = std::set<Tile>;
 // }}}
-
-// fn: edges_to_nodes {{{
-Nodes edges_to_nodes(Edges const& edges)
-{
-  Nodes nodes;
-
-  for( auto&& e : edges ){ nodes.push_back(e.first); }
-
-  nodes.push_back(edges.back().second);
-
-  return nodes;
-} // fn: edges_to_nodes }}}
 
 // fn: e_bfs {{{
 template<typename F = std::function<bool(Edge)>>
@@ -351,46 +346,144 @@ Nodes p_bfs(Edge src, F f_adjacent)
 
 } // fn: p_bfs }}}
 
+// fn: complete_dummy_edges {{{
+template<SignedIntegral I>
+void complete_dummy_edges(I root, Ops const& ops)
+{
+  // Create a node-layer view
+  auto [m_layer_nodes, m_node_layer] {ns_views::depth::run(root, ops.preds, ops.succs)};
+
+  auto f_dist_x = [&
+    , &m_node_layer=m_node_layer
+    , &m_layer_nodes=m_layer_nodes
+  ](Node u, Node v)
+  {
+    // Get layer of u and v
+    u64 u_layer{m_node_layer.at(u)};
+    u64 v_layer{m_node_layer.at(v)};
+
+    // Get layers of u and v
+    auto&& u_rng{m_layer_nodes.at(u_layer)};
+    auto&& v_rng{m_layer_nodes.at(v_layer)};
+
+    // Get index of u and v
+    auto u_idx{fn(u_rng).count_while([&](Node w){ return w != u; })};
+    auto v_idx{fn(v_rng).count_while([&](Node w){ return w != v; })};
+
+    // Adjust to point to u and v
+    ++u_idx;
+    ++v_idx;
+
+    // Return the absolute diference of indices
+    return fp::abs_diff(u_idx,v_idx);
+  };
+
+  // Steps to link cycle
+  // 1. A node u has a predecessor v
+  // 2. Node v has a successor w != u
+  // 3. ∄ edge u -- w
+  // 4. Link u -- w
+
+  auto f_make_complete = [&](Node u) -> bool
+  {
+    bool is_modified{false};
+
+    // 1. Get preds of u
+    auto u_preds{ops.preds(u)};
+
+    for (auto v : u_preds)
+    {
+      // 2. Get successors of v
+      auto v_succs{ops.succs(v)};
+
+      // 2. Remove u
+      v_succs = fn(v_succs).keep([&](Node w){ return w != u; }).vec();
+
+      if( v_succs.empty() ){ continue; }
+
+      // Get the successor closest to u
+      v_succs = fn(v_succs).sort({},[&](Node w){ return f_dist_x(w,u); }).vec();
+
+      auto w{v_succs.at(0)};
+
+      // 3. Check if edge u -- w ∄
+      if( ! ops.adj(u,w) && ! ops.adj(w,u) )
+      {
+        is_modified = true;
+
+        // Link u -- w
+        ops.link(u,w);
+
+        fmt::print("Inserted edge: {} -- {}\n", u, w);
+
+      } // if
+
+    } // for
+
+    return is_modified;
+  };
+
+  // Populate a queue with all nodes
+  std::queue<I> q;
+  auto kahn{ns_search::kahn::run(root,ops.preds,ops.succs)};
+  for( Node u : kahn ){ q.push(u); }
+
+  fmt::print("kahn: {}\n", kahn);
+
+  while( ! q.empty() )
+  {
+    auto u{q.front()}; q.pop();
+
+    (void) f_make_complete(u);
+
+  } // while
+
+  for (auto nodes : m_layer_nodes)
+  {
+    fmt::print("Nodes: {}\n", nodes);
+  } // for
+
+
+} // fn: complete_dummy_edges }}}
+
 // fn: minimal_basis {{{
 template<SignedIntegral I>
 [[nodiscard]] decltype(auto) minimal_basis(I root, Ops const& ops)
 {
   // Initial path
-  Edges ipath;
+  Edges path;
 
   // Initial cycle
   Cycles zz_c;
 
   // Run zig-zag until it founds a cycle
-  auto zz_o{ns_search::zig_zag::run(root,ops,ipath,zz_c
+  auto zz_o{ns_search::zig_zag::run(root,ops,path,zz_c
     , [&](auto){ return ! zz_c.empty(); }
   )};
 
   // Get first incident cycle
-  auto inodes{fn(ipath)
+  auto nodes{fn(path)
     .as([](Edge e){ return e.first; })
-    .chain(Nodes{ipath.back().second})
+    .chain(Nodes{path.back().second})
     .unique()
     .vec()
   };
 
   // Initial nodes
-  inodes = incident_cycle(inodes);
-
-  err::info()("inodes: {}", inodes);
+  nodes = incident_cycle(nodes);
 
   // Initial edges
-  ipath = fp::overlapping_pairs(inodes);
+  path = fp::overlapping_pairs(nodes);
+
+  fmt::print("nodes: {}\n", nodes);
+  fmt::print("path: {}\n", path);
 
   // Keep track of visited edges
   std::set<Edge> visited;
 
-  // Check if an edge is in visited set
-  auto f_contains =
-  [&]<typename... E>(E&&... e) -> bool
-  {
-    return (visited.contains(e) || ...);
-  };
+  // Get articulation points
+  auto aps{fn(ns_search::aps::run(root,ops.preds,ops.succs)).set()};
+  fmt::print("APS: {}\n", aps);
 
   // Get neighboring edges, given a node u
   auto f_neighbors = [&](Node u) -> Nodes
@@ -407,48 +500,42 @@ template<SignedIntegral I>
     return fn(ops.preds(u)).chain<Nodes>(ops.succs(u)).size();
   };
 
-  // Given an edge [u,v], if there are edges adjacent of u and v, such that they
-  // are not in visited set, return them
-  auto f_not_in_adjacent = [&]<typename F>(Node u, F f) -> Edges
-  {
-    auto edges{fn(f(u))
-      .as([u=u](Node w){ return Edge{u,w}; })
-      .keep([&](Edge f){ return ! f_contains(f); })
-      .vec()
-    };
+  // Check if a node is leaf
+  auto f_node_is_leaf = [&](Node u){ return f_degree(u) == 1; };
 
-    return fn(edges).keep(
-      [&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); }
-    )
-    .vec();
-  };
+  // Check if an edge is leaf
+  auto f_edge_is_leaf = [&](Edge e){ return f_node_is_leaf(e.first) or f_node_is_leaf(e.second); };
 
   // Return adjacent edges if both endpoints of edge 'e', has adjacent edges such
   // that they were not yet visited
-  auto f_adjacent = [&](Edge e) -> Edges
+  auto f_filter_neighbors = [&](Edge e) -> Edges
   {
-    auto r1{f_not_in_adjacent(e.first,f_neighbors)};
+    auto [u,v] = e;
 
-    // if( r1.empty() ){ return {}; }
+    // For u and v, get neighboring edges which are
+    // - Unvisited
+    // - Not leafs
+    auto r1{fn(f_neighbors(u))
+      .as([u=u](Node w){ return Edge{u,w}; })
+      .keep([&](Edge f){ return ! visited.contains(f); })
+      .keep([&](Edge f){ return ! f_edge_is_leaf(f); })
+      .vec()
+    };
 
-    auto r2{f_not_in_adjacent(e.second,f_neighbors)};
+    auto r2{fn(f_neighbors(v))
+      .as([v=v](Node w){ return Edge{v,w}; })
+      .keep([&](Edge f){ return ! visited.contains(f); })
+      .keep([&](Edge f){ return ! f_edge_is_leaf(f); })
+      .vec()
+    };
 
-    // if( r2.empty() ){ return {}; }
+    // If either of [u,v] endpoins are empty, return empty
+    if( r1.empty() or r2.empty() )
+    {
+      return {};
+    } // else if
 
-    // Filter out ones in visited
-    // Filter out ones with leaves
-    return fn(r1)
-      .chain(r2)
-      .dif(visited)
-      .keep([&](Edge e){ return (f_degree(e.first) > 1) && (f_degree(e.second) > 1); })
-      .vec();
-  };
-
-  // Remove edge from visited set
-  auto f_rm_visited = [&](Edge e)
-  {
-    visited.erase(e);
-    visited.erase(Edge{e.second,e.first});
+    return fn(r1).chain(r2).vec();
   };
 
   // Add edge to visited set
@@ -458,39 +545,74 @@ template<SignedIntegral I>
     visited.insert(Edge{e.second,e.first});
   };
 
-  // Conditionally visit edges, returns unvisited ones
-  auto f_visit = [&](Edges const& edges) -> Edges
+  // Get edges from an articulation point
+  auto f_get_ap_edges = [&]<Range R>(R&& r, Node u) -> Edges
   {
-    // Visit all edges
-    (void) fn(edges).ply([&](Edge e){ f_add_visited(e); });
+    // Check if u is ap
+    if( aps.contains(u) )
+    {
+      // Get neighbors of u
+      // As edges uv
+      // Which are not part of current cycle
+      // Which are not visited
+      // Which are not leaves
+      return fn(f_neighbors(u))
+        .as([&](Node v){ return Edge{u,v}; })
+        .keep([&](Edge e){ return ! fn(r).has(e); })
+        .keep([&](Edge e){ return ! visited.contains(e); })
+        .keep([&](Edge e){ return ! f_edge_is_leaf(e); })
+        .vec();
+    } // if
+
+    return {};
+  };
+
+  // Conditionally visit edges, returns unvisited ones
+  auto f_to_explore = [&](Edges const& edges) -> std::set<Edge>
+  {
+    // fmt::print("-- Edges: {}\n", edges);
 
     // Save unvisited
     Edges unvisited;
 
-    // Given an edge uv, save unvisited adjacent edges uw,vx
+    // Check edges to visit
     for( Edge e : edges )
     {
-      auto adjacent{f_adjacent(e)};
-
-      fmt::print("1. e: {} Adjacent: {}\n", e, adjacent);
-
-      fmt::print("2. e: {} Adjacent: {}\n", e, adjacent);
+      // Get neighbor edges of both endpoints, which are:
+      // - Not visited
+      // - Not leaves
+      // - not part of current path
+      Edges neighbor{f_filter_neighbors(e)};
 
       // At least one endpoint had no unvisited neighbors
-      if( adjacent.size() == 0 ){ continue; }
-
-      // If both endpoints of e, uv, have unvisited edges, then e is unvisited
-      if( fn(adjacent).unique([&](Edge e1, Edge e2){ return e1.first == e2.first; }).vec().size() > 2 )
+      if( neighbor.empty() )
       {
-        f_rm_visited(e);
-        unvisited.push_back(e);
-      } // if
+        // Check if at least one endpoint is ap
+        auto [u,v] = e;
 
-      // Save unvisited adjacent edges
-      for( Edge f : adjacent ){ unvisited.push_back(f); }
+        if( aps.contains(u) or aps.contains(v) )
+        {
+          // If u or v are aps, get neighboring edges
+          // Push into unvisited
+          fn(f_get_ap_edges(edges,u))
+            .chain(f_get_ap_edges(edges,v))
+            .ply([&](Edge f){ unvisited.push_back(f); })
+            .discard();
+        } // if
+
+      } // if
+      else
+      {
+        // // Mark e as visited
+        // f_add_visited(e);
+
+        unvisited.push_back(e);
+      } // else
     } // for
 
-    return unvisited;
+    // fmt::print("-- unvisited: {}\n", unvisited);
+
+    return fn(unvisited).set();
   };
 
   // Use a queue to define the order to detect adjacent cycles
@@ -499,21 +621,20 @@ template<SignedIntegral I>
   // Minimal basis paths
   std::vector<std::vector<Nodes>> basis;
 
-  // Verify when to switch to next basis vector
-  std::set<Edge> v_edges;
-
-  // Push unvisited edges to queue
-  for( auto e : f_visit(ipath) )
-  {
-    err::info()("Unvisited {}\n", e);
-    q.push_back(e);
-  }
+  // Mark edges not in queue as visited
+  for( auto e : f_to_explore(path) ){ q.push_back(e); }
 
   // Current head of subsolution
-  Nodes head{inodes};
+  Nodes head{nodes};
 
   // Next heads of subsolutions
   std::queue<Nodes> q_heads;
+
+  q_heads.push(nodes);
+
+  fmt::print("-- Initial visited: {}\n", visited);
+
+  i64 iteration{};
 
   // Keep searching for cycles while q is not empty
   while( ! q.empty() )
@@ -521,43 +642,72 @@ template<SignedIntegral I>
     // Search next cycle from edge e[u,v]
     auto e{q.front()}; q.pop_front();
 
-    if( visited.contains(e) ){ continue; }
-
-    err::info()("Search from {} → {}\n", e.first, e.second);
+    if( ! visited.contains(e) )
+    {
+      // Mark e as visited
+      f_add_visited(e);
+    } // if
+    else
+    {
+      continue;
+    } // else
 
     // Create pairs to check novel edges for unvisited neighbors
-    auto nodes{p_bfs(e,[&](Edge e){ return f_adjacent(e); })};
+    nodes = p_bfs(e,[&](Edge e){ return f_filter_neighbors(e); });
 
-    // Include in solution
-    // If no intersection is found between current path and head, make previous
-    // path the new head and add nodes
-    if( fn(fp::nub(nodes)).in(fp::nub(head)).vec().size() < 2 )
+    fmt::print("-- e: {}\n", e);
+
+    fmt::print("-- Visited: {}\n", visited);
+
+    fmt::print("-- adjacent: {}\n", nodes);
+
+    if( nodes.empty() ){ continue; }
+
+    if( iteration != 0 )
     {
-      do
+      // Get intersection of old and new cycle
+      auto intersection{fn(fp::nub(nodes)).in(fp::nub(head)).set()};
+
+      // Check if a node in intersection is an articulation point
+      auto f_inter_is_ap = [&]{ return fn(intersection).any([&](Node w){ return aps.contains(w); }); };
+
+      // Backtrack on q_heads until a cycle intersects with current cycle
+      bool backtracked{false};
+
+      while( intersection.size() < 2 && ! f_inter_is_ap() )
       {
-        if( q_heads.empty() ){ break; }
+        backtracked = true;
+
+        err::err({ ! q_heads.empty() })("q_heads must not be empty");
+
         head = q_heads.front(); q_heads.pop();
-      } // do
-      while( fn(fp::nub(nodes)).in(fp::nub(head)).vec().size() < 2 );
 
-      basis.push_back({head});
+        intersection = fn(fp::nub(nodes)).in(fp::nub(head)).set();
+      } // while
 
+      if( backtracked )
+      {
+        basis.push_back({head});
+      } // if
+
+      // If the intersection is not an articulation point
       basis.rbegin()->push_back(nodes);
-
       q_heads.push(nodes);
     } // if
     else
     {
-      q_heads.push(nodes);
-      basis.rbegin()->push_back(nodes);
+      basis.push_back({nodes});
     } // else
 
-    // Mark cycle as visited
-    Edges next{f_visit(fp::overlapping_pairs(nodes))};
+    // Get next edges to explore
+    std::set<Edge> next{f_to_explore(fp::overlapping_pairs(nodes))};
+
+    fmt::print("-- Unvisited: {}\n", next);
 
     // Enqueue unvisited edges
-    for( auto f : next ){ q.push_back(f); v_edges.insert(f); }
+    for( auto f : next ){ q.push_back(f); }
 
+    ++iteration;
   } // while
 
   return basis;
@@ -679,7 +829,11 @@ struct State
   bool b_backtracking;
 
   State()
-    : b_reversed{false}
+    : slice()
+    , m_backtrack()
+    , placed()
+    , unplaced()
+    , b_reversed{false}
     , b_backtracking{false}
   {}
 };
@@ -947,7 +1101,6 @@ bool place(Ops const& ops
   );
 } // fn: place }}}
 
-// fn: global_backtracking {{{
 decltype(auto) global_backtracking(Ops const& ops)
 {
   // Solution
@@ -958,23 +1111,15 @@ decltype(auto) global_backtracking(Ops const& ops)
 
   for (auto const& base : basis)
   {
-    fmt::print("-- Base: {}\n", base);
+    err::info()("-- Base: {}\n", base);
   } // for
+
+  return placement;
 
   // Calculate graph depth-view
   auto depth_view{ns_views::depth::run(0,ops.preds,ops.succs).nl};
 
-  // Maintain a stacks of unfinished and finished sub-basis
-  std::stack<std::pair<Nodes,Nodes>> unfinished, finished;
-
-  // Maintain a stack of previous states of placed cycles
-  std::stack<State> stack_states;
-
-  // Maintain a stack of previous solutions
-  std::stack<Placement> stack_placement;
-
-  // Push initial empty solution to stack
-  stack_placement.push(placement);
+  std::stack<std::pair<Nodes,Nodes>> unfinished;
 
   // Move values to unfinished
   for (auto it1{basis.begin()}; it1 != basis.end(); ++it1)
@@ -983,6 +1128,12 @@ decltype(auto) global_backtracking(Ops const& ops)
     {
       // Calculate intersection with head cycle
       Nodes intersection{fn(fn(it1->at(0)).in(*it2).vec()).sort().unique().vec()};
+
+      if( it1 == basis.begin() && it2 == std::next(it1->begin()) )
+      {
+        placement = place_intersection(intersection,false);
+      } // if
+
       // Place intersection and cycle in stack
       unfinished.push(std::make_pair(intersection, *it2));
     } // for
@@ -995,85 +1146,253 @@ decltype(auto) global_backtracking(Ops const& ops)
     unfinished = stack_rev;
   }
 
-  bool b_backtracking{false};
-
   while( ! unfinished.empty() )
   {
-    if( placement.empty() )
-    {
-      auto fst{basis.at(0).at(0)};
-      auto snd{basis.at(0).at(1)};
-
-      auto intersection{fn(fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
-
-      placement = place_intersection(intersection, b_backtracking);
-
-      State state;
-
-      auto result{place(ops,placement,depth_view,intersection,fst,Partition::R,state)};
-
-      if( ! result )
-      {
-        err::err()("Failure to find a feasible solution at first incident cycle");
-      } // if
-    } // if
-
-    // Get next element
-    auto sub{unfinished.top()};
-
-    // Get intersection
-    auto const& [i,p] = std::tie(sub.first,sub.second);
-
-    // Generate a new state for possible backtracking
     State state;
 
-    if( b_backtracking )
-    {
-      state = stack_states.top();
-      stack_states.pop();
-      state.b_backtracking = true;
-      placement = stack_placement.top();
-      stack_placement.pop();
-    } // if
-    else
-    {
-      stack_placement.push(placement);
-    } // else
+    auto [i,p] = unfinished.top(); unfinished.pop();
 
-    // Perform placement based on intersection
-    auto result{place(ops,placement,depth_view,i,p,Partition::L,state)};
 
-    // If operation was successful
-    // - Include top of unfinished stack in finished stack
-    // - Pop unfinished stack
-    // - Add state to stack of states
-    // - Set backtracking flag to false
-    if( result )
+    fmt::print("Placement Before\n");
+    for (auto p : placement)
     {
-      finished.push(sub);
-      unfinished.pop();
-      stack_states.push(std::move(state));
-      b_backtracking = false;
-    } // if
-    // Otherwise, backtrack
-    // - Pop current placement from stack
-    // - Include top of finished stack in unfinished
-    // - Pop finished stack
-    // - Set b_backtracking to true
-    else
+      fmt::print("{}\n", p);
+    } // for
+    fmt::print("\n");
+
+    bool result{place(ops,placement,depth_view,i,p,Partition::L,state)};
+
+    fmt::print("Placement After\n");
+    for (auto p : placement)
     {
-      err::err({ ! finished.empty() })("Failure to find a feasible solution");
-      stack_placement.pop();
-      unfinished.push(finished.top());
-      finished.pop();
-      b_backtracking = true;
-    } // else
+      fmt::print("{}\n", p);
+    } // for
+    fmt::print("\n");
+
+
+    if( ! result ){ err::err()("Failed"); }
   } // while
 
   return placement;
-} // function: global_backtracking
 
-// fn: global_backtracking }}}
+} // fn: global_backtracking
+
+// // fn: global_backtracking {{{
+// decltype(auto) global_backtracking(Ops const& ops)
+// {
+//   // Solution
+//   Placement placement;
+//
+//   // Get minimal basis
+//   auto basis{minimal_basis(i64{},ops)};
+//
+//   for (auto const& base : basis)
+//   {
+//     err::info()("-- Base: {}\n", base);
+//   } // for
+//
+//   // Calculate graph depth-view
+//   auto depth_view{ns_views::depth::run(0,ops.preds,ops.succs).nl};
+//
+//   // Maintain a stacks of unfinished and finished sub-basis
+//   std::stack<std::pair<Nodes,Nodes>> unfinished, finished;
+//
+//   // Maintain a stack of previous states of placed cycles
+//   std::stack<State> stack_states;
+//
+//   // Maintain a stack of previous solutions
+//   std::stack<Placement> stack_placement;
+//
+//   std::stack<std::pair<Placement,State>> stack_placement_state;
+//
+//   // Move values to unfinished
+//   for (auto it1{basis.begin()}; it1 != basis.end(); ++it1)
+//   {
+//     for (auto it2{std::next(it1->begin())}; it2 != it1->end(); ++it2)
+//     {
+//       // Calculate intersection with head cycle
+//       Nodes intersection{fn(fn(it1->at(0)).in(*it2).vec()).sort().unique().vec()};
+//       // Place intersection and cycle in stack
+//       unfinished.push(std::make_pair(intersection, *it2));
+//     } // for
+//   } // for
+//
+//   // Reverse unfinished stack
+//   {
+//     std::stack<std::pair<Nodes,Nodes>> stack_rev;
+//     while( ! unfinished.empty() ){ stack_rev.push(unfinished.top()); unfinished.pop(); }
+//     unfinished = stack_rev;
+//   }
+//
+//   bool b_backtracking{false};
+//
+//   err::info()("-- Started global backtracking...\n");
+//
+//   // Place intersection and first cycle
+//   {
+//     auto fst{basis.at(0).at(0)};
+//     auto snd{basis.at(0).at(1)};
+//
+//     auto intersection{fn(fn(fst).in<Nodes>(snd)).sort().unique<Nodes>()};
+//
+//     // Push initial cycle
+//     unfinished.push(std::make_pair(intersection,fst));
+//   } // if
+//
+//   // Generate a new state for possible backtracking
+//   State state;
+//
+//   // Get next element
+//   auto sub{unfinished.top()};
+//
+//   while( ! unfinished.empty() )
+//   {
+//     // Get intersection
+//     auto const& [i,p] = std::tie(sub.first,sub.second);
+//
+//     err::info()("-- Started placement...\n");
+//
+//     err::info()("-- Intersection: {}\n", i);
+//     err::info()("-- Nodes to position: {}\n", p);
+//
+//     fmt::print("Placement Before\n");
+//     for (auto p : placement)
+//     {
+//       fmt::print("{}\n", p);
+//     } // for
+//     fmt::print("\n");
+//
+//     if( b_backtracking )
+//     {
+//       b_backtracking = false;
+//       state.b_backtracking = true;
+//     } // if
+//
+//     Placement placement_prev{placement};
+//
+//     auto print_stack = []<typename S>(S s)
+//       requires requires(S t){ t.top(); }
+//       && requires(S t){ t.pop(); }
+//       && requires(S t){ t.empty(); }
+//     {
+//       while ( ! s.empty() )
+//       {
+//         auto e{s.top()}; s.pop();
+//         fmt::print("{}, ", e);
+//       } // while
+//     };
+//
+//
+//     fmt::print("----------\nState prev:\n");
+//     fmt::print("b_backtracking: {}\n", state.b_backtracking);
+//     fmt::print("b_reversed: {}\n", state.b_reversed);
+//     fmt::print("m_backtrack: {}\n", state.m_backtrack);
+//     fmt::print("placed: "); print_stack(state.placed);
+//     fmt::print("\nunplaced: "); print_stack(state.unplaced);
+//     fmt::print("\nslice: {}\n", state.slice);
+//     fmt::print("----------\n");
+//
+//     // Perform placement based on intersection
+//     bool result{place(ops,placement,depth_view,i,p,Partition::L,state)};
+//
+//     fmt::print("----------\nState after:\n");
+//     fmt::print("b_backtracking: {}\n", state.b_backtracking);
+//     fmt::print("b_reversed: {}\n", state.b_reversed);
+//     fmt::print("m_backtrack: {}\n", state.m_backtrack);
+//     fmt::print("placed: "); print_stack(state.placed);
+//     fmt::print("\nunplaced: "); print_stack(state.unplaced);
+//     fmt::print("\nslice: {}\n", state.slice);
+//     fmt::print("----------\n");
+//
+//     err::info()("-- Finished placement...\n");
+//
+//     if( result )
+//     {
+//       err::info()("-- Success\n");
+//     } // if
+//     else
+//     {
+//       err::info()("-- Failure\n");
+//     } // else
+//
+//
+//     fmt::print("Placement After\n");
+//     for (auto p : placement)
+//     {
+//       fmt::print("{}\n", p);
+//     } // for
+//     fmt::print("\n");
+//
+//     // If operation was successful
+//     // - Include top of unfinished stack in finished stack
+//     // - Pop unfinished stack
+//     // - Add state to stack of states
+//     // - Set backtracking flag to false
+//     if( result )
+//     {
+//       err::err({ ! unfinished.empty() })("Unfinished stack must not be empty!");
+//
+//       // Save new solution
+//       stack_placement_state.push(std::make_pair(placement_prev,state));
+//
+//       // Push top of unfinished stack to finished stack
+//       finished.push(sub);
+//
+//       // Pop unfinished stack
+//       unfinished.pop();
+//
+//       // Reset state
+//       state = {};
+//
+//       if( ! unfinished.empty() )
+//       {
+//         // Get next intersection and cycle
+//         sub = unfinished.top();
+//       } // if
+//
+//     } // if
+//     // Otherwise, backtrack
+//     // - Pop current placement from stack
+//     // - Include top of finished stack in unfinished
+//     // - Pop finished stack
+//     else
+//     {
+//       err::info()("-- Backtracking!!!!!!!!!...\n");
+//
+//       err::err({ ! stack_placement_state.empty() })("placement_state stack must not be empty!");
+//
+//       err::err({ ! finished.empty() })("Finished stack must not be empty!");
+//
+//       // Discard current solution, since new solution from it is not viable
+//       stack_placement_state.pop();
+//
+//       // Get previous placement and state
+//       std::tie(placement,state) = stack_placement_state.top();
+//
+//       // Set state to backtracking mode
+//       state.b_backtracking = true;
+//
+//       // Push top of finished stack top of unfinished stack
+//       unfinished.push(finished.top());
+//
+//       // Pop finished stack
+//       finished.pop();
+//
+//       // Update next element
+//       sub = unfinished.top();
+//
+//       b_backtracking = true;
+//
+//     } // else
+//
+//   } // while
+//
+//   err::info()("-- Finished global backtracking...\n");
+//
+//   return placement;
+// } // function: global_backtracking
+//
+// // fn: global_backtracking }}}
 
 // fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
@@ -1081,26 +1400,59 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Read graph
   ns_graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-  auto metadata {ns_reader::Reader{argv[1],emplace}};
+  auto metadata {ns_io::Reader{argv[1],emplace}};
 
   // Helpers
   auto f_p = [&g](auto v){ return g.predecessors(v); };
   auto f_s = [&g](auto v){ return g.successors(v); };
   auto f_a = [&g](auto u, auto v){ return g.adjacent(u,v); };
-  auto f_l = [&g](auto e){ g.emplace(e); };
-  auto f_u = [&g](auto e){ g.erase(e); };
+  auto f_l = [&g](auto u, auto v){ g.emplace(std::make_pair(u,v)); };
+  auto f_u = [&g](auto u, auto v){ g.erase(std::make_pair(u,v)); };
 
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u);
 
+  ns_io::Writer(metadata.data(), f_p, f_s, "0-out.v");
+
+  celaeno::graph::operations::balance::outgoing::run(0,ops);
+
+  ns_io::Writer(metadata.data(), f_p, f_s, "1-out.v");
+
+  celaeno::graph::operations::balance::paths::run(0,ops);
+
+  ns_io::Writer(metadata.data(), f_p, f_s, "2-out.v");
+
+  celaeno::graph::operations::balance::crossings::run(0,ops);
+
+  ns_io::Writer(metadata.data(), f_p, f_s, "3-out.v");
+
+  // complete_dummy_edges(0, ops);
+  //
+  // ns_io::Writer(metadata.data(), f_p, f_s, "4-out.v");
+
+  // celaeno::graph::operations::balance::paths::run(0,ops);
+  //
+  // ns_io::Writer(metadata.data(), f_p, f_s, "4-out.v");
+
   fmt::print("Graph:\n");
-  for (auto const& e : g.data())
+  for (auto e : g.data())
   {
-    fmt::print("-- {}\n", e);
+    fmt::print("{}\n", e);
   } // for
 
+  // return 0;
+
   // Perform placement
-  Placement placement{global_backtracking(ops)};
+  std::cerr << "Started computation\n";
+  auto start {std::chrono::system_clock::now()};
+  Placement placement {global_backtracking(ops)};
+  auto end {std::chrono::system_clock::now()};
+  std::cerr << "Finished computation\n";
+  std::chrono::duration<f64> dur {end-start};
+  std::stringstream ss; ss << dur.count();
+
+  fmt::print("Circuit: {}\n", argv[1]);
+  fmt::print("Time(s): {}\n", ss.str());
 
   // Offset coordinates to remove negative values
   auto x_min{rg::min_element(placement,{},[](auto e){ return e.second.first; })->second.first};

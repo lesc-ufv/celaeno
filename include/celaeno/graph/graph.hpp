@@ -72,8 +72,8 @@ class Ops
   using Preds = std::function<std::vector<i64>(i64)>;
   using Succs = std::function<std::vector<i64>(i64)>;
   using Adj = std::function<bool(i64,i64)>;
-  using Link = std::function<void(std::pair<i64,i64>)>;
-  using Unlink = std::function<void(std::pair<i64,i64>)>;
+  using Link = std::function<void(i64,i64)>;
+  using Unlink = std::function<void(i64,i64)>;
 
   public:
     Preds preds;

@@ -30,10 +30,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <vector>
+#include <set>
+
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
 #include <fmt/ranges.h>
 #include <range/v3/all.hpp>
+
+#pragma once
 
 // namespace celaeno::fun {{{
 namespace celaeno::fun
@@ -88,6 +93,12 @@ struct Fun
     return rg::count_if(view,f);
   }
 
+  template<typename F>
+  [[nodiscard]] size_t count_while(F&& f)
+  {
+    return this->take_while(f).vec().size();
+  }
+
   template<typename F = std::less<>, typename P = ranges::identity>
   [[nodiscard]] auto max(F&& f = {}, P&& p = {})
   {
@@ -101,6 +112,12 @@ struct Fun
   }
 
   template<typename F>
+  [[nodiscard]] auto any(F&& f)
+  {
+    return rg::any_of(view,f);
+  }
+
+  template<typename F>
   [[nodiscard]] auto group(F&& f)
   {
     auto it{rg::partition(view,f)};
@@ -111,6 +128,13 @@ struct Fun
   {
     return view | rg::to<std::vector>;
   }
+
+  [[nodiscard]] auto set()
+  {
+    return view | rg::to<std::set>;
+  }
+
+  void discard() { return; }
 
   // Print
   template<typename T>
