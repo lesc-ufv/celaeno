@@ -63,7 +63,6 @@ using namespace celaeno::aliases;
 // namespaces {{{
 namespace rg = ranges;
 namespace ra = ranges::actions;
-namespace rv = ranges::views;
 namespace fp = fplus;
 namespace ns_views = celaeno::graph::views;
 namespace barycenter = celaeno::heuristics::barycenter;
@@ -72,7 +71,7 @@ namespace ccrossings = celaeno::graph::operations::count::crossings;
 // }}}
 
 // fn: reverse {{{
-template<Matrix M>
+template<typename M>
 [[nodiscard]] decltype(auto) reverse(M&& m)
 {
   using matrix_t = typename std::decay_t<M>;
@@ -113,7 +112,7 @@ template<typename C, typename L>
 } // function: bor }}}
 
 // fn: ror {{{
-template<Matrix M, Range L>
+template<typename M, Range L>
 std::optional<std::pair<std::decay_t<M>,std::decay_t<L>>> ror(M m, L col_layer)
 {
   // Get column matrix
@@ -143,7 +142,7 @@ std::optional<std::pair<std::decay_t<M>,std::decay_t<L>>> ror(M m, L col_layer)
 } // function: ror }}}
 
 // fn: roc {{{
-template<Matrix M, Range L>
+template<typename M, Range L>
 std::optional<std::pair<std::decay_t<M>,std::decay_t<L>>> roc(M m, L row_layer)
 {
   // Check if any swap occurred
@@ -190,7 +189,7 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
   auto layers = fp::overlapping_pairs(fp::numbers({},layer_count));
 
   auto impl_phase_1 =
-  [&]<Matrix M>(M m0, auto& l1, auto &l2)
+  [&]<typename M>(M m0, auto& l1, auto &l2)
   {
     while(true)
     {

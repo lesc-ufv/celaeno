@@ -61,8 +61,8 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
   requires CallableWith<N1,i64>
   && CallableWith<N2,i64>
   && CallableWith<N3,i64,i64>
-  && CallableWith<E1,std::pair<i64,i64>>
-  && CallableWith<E2,std::pair<i64,i64>>
+  && CallableWith<E1,i64,i64>
+  && CallableWith<E2,i64,i64>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)

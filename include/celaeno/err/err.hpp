@@ -10,6 +10,7 @@
 #include <set>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
@@ -93,9 +94,62 @@ class Location
     , [[maybe_unused]] Args&&... args )
   {
 #ifdef DEBUG
-      spdlog::info(loc.get() + std::forward<M>(m), std::forward<Args>(args)...);
+    spdlog::info(loc.get() + std::forward<M>(m), std::forward<Args>(args)...);
 #endif // DEBUG
   }; // anonymous lambda
 } // fn: info }}}
+
+
+class Fold
+{
+  private:
+    std::shared_ptr<spdlog::logger> logger;
+
+  public:
+    Fold(std::shared_ptr<spdlog::logger> src)
+      : logger(src)
+    {
+      logger->info("{{{{{{");
+    } // Fold
+
+    ~Fold()
+    {
+      logger->info("}}}}}}");
+    } // ~Fold
+}; // struct: Fold
+
+class Log
+{
+  private:
+    char const * const log_filename;
+    std::shared_ptr<spdlog::logger> logger;
+
+  public:
+    Log()
+      : log_filename("celaeno.log")
+      , logger(spdlog::basic_logger_st("celaeno", log_filename, true))
+    {
+      logger->info("{{{");
+    }
+
+    ~Log()
+    {
+      logger->info("}}}");
+    }
+
+    decltype(auto) info([[maybe_unused]] Location const& loc = {})
+    {
+      return [&]<String M, Printable... Args>(M&& m, Args&&... args)
+      {
+        logger->info(loc.get()+std::forward<M>(m), std::forward<Args>(args)...);
+      }; // anonymous lambda
+    } // fn: info
+
+    decltype(auto) fold()
+    {
+      return Fold{logger};
+    } // fold
+
+}; // class: Log
 
 } // namespace celaeno::err }}}
