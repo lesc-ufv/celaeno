@@ -42,6 +42,14 @@ set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
 
 # External libraries
+if(NOT pybind11_FOUND)
+  find_package(pybind11 REQUIRED)
+endif()
+
+if(NOT cppcoro_FOUND)
+  find_package(cppcoro REQUIRED)
+endif()
+
 if(NOT doctest_FOUND)
   find_package(doctest REQUIRED)
 endif()
@@ -54,8 +62,8 @@ if(NOT fmt_FOUND)
   find_package(fmt REQUIRED)
 endif()
 
-if(NOT functionalplus_FOUND)
-  find_package(functionalplus REQUIRED)
+if(NOT FunctionalPlus_FOUND)
+  find_package(FunctionalPlus REQUIRED)
 endif()
 
 if(NOT range-v3_FOUND)
