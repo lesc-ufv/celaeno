@@ -99,42 +99,57 @@ class Location
   }; // anonymous lambda
 } // fn: info }}}
 
-
+// class: Fold {{{
 class Fold
 {
   private:
     std::shared_ptr<spdlog::logger> logger;
 
   public:
-    Fold(std::shared_ptr<spdlog::logger> src)
+    Fold(std::shared_ptr<spdlog::logger> src, std::string const& suffix)
       : logger(src)
     {
-      logger->info("{{{{{{");
+      logger->info("{{{" + suffix);
     } // Fold
 
     ~Fold()
     {
-      logger->info("}}}}}}");
+      logger->info("}}}");
     } // ~Fold
-}; // struct: Fold
+}; // class: Fold }}}
 
-class Log
+// class: Logger {{{
+class Logger
 {
   private:
-    char const * const log_filename;
+    static char const * const log_filename;
     std::shared_ptr<spdlog::logger> logger;
 
   public:
-    Log()
-      : log_filename("celaeno.log")
-      , logger(spdlog::basic_logger_st("celaeno", log_filename, true))
+    Logger(std::shared_ptr<spdlog::logger> logger, Location const& loc = {})
+      : logger(logger)
     {
-      logger->info("{{{");
+      logger->info("{{{" + loc.get()); // }}}
+      logger->flush();
     }
 
-    ~Log()
+    Logger(Location const& loc = {})
+      : logger(spdlog::basic_logger_st("celaeno", log_filename, true))
     {
+      logger->info("{{{" + loc.get()); // }}}
+      logger->flush();
+    }
+
+    ~Logger()
+    {
+      // {{{
       logger->info("}}}");
+      logger->flush();
+    }
+
+    std::shared_ptr<spdlog::logger> sink()
+    {
+      return logger;
     }
 
     decltype(auto) info([[maybe_unused]] Location const& loc = {})
@@ -142,14 +157,21 @@ class Log
       return [&]<String M, Printable... Args>(M&& m, Args&&... args)
       {
         logger->info(loc.get()+std::forward<M>(m), std::forward<Args>(args)...);
+        logger->flush();
       }; // anonymous lambda
     } // fn: info
 
-    decltype(auto) fold()
+    decltype(auto) fold(Location const& loc = {})
     {
-      return Fold{logger};
+      return Fold{logger,loc.get()};
     } // fold
 
-}; // class: Log
+}; // class: Logger }}}
+
+// class: Logger {{{
+
+char const * const Logger::log_filename = "celaeno.log";
+
+// class: Logger }}}
 
 } // namespace celaeno::err }}}

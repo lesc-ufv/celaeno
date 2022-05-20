@@ -61,7 +61,9 @@ struct Fun
 {
   V view;
 
-  Fun(V v) : view(v) {}
+  Fun(V v)
+    : view(v)
+    {}
 
   // Terminators
   template<Range R, typename F = std::equal_to<> >
@@ -79,6 +81,16 @@ struct Fun
   [[nodiscard]] auto sum()
   {
     return rg::accumulate(view,0);
+  }
+
+  [[nodiscard]] auto pairs()
+  {
+    auto v{this->slide(2)
+      .as([](auto e){ return std::make_pair(e.at(0),e.at(1)); })
+      .vec()
+    };
+
+    return Fun<decltype(v)>(v);
   }
 
   template<typename T>
@@ -103,6 +115,12 @@ struct Fun
   [[nodiscard]] auto max(F&& f = {}, P&& p = {})
   {
     return *rg::max_element(view,f,p);
+  }
+
+  template<typename F = std::less<>, typename P = ranges::identity>
+  [[nodiscard]] auto min(F&& f = {}, P&& p = {})
+  {
+    return *rg::min_element(view,f,p);
   }
 
   template<typename F>
@@ -148,8 +166,11 @@ struct Fun
   template<typename F = std::less<>, typename P = ranges::identity>
   [[nodiscard]] auto sort(F&& f = {}, P&& p = {})
   {
-    rg::sort(view,f,p);
-    return *this;
+    auto elements{this->vec()};
+
+    rg::sort(elements,f,p);
+
+    return Fun<decltype(elements)>(elements);
   }
 
   [[nodiscard]] auto rot(int n)
@@ -159,12 +180,25 @@ struct Fun
     return *this;
   }
 
-  template<typename It>
+  template<ForwardIterator It>
   [[nodiscard]] auto rot(It it)
   {
     rg::rotate(view,it);
 
     return *this;
+  }
+
+  template<typename F>
+  [[nodiscard]] auto rot(F f)
+  {
+    auto v{this->vec()};
+
+    while( ! f(v) )
+    {
+      rg::rotate(v,v.begin()+1);
+    } // while
+
+    return Fun<decltype(v)>(v);
   }
 
   template<typename F>
@@ -177,18 +211,18 @@ struct Fun
   // Views {{{
 
   // fn: make_view {{{
-  template<typename Out = void, typename E>
-  [[nodiscard]] auto make_view(E e)
+  template<typename Out = void, typename T>
+  [[nodiscard]] auto make_view(T t)
   {
-    using Type = decltype(e);
+    using Type = decltype(t);
 
     if constexpr ( SameAs<Out,void> )
     {
-      return Fun<Type>(e);
+      return Fun<Type>(t);
     } // if
     else
     {
-      return e | rg::to<Out>;
+      return t | rg::to<Out>;
     } // else
   } // fn: make_view }}}
 
@@ -369,15 +403,15 @@ struct Fun
     return make_view<Out>(view | rv::reverse);
   } // fn: rev }}}
 
-  // fn: sliding {{{
+  // fn: slide {{{
   //
   // Places a sliding window of size n in current view
   //
   template<typename Out = void>
-  [[nodiscard]] auto sliding(int n)
+  [[nodiscard]] auto slide(int n)
   {
     return make_view<Out>(view | rv::sliding(n));
-  } // fn: sliding }}}
+  } // fn: slide }}}
 
   // fn: squash {{{
   //

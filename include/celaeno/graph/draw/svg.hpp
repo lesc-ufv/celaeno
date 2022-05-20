@@ -156,6 +156,18 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
   std::stringstream edges;
 
   //Get farthest vertices to build viewport
+  auto min_box_x {rg::min_element(vertex_tile,{},
+  [](auto e) { return e.second.first; })->second.first};
+
+  auto min_box_y {rg::min_element(vertex_tile,{},
+  [](auto e) { return e.second.second; })->second.second};
+
+  for (auto& [v,t] : vertex_tile)
+  {
+    t.first += std::abs(min_box_x);
+    t.second += std::abs(min_box_y);
+  } // for
+
   auto view_box_x {rg::max_element(vertex_tile,{},
   [](auto e) { return e.second.first; })->second.first};
 

@@ -374,56 +374,57 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops)
   //   return u;
   // };
   //
+
   //
+  // Passtrough balancing dummies
   //
-  // // Passtrough balancing dummies
-  //
-  // // Check if a node is a balancing dummy
-  // auto f_is_balancing_dummy =
-  // [&](T u)
-  // {
-  //   return ops.preds(u).size() == 1 && ops.succs(u).size() == 1;
-  // };
-  //
-  // // Get nodes until they are not a balancing dummy
-  // auto f_get_not_balancing_dummy =
-  // [&]<typename F>(T u, F f)
-  // {
-  //   while( f_is_balancing_dummy(u) )
-  //   {
-  //     u = f(u).at(0);
-  //   }
-  //   return u;
-  // };
-  //
-  // for (auto& [dummy_cross,m_cross] : out)
-  // {
-  //   Cross<i64> m_new_cross;
-  //
-  //   for (auto& [parent,child] : m_cross)
-  //   {
-  //     i64 new_parent{parent};
-  //     i64 new_child{child};
-  //
-  //     if( f_is_balancing_dummy(parent) )
-  //     {
-  //       fmt::print("Parent {} is balancing dummy\n", parent);
-  //       new_parent = f_get_not_balancing_dummy(parent,ops.preds);
-  //       fmt::print("new_parent: {}\n", new_parent);
-  //     } // if
-  //
-  //     if( f_is_balancing_dummy(child) )
-  //     {
-  //       fmt::print("Child {} is balancing dummy", child);
-  //       new_child = f_get_not_balancing_dummy(child,ops.succs);
-  //       fmt::print("new_child: {}\n", new_child);
-  //     } // if
-  //
-  //     m_new_cross[new_parent] = new_child;
-  //   } // for
-  //
-  //   m_cross = m_new_cross;
-  // } // for
+
+  // Check if a node is a balancing dummy
+  auto f_is_balancing_dummy =
+  [&](T u)
+  {
+    return ops.preds(u).size() == 1 && ops.succs(u).size() == 1;
+  };
+
+  // Get nodes until they are not a balancing dummy
+  auto f_get_not_balancing_dummy =
+  [&]<typename F>(T u, F f)
+  {
+    while( f_is_balancing_dummy(u) )
+    {
+      u = f(u).at(0);
+    }
+    return u;
+  };
+
+  for (auto& [dummy_cross,m_cross] : out)
+  {
+    Cross<i64> m_new_cross;
+
+    for (auto& [parent,child] : m_cross)
+    {
+      i64 new_parent{parent};
+      i64 new_child{child};
+
+      if( f_is_balancing_dummy(parent) )
+      {
+        fmt::print("Parent {} is balancing dummy\n", parent);
+        new_parent = f_get_not_balancing_dummy(parent,ops.preds);
+        fmt::print("new_parent: {}\n", new_parent);
+      } // if
+
+      if( f_is_balancing_dummy(child) )
+      {
+        fmt::print("Child {} is balancing dummy", child);
+        new_child = f_get_not_balancing_dummy(child,ops.succs);
+        fmt::print("new_child: {}\n", new_child);
+      } // if
+
+      m_new_cross[new_parent] = new_child;
+    } // for
+
+    m_cross = m_new_cross;
+  } // for
 
 
   for (auto e : out)

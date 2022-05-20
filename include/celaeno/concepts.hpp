@@ -72,6 +72,12 @@ requires(U u) { { std::string{u} } -> std::same_as<std::string>; };
 
 // Ranges {{{
 template<typename T>
+concept ForwardIterator = std::forward_iterator<T>;
+
+template<typename T>
+concept InputIterator = std::input_iterator<T>;
+
+template<typename T>
 concept Range = std::ranges::range<T>;
 
 template<typename M, typename R = typename std::decay_t<M>::value_type::value_type>

@@ -45,7 +45,6 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/heuristics/manhattan.hpp>
 
 // TODO Remove
 #include <fmt/core.h>
@@ -114,12 +113,10 @@ std::deque<T> rebuild_path(T start, T end, Map const& m)
 } // fn: rebuild_path }}}
 
 // fn: run {{{
-template<typename T, typename F1, typename F2>
+template<typename T, typename F1, typename F2, typename F3>
 std::optional<std::deque<T>>
-  run(T start, T end, F1&& f_neighbors, F2&& f_constraints)
+  run(T start, T end, F1&& f_neighbors, F2&& f_constraints, F3&& f_heuristic)
 {
-  auto f_heuristic = [&](std::pair<i64,i64> n){ return ns_heuristics::manhattan::run(n,end); };
-
   // Open set in ascending order
   std::multimap<f64,T> open;
 
@@ -136,11 +133,11 @@ std::optional<std::deque<T>>
   std::map<T,T> mem;
 
   // Initialize open set and costs
-  open.emplace(f_heuristic(start), start);
+  open.emplace(f_heuristic(start,end), start);
   d_cost.emplace(start, 0);
 
-  // Save manhattan dist begin/end
-  auto dist_be{ns_heuristics::manhattan::run(start,end)};
+  // Save dist begin/end
+  auto dist_be{f_heuristic(start,end)};
 
   // Main loop
   while( ! open.empty() )
@@ -152,7 +149,7 @@ std::optional<std::deque<T>>
 
     // Stop algorithm if distance is 2 times greater than dist_be
     // TODO detect when algorithm is circlying around instead
-    if( ns_heuristics::manhattan::run(start,c) > dist_be*4 ){ break; }
+    if( f_heuristic(start,c) > dist_be*4 ){ break; }
 
     // fmt::print("Combined cost of {}: {}\n", c, cost);
 
@@ -187,7 +184,7 @@ std::optional<std::deque<T>>
 
         // Update combined cost
         // fmt::print("-- Cost of {} to {}: {} + {}\n", n, end, n_cost, f_heuristic(n));
-        open.emplace(n_cost+f_heuristic(n),n);
+        open.emplace(n_cost+f_heuristic(n,end),n);
       } // if
     } // for
   } // while

@@ -1,6 +1,6 @@
 # vim: set expandtab syntax=dockerfile fdm=marker ts=2 sw=2 tw=100 et :
 
-FROM alpine:latest
+FROM ubuntu:latest
 
 # Arguments
 ARG VIM
@@ -9,12 +9,11 @@ ARG DEBUG_SHOW_ALG
 ARG DEBUG_SHOW_HDL
 ARG OPT_SEQ
 
-# Install packages
-RUN apk add --no-cache build-base ninja make cmake \
-  clang git py3-pip bash clang-extra-tools nnn fish sudo
+RUN apt install -y build-essential ninja-build make cmake clang git python3-pip clang-tools \
+  nnn fish sudo
 
 # Opt vim install
-RUN if [[ ! -z "$VIM" ]] ; then apk add neovim nodejs npm; fi
+RUN if [[ ! -z "$VIM" ]] ; then apt install -y neovim nodejs npm; fi
 
 # Install conan with pip3
 RUN pip3 install -I conan
@@ -22,8 +21,9 @@ RUN pip3 install -I conan
 # Configure user
 ARG USER=user
 ENV HOME /home/$USER
-RUN addgroup -g 1000 $USER
-RUN adduser -u 1000 -G $USER -s /bin/fish -D $USER
+RUN mkdir /home/$USER
+RUN groupadd $USER
+RUN useradd -u 1000 -g $USER -s /bin/fish $USER
 RUN echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER && chmod 0440 /etc/sudoers.d/$USER
 ## Change to new user
 USER $USER
@@ -32,29 +32,28 @@ WORKDIR $HOME
 # Configure conan
 RUN conan profile new default --detect
 RUN conan profile update settings.compiler.libcxx=libstdc++11 default
-RUN conan remote add celaeno https://api.bintray.com/conan/ruanformigoni/celaeno
 
 # Configure project
 RUN git clone https://gitlab.com/formigoni/celaeno.git celaeno
 WORKDIR $HOME/celaeno
 RUN git checkout development
 
-# Install dependencies
-RUN mkdir build && cd build && conan install .. --build missing && cd ..
-
-# Configure project
-RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
-  && cp ./build/compile_commands.json .
-
-# Project options # -z → string is empty
-RUN  if [[ ! -z $DEBUG_SVG_HPP ]]; then cmake -H. -Bbuild -DDEBUG_SVG_HPP; fi
-RUN  if [[ ! -z $DEBUG_SHOW_ALG ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_ALG; fi
-RUN  if [[ ! -z $DEBUG_SHOW_HDL ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_HDL; fi
-RUN  if [[ ! -z $OPT_SEQ ]]; then cmake -H. -Bbuild -DOPT_SEQ; fi
-
-# Build project
-RUN cmake --build build
+# # Install dependencies
+# RUN mkdir build && cd build && conan install .. --build missing && cd ..
+# 
+# # Configure project
+# RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release \
+#   -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
+#   && cp ./build/compile_commands.json .
+# 
+# # Project options # -z → string is empty
+# RUN  if [[ ! -z $DEBUG_SVG_HPP ]]; then cmake -H. -Bbuild -DDEBUG_SVG_HPP; fi
+# RUN  if [[ ! -z $DEBUG_SHOW_ALG ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_ALG; fi
+# RUN  if [[ ! -z $DEBUG_SHOW_HDL ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_HDL; fi
+# RUN  if [[ ! -z $OPT_SEQ ]]; then cmake -H. -Bbuild -DOPT_SEQ; fi
+# 
+# # Build project
+# RUN cmake --build build
 
 # Configure Neovim
 RUN if [[ ! -z "$VIM" ]] ; then \

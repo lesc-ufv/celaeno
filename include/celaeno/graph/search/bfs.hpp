@@ -67,11 +67,11 @@ using namespace celaeno::aliases;
 // }}}
 
 // Algorithm {{{
-template<SignedIntegral T, typename P, typename S, typename C = std::function<bool(i64)>>
+template<typename T, typename P, typename S, typename C = std::function<bool(i64)>>
 std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return false;})
-  requires CallableWith<P,i64>
-  && CallableWith<S,i64>
-  && CallableWith<C,i64>
+  requires CallableWith<P,T>
+  && CallableWith<S,T>
+  && CallableWith<C,T>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
