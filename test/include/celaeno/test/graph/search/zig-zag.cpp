@@ -279,43 +279,20 @@ template<SignedIntegral I, typename C>
   return basis;
 } // fn: minimal_basis }}}
 
-// fn: bfs_minimal_basis {{{
-Basis bfs_minimal_basis(Basis& basis)
+// fn: minimal_basis_bfs_ordering {{{
+void minimal_basis_bfs_ordering(Basis& basis)
 {
-  Basis out;
+  // Take first base, use it as a starting point
+  Basis::iterator cut{basis.begin()};
 
-  std::queue<Base> q;
-
-  q.push(std::move(basis.front()));
-
-  basis.erase(basis.begin());
-
-  while(!q.empty())
+  // Partition the vector into adjacencies of cur
+  for(auto it{basis.begin()}; it != basis.end(); ++it)
   {
-    // Take first base, use it as a starting point for the bfs
-    Base current{std::move(q.front())}; q.pop();
-
-    fmt::print("-- base: {}\n", current);
-
-    // Find the cycle adjacent to basis, i.e., the ones that have an intersection of at least 2 nodes
-    auto it{rg::partition(basis,[&](Base const& b){ return fn(b).in(current).vec().size() >= 2; })};
-
-    // Move adjacent ones to queue
-    for(auto i{basis.begin()}; i != it; ++i)
-    {
-      fmt::print("-- adj base: {}\n", *i);
-      q.push(std::move(*i));
-    }
-
-    // Remove adjacent ones from basis
-    for(auto i{basis.begin()}; i != it; ++i) { basis.erase(i); }
-
-    // Finish processing of current
-    out.push_back(std::move(current));
+    cut = std::partition(cut
+      , basis.end()
+      , [&](Base const& b) { return fn(b).in(*it).vec().size() >= 2; });
   }
-
-  return out;
-} // function: bfs_minimal_basis }}}
+} // function: minimal_basis_bfs_ordering }}}
 
 // fn: align_intersections {{{
 template<Range R>
@@ -864,12 +841,12 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
   // Get minimal basis
   auto basis{minimal_basis(i64{},ops,m_crossing_nodes,logger.sink())};
 
-  basis = bfs_minimal_basis(basis);
+  minimal_basis_bfs_ordering(basis);
 
   // Process into adjacent intersection
-  for (auto const& base : basis)
+  for (i32 i{}; auto const& base : basis)
   {
-    logger.info()("-- Base: {}", base);
+    logger.info()("-- Base {}: {}", i++, base);
   } // for
 
   auto pair_intersection_basis{align_intersections(basis,logger.sink())};
