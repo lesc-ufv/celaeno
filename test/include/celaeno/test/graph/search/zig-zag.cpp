@@ -124,6 +124,21 @@ using Base = std::vector<Node>;
 using Basis = std::vector<Base>;
 // }}}
 
+// fn: lowest_node_id {{{
+i64 lowest_node_id(Ops const& ops)
+{
+  // Dummy vertex with lowest value
+  i64 idx{};
+
+  // Define function to compare values lt 0
+  auto f_lowest = [&idx](auto&& e) { if(e < idx){ idx=e; } return false; };
+
+  // Get the dummy vertex with the lowest value
+  ns_search::bfs::run(0,ops.preds,ops.succs,f_lowest);
+
+  return --idx;
+} // function: lowest_node_id }}}
+
 // fn: e_bfs {{{
 template<typename F = std::function<bool(Edge)>>
 [[nodiscard]] Annotations e_bfs(Ops const& ops
@@ -455,6 +470,10 @@ Tiles Adjacencies::tiles()
       , Tile{t.first+1,t.second}
       , Tile{t.first,t.second-1}
       , Tile{t.first,t.second+1}
+      , Tile{t.first-1,t.second+1}
+      , Tile{t.first+1,t.second-1}
+      , Tile{t.first-1,t.second-1}
+      , Tile{t.first+1,t.second+1}
     };
   };
 
@@ -467,7 +486,7 @@ Tiles Adjacencies::tiles()
     , [](Tile t){ return Tiles{}; }
     , [&](Tile t)
       {
-        auto dist_cur{ns_heuristics::manhattan::run(this->src,t)};
+        auto dist_cur{ns_heuristics::chebyshev::run(this->src,t)};
 
         if( dist_cur > this->dist_exact+1 )
         {
@@ -489,7 +508,7 @@ Tiles Adjacencies::tiles()
 // struct: Adjacencies }}}
 
 // fn: place_intersection {{{
-auto place_intersection(Range auto&& intersection)
+auto place_intersection(Range auto intersection)
 {
   // Initialize new placement
   Placement placement;
@@ -513,6 +532,9 @@ auto place_intersection(Range auto&& intersection)
   {
     placement[u] = std::make_pair(0,i++);
   } // for
+  // // rg::reverse(intersection);
+  // placement[intersection.front()] = std::make_pair(0,0);
+  // placement[intersection.back()] = std::make_pair(-1,1);
   // if
 
   return placement;
@@ -530,6 +552,9 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
 {
   // Init logger
   err::Logger logger{sink};
+
+  // Get lowest node id
+  static i64 lowest{lowest_node_id(ops)};
 
   // Save old state of p
   Placement p_backup{p};
@@ -591,6 +616,9 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
 
   bool stop{false};
 
+  // Wire tiles
+  std::unordered_map<Node,std::unordered_map<Node,Tile>> wires_of;
+
   while( ! unplaced.empty() )
   {
     [[maybe_unused]] auto fold{logger.fold()};
@@ -642,7 +670,7 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
         [&](Node v)
         {
           auto&& targets{m_node_m_a.at(v).at(u)};
-          auto   dist{ns_heuristics::manhattan::run(t,p[v])};
+          auto   dist{ns_heuristics::chebyshev::run(t,p[v])};
           return fn(targets).has(dist);
         });
       };
@@ -659,7 +687,7 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
           : m_edge_weight.at({v,u});
       };
 
-      auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::manhattan::run(a,b); };
+      auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
 
       // Keep a candidate if it satisfies edges constraints to all its placed
       // neighbors
@@ -676,22 +704,22 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
         {
           for (auto v : neighbors_positioned)
           {
-            // Calculate manhattan distance
-            auto d_manhattan{f_dist(t,p.at(v))};
-            // Calculate manhattan-based A* path
+            // Calculate chebyshev distance
+            auto d_chebyshev{f_dist(t,p.at(v))};
+            // Calculate chebyshev-based A* path
             auto d_astar{ns_search::a_star::run(t
               , p.at(v)
               , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
               , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
-              , [](Tile t1, Tile t2){ return ns_heuristics::manhattan::run(t1,t2); }
+              , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
             )};
             // Log
             if( d_astar )
             {
               logger.info()("Tile {} Node {} - Neighbor {} - A*: {}", t, u, v, *d_astar);
             } // if
-            // Check if path exists, and it is eq to manhattan
-            if( ! d_astar || static_cast<size_t>(d_manhattan+1) != d_astar->size() )
+            // Check if path exists, and it is eq to chebyshev
+            if( ! d_astar || static_cast<size_t>(d_chebyshev+1) != d_astar->size() )
             {
               return false;
             } // if
@@ -732,15 +760,57 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
       } // if
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
+      // Remove wires of the previous node from placed stack
+      for (auto&& [node,tile] : wires_of[v])
+      {
+        p.erase(node);
+      } // for
+      wires_of[v].clear();
       // Remove previous node from placement map
       if( p.contains(v) ){ p.erase(v); }
       // Include previous node in unplaced stack
       unplaced.push(v);
-
       continue;
     } // if
 
-    // Save node u in most promissing position
+    // Get most promissing position
+    Tile chosen{candidates.front()};
+
+    // Block paths between u and candidate
+    for (auto v : neighbors_positioned)
+    {
+      // Candidates
+      auto f_get_candidates = [&](Tile const& t, i64 dist) { return Adjacencies{t,dist}.tiles(); };
+      // Distance
+      auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
+      // Calculate chebyshev distance
+      auto d_chebyshev{f_dist(chosen,p.at(v))};
+      // Calculate chebyshev-based A* path
+      auto d_astar{ns_search::a_star::run(chosen
+          , p.at(v)
+          , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
+          , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
+          , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
+          )};
+
+      err::err({d_astar != std::nullopt})("A* second run failed");
+
+      d_astar->pop_front();
+      d_astar->pop_back();
+
+      for (Tile tile : *d_astar)
+      {
+        wires_of[u][--lowest] = tile;
+      } // for
+    } // for
+
+    for (auto&& [node,tile] : wires_of[u])
+    {
+      p[node] = tile;
+    } // for
+    // if
+
+    // Save node u in it
     p[u] = candidates.front();
 
     // Erase used position
@@ -761,6 +831,13 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
 
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
+
+      // Remove wires
+      for (auto&& [node,tile] : wires_of[v])
+      {
+        p.erase(node);
+      } // for
+      wires_of[v].clear();
 
       // Remove previous node from placement map
       if( p.contains(v) ){ p.erase(v); }
