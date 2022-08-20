@@ -101,6 +101,16 @@ decltype(auto) runtime(F&& f_test)
 } // function: runtime }}}
 
 // Shapes {{{
+constexpr std::string_view const a_head
+{
+  "<defs>"
+  "  <marker id='arrowhead' markerWidth='5' markerHeight='4'" 
+  "  refX='0' refY='1.75' orient='auto'>"
+  "    <polygon points='0 0, 5 1.75, 0 3.5' fill='red' />"
+  "  </marker>"
+  "</defs>\n"
+};
+
 constexpr std::string_view const h_template
 {
   "<svg version='1.1' viewBox='0 0 {} {}'>\n"
@@ -113,13 +123,13 @@ constexpr std::string_view const v_label_template
 
 constexpr std::string_view const v_template
 {
-  "<circle stroke='black' stroke-width='2px' r='{}' cx='{}' cy='{}' fill='{}'/>\n",
+  "<circle stroke='{}' stroke-width='1px' r='{}' cx='{}' cy='{}' fill='{}'/>\n",
 };
 
 constexpr std::string_view const e_template
 {
   "<line x1 = '{}' y1 = '{}' x2 = '{}' y2 = '{}' "
-  "stroke = 'black' stroke-width = '1'/>\n"
+  "stroke = 'red' stroke-width = '1' marker-end='url(#arrowhead)'/>\n"
 };
 
 constexpr std::string_view const footer{"</svg>\n"};
@@ -138,7 +148,7 @@ constexpr i32 const circle_offset{tile_size/2};
 
 // fn: svg {{{
 template<String S, typename Map, typename Paths, typename F>
-void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
+void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
 {
   // Output file
   std::ofstream of{filename};
@@ -181,6 +191,40 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
     tile.second = tile.second*tile_size+circle_offset;
   } // for
 
+  for (auto&& [u,tile] : vertex_tile)
+  {
+    // Draw lines from predecessors of u
+    for (auto&& pred : ops.preds(u))
+    {
+      if( ! vertex_tile.contains(pred) ) { continue; }
+      auto [ux,uy] = tile;
+      auto [vx,vy] = vertex_tile.at(pred);
+      // Tail offset to fit between tile and vertex
+      i64 offset{tile_size/2 - (tile_size/2-vertex_radius)};
+      i64 marker_width{5};
+      i64 marker_height{4};
+
+      if( vx > ux )
+      {
+        vx -= offset;
+        ux += offset + marker_width;
+      }
+      else if( vx < ux )
+      {
+        vx += offset;
+        ux -= offset + marker_width;
+      }
+
+      if( uy < vy )
+      {
+        uy += offset + marker_height;
+        vy -= offset;
+      }
+
+      edges << fmt::format(e_template, vx, vy, ux, uy);
+    } // for
+  } // for
+
   // // Edge Routing
   // rg::for_each(paths, [&](auto&& e)
   // {
@@ -211,18 +255,21 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
     // Draw pseudo-nodes with black filling
     if (v < 0)
     {
-      vertices << fmt::format(v_template, vertex_radius, x, y, "black");
+      vertices << fmt::format(v_template, "white", vertex_radius, x, y, "black");
       vertices << fmt::format(v_label_template, x, y, 10, "white", f_label(v));
     } // if
     else
     {
-      vertices << fmt::format(v_template, vertex_radius, x, y, "white");
+      vertices << fmt::format(v_template, "black", vertex_radius, x, y, "white");
       vertices << fmt::format(v_label_template, x, y, 10, "black", f_label(v));
     } // else
   } // for
 
   // File writting
   of << fmt::format("{}\n", header.str());
+
+  // Arrow head
+  of << a_head;
 
   // Draw grid
   std::stringstream tiles;
@@ -246,74 +293,74 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
 
 
   of << fmt::format("{}\n", tiles.str());
-  of << fmt::format("{}\n", edges.str());
   of << fmt::format("{}\n", vertices.str());
+  of << fmt::format("{}\n", edges.str());
   of << fmt::format("{}\n", footer);
   of.close();
 } // function: svg }}}
 
-// fn: run  {{{
-template<SignedIntegral S, typename L, String Str>
-decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
-{
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::draw::svg");
-#endif
-
-#ifdef DEBUG_SVG_HPP
-  // Create logging sink
-  auto logger{spdlog::basic_logger_mt("celaeno::graph::draw::svg", "logs.txt")};
-#endif
-
-  //
-  // Pre-processing
-  //
-  ns_balance::paths::run(root,ops);
-  ns_balance::outgoing::run(root,ops);
-  ns_balance::paths::run(root,ops);
-  // ns_minimize::pseudo::run(root,ops);
-
-  //
-  // Layer ordering
-  //
-  // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
-  auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).ln};
-  auto layers {fp::get_map_values(depth_view)};
-
-  //
-  // Tile Placement and Edge Routing
-  //
-#ifdef DEBUG_SVG_HPP
-  // Placement
-  auto [vertex_tile,time_placement]{runtime(
-    [&]{ return ns_representations::grid::run(root, ops, layers);
-  })};
-
-  // Routing
-  auto [paths,time_routing]{runtime(
-    [&,vertex_tile=vertex_tile]{return route(ops, vertex_tile, layers);}
-  )};
-
-  // Area
-  auto [x,y] = ns_representations::grid::area(vertex_tile);
-
-  // Logging
-  logger->info("File: {}", fn);
-  logger->info("Placement Time: {}", time_placement);
-  logger->info("Routing Time: {}", time_routing);
-  logger->info("Area: {}x{}", x,y);
-#else
-  auto vertex_tile {ns_representations::grid::run(root, ops, layers)};
-  auto paths{route(ops, vertex_tile, layers)};
-#endif
-
-#ifndef DEBUG_DISABLE_OUTPUT
-  // Write output .svg file
-  svg(fmt::format("{}.svg", fn), vertex_tile, paths, f_label);
-#endif // DEBUG_DISABLE_OUTPUT
-
-} // function: run }}}
+// // fn: run  {{{
+// template<SignedIntegral S, typename L, String Str>
+// decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
+// {
+//
+// #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
+//   spdlog::set_level(spdlog::level::debug);
+//   spdlog::debug("Algorithm: celaeno::graph::draw::svg");
+// #endif
+//
+// #ifdef DEBUG_SVG_HPP
+//   // Create logging sink
+//   auto logger{spdlog::basic_logger_mt("celaeno::graph::draw::svg", "logs.txt")};
+// #endif
+//
+//   //
+//   // Pre-processing
+//   //
+//   ns_balance::paths::run(root,ops);
+//   ns_balance::outgoing::run(root,ops);
+//   ns_balance::paths::run(root,ops);
+//   // ns_minimize::pseudo::run(root,ops);
+//
+//   //
+//   // Layer ordering
+//   //
+//   // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
+//   auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).ln};
+//   auto layers {fp::get_map_values(depth_view)};
+//
+//   //
+//   // Tile Placement and Edge Routing
+//   //
+// #ifdef DEBUG_SVG_HPP
+//   // Placement
+//   auto [vertex_tile,time_placement]{runtime(
+//     [&]{ return ns_representations::grid::run(root, ops, layers);
+//   })};
+//
+//   // Routing
+//   auto [paths,time_routing]{runtime(
+//     [&,vertex_tile=vertex_tile]{return route(ops, vertex_tile, layers);}
+//   )};
+//
+//   // Area
+//   auto [x,y] = ns_representations::grid::area(vertex_tile);
+//
+//   // Logging
+//   logger->info("File: {}", fn);
+//   logger->info("Placement Time: {}", time_placement);
+//   logger->info("Routing Time: {}", time_routing);
+//   logger->info("Area: {}x{}", x,y);
+// #else
+//   auto vertex_tile {ns_representations::grid::run(root, ops, layers)};
+//   auto paths{route(ops, vertex_tile, layers)};
+// #endif
+//
+// #ifndef DEBUG_DISABLE_OUTPUT
+//   // Write output .svg file
+//   svg(fmt::format("{}.svg", fn), vertex_tile, paths, f_label);
+// #endif // DEBUG_DISABLE_OUTPUT
+//
+// } // function: run }}}
 
 } // namespace celaeno::graph::draw::svg }}}
