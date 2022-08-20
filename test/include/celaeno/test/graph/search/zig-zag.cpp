@@ -68,7 +68,7 @@
 #include <celaeno/graph/operations/balance/crossings.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 
-#include "unbalance.hpp"
+// #include "unbalance.hpp"
 
 // TODO Remove
 #include <celaeno/graph/operations/balance/outgoing.hpp>
@@ -528,13 +528,14 @@ auto place_intersection(Range auto intersection)
   } // if
 
   // Update placement
-  for (i64 i{}; auto u : intersection)
-  {
-    placement[u] = std::make_pair(0,i++);
-  } // for
-  // // rg::reverse(intersection);
-  // placement[intersection.front()] = std::make_pair(0,0);
-  // placement[intersection.back()] = std::make_pair(-1,1);
+  // for (i64 i{}; auto u : intersection)
+  // {
+  //   placement[u] = std::make_pair(i,--i);
+  // } // for
+
+  rg::reverse(intersection);
+  placement[intersection.front()] = std::make_pair(0,0);
+  placement[intersection.back()] = std::make_pair(1,-1);
   // if
 
   return placement;
@@ -660,6 +661,40 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
         .vec();
 
       logger.info()("condidates initial: {}", candidates);
+
+      // Remove candidates that are behind positioned input nodes
+      candidates = fn(candidates)
+        .keep([&](Tile const& t)
+          {
+            for(Node const& n : neighbors_positioned)
+            {
+              Tile const& tn{p[n]};
+              if( fn(ops.preds(u)).has(n) )
+              {
+                if( tn.second < t.second )
+                {
+                  return false;
+                }
+                // if( tn.first < t.first )
+                // {
+                //   return false;
+                // }
+              }  // if
+              else
+              {
+                if( tn.second > t.second )
+                {
+                  return false;
+                }
+                // if( tn.first < t.first )
+                // {
+                //   return false;
+                // }
+              } // else
+            }
+            return true;
+          })
+        .vec();
 
       // Define the quality of a tiles based on annotations
       auto f_quality = [&](Tile t)
@@ -1037,25 +1072,25 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
     // - Push incident cycle to backtracking stack
     if( auto it{generator.begin()}; it != generator.end() )
     {
-      fmt::print("Draw of {}\n", i);
+      // fmt::print("Draw of {}\n", i);
 
-      // Draw
-      ns_draw::svg::svg(fmt::format("steps/{}-0.svg", ++i)
-        , Placement{placement}
-        , std::vector<std::vector<i64>>{}
-        , [](auto e){ return e; }
-      );
+      // // Draw
+      // ns_draw::svg::svg(ops,fmt::format("steps/{}-0.svg", ++i)
+      //   , Placement{placement}
+      //   , std::vector<std::vector<i64>>{}
+      //   , [](auto e){ return e; }
+      // );
 
       placement = *it;
       st_generator.push(std::move(generator));
       st_solutions.push(std::make_pair(intersection,cycle));
 
-      // Draw
-      ns_draw::svg::svg(fmt::format("steps/{}-1.svg", i)
-        , Placement{placement}
-        , std::vector<std::vector<i64>>{}
-        , [](auto e){ return e; }
-      );
+      // // Draw
+      // ns_draw::svg::svg(ops,fmt::format("steps/{}-1.svg", i)
+      //   , Placement{placement}
+      //   , std::vector<std::vector<i64>>{}
+      //   , [](auto e){ return e; }
+      // );
 
       logger.info()("-- Success for:");
       for (auto e : cycle)
@@ -1125,9 +1160,11 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   auto m_crossing_nodes{celaeno::graph::operations::balance::crossings::run(0,ops)};
 
-  unbalance(0,ops);
-
   ns_io::Writer(metadata.data(), f_p, f_s, "out/3-out.v");
+
+  // unbalance(0,ops);
+
+  // ns_io::Writer(metadata.data(), f_p, f_s, "out/3-out.v");
 
   // celaeno::graph::operations::balance::paths::run(0,ops);
   //
@@ -1169,13 +1206,22 @@ int main([[maybe_unused]] int argc, char const* argv[])
     y += std::abs(y_min);
   } // for
 
+  // Expand grid to solve crossings
+  for (auto& [n,p] : placement)
+  {
+    auto& [x,y] = p;
+
+    x *= 2;
+    y *= 2;
+  } // for
 
   fmt::print("\n------\n");
   for( auto&& e : placement ){ fmt::print("{}\n", e); }
   fmt::print("------\n");
 
   // Draw
-  ns_draw::svg::svg("out/out.svg"
+  ns_draw::svg::svg(ops
+    , "out/out.svg"
     , placement
     , std::vector<std::vector<i64>>{}
     , [](auto i){ return i; }
