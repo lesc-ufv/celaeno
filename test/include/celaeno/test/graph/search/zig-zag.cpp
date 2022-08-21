@@ -115,6 +115,7 @@ using MNodeMAnnotations = std::map<Node,Annotations>;
 using MEdgeWeight = std::map<Edge,Weight>;
 using Tile = std::pair<i64,i64>;
 using Tiles = std::vector<Tile>;
+using Paths = std::map<std::pair<Node,Node>,std::deque<Tile>>;
 using Placement = std::map<Node,Tile>;
 using Base = std::vector<Node>;
 using Basis = std::vector<Base>;
@@ -538,7 +539,7 @@ auto place_intersection(Range auto intersection)
 } // function: place_intersection }}}
 
 // fn: place_cycle {{{
-cppcoro::generator<Placement> place_cycle(Ops const& ops
+cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
   , Placement p
   , Range auto cycle
   , Range auto inter
@@ -591,6 +592,9 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
   // Keep track of unplaced and placed elements
   std::stack<Node> placed, unplaced;
 
+  // Save paths
+  Paths paths;
+
   // Try with reverse path if fails
   bool b_reversed{false};
 
@@ -598,7 +602,7 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
   // Check if cycle was already placced
-  if(unplaced.empty()){ co_yield p; }
+  if(unplaced.empty()){ co_yield std::make_pair(p,Paths{}); }
 
   // Helper to reverse path if current fails
   auto f_try_reverse_path = [&]
@@ -826,6 +830,16 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
 
       err::err({d_astar != std::nullopt})("A* second run failed");
 
+      // Check if path is reversed or not
+      if( fn(ops.succs(u)).has(v) )
+      {
+        paths[{u,v}] = *d_astar;
+      } // if
+      else
+      {
+        paths[{v,u}] = fn(*d_astar).rev().deque();
+      } // else
+
       d_astar->pop_front();
       d_astar->pop_back();
 
@@ -858,7 +872,7 @@ cppcoro::generator<Placement> place_cycle(Ops const& ops
       // No need to explore reverse path
       b_reversed = true;
 
-      co_yield p;
+      co_yield std::make_pair(p,paths);
 
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
@@ -945,6 +959,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
 
   // Solution
   Placement placement;
+  Paths paths;
 
   // Get minimal basis
   auto basis{minimal_basis(i64{},ops,m_crossing_nodes,logger.sink())};
@@ -986,10 +1001,21 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
   placement = place_intersection(intersection);
 
   // Stack generators
-  std::stack<cppcoro::generator<Placement>> st_generator;
+  std::stack<cppcoro::generator<std::pair<Placement,Paths>>> st_generator;
 
   // Stack of processed solutions
   std::stack<std::pair<Nodes,Nodes>> st_solutions;
+
+  // Push intersection
+  if(auto [u,v] = std::make_pair(intersection.front(),intersection.back());
+    fn(ops.succs(u)).has(v) )
+  {
+    paths[{u,v}] = std::deque<Tile>({placement.at(intersection.front()), placement.at(intersection.back())});
+  } // if
+  else
+  {
+    paths[{v,u}] = std::deque<Tile>({placement.at(intersection.back()), placement.at(intersection.front())});
+  } // else
 
   bool b_backtrack{false};
 
@@ -1042,7 +1068,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
       logger.info()("Weight: {}", e);
     } // for
 
-    cppcoro::generator<Placement> generator;
+    cppcoro::generator<std::pair<Placement,Paths>> generator;
 
     if( ! b_backtrack )
     {
@@ -1081,7 +1107,12 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
       //   , [](auto e){ return e; }
       // );
 
-      placement = *it;
+      placement = it->first;
+      for (auto&& [pair,path] : it->second)
+      {
+        paths[pair] = path;
+      } // for
+
       st_generator.push(std::move(generator));
       st_solutions.push(std::make_pair(intersection,cycle));
 
@@ -1126,7 +1157,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
   // bool result{place(ops,placement,depth_view,i,p,Partition::L)};
   std::erase_if(placement,[&](auto&& e){ return e.first < id_lowest; });
 
-  return placement;
+  return std::make_pair(placement,paths);
 
 } // fn: global_backtracking }}}
 
@@ -1185,7 +1216,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Perform placement
   // std::cerr << "Started computation\n";
   auto start {std::chrono::system_clock::now()};
-  Placement placement {global_backtracking(ops,m_crossing_nodes)};
+  auto [placement, routing] {global_backtracking(ops,m_crossing_nodes)};
   auto end {std::chrono::system_clock::now()};
   // std::cerr << "Finished computation\n";
   std::chrono::duration<f64> dur {end-start};
@@ -1215,6 +1246,17 @@ int main([[maybe_unused]] int argc, char const* argv[])
     y *= 2;
   } // for
 
+  for(auto& [pair,path] : routing)
+  {
+    for(Tile& tile : path)
+    {
+      tile.first += std::abs(x_min);
+      tile.second += std::abs(y_min);
+      tile.first *= 2;
+      tile.second *= 2;
+    }
+  }
+
   fmt::print("\n------\n");
   for( auto&& e : placement ){ fmt::print("{}\n", e); }
   fmt::print("------\n");
@@ -1223,7 +1265,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   ns_draw::svg::svg(ops
     , "out/out.svg"
     , placement
-    , std::vector<std::vector<i64>>{}
+    , routing
     , [](auto i){ return i; }
   );
 

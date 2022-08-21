@@ -47,6 +47,7 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/fun/fun.hpp>
 #include <celaeno/heuristics/manhattan.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -86,6 +87,7 @@ namespace ns_views = celaeno::graph::views;
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
+using namespace celaeno::fun::fn;
 // }}}
 
 // function: runtime {{{
@@ -126,10 +128,16 @@ constexpr std::string_view const v_template
   "<circle stroke='{}' stroke-width='1px' r='{}' cx='{}' cy='{}' fill='{}'/>\n",
 };
 
+constexpr std::string_view const e_template_marker
+{
+  "<line x1 = '{}' y1 = '{}' x2 = '{}' y2 = '{}' "
+  "stroke = 'black' stroke-width = '1' marker-end='url(#arrowhead)'/>\n"
+};
+
 constexpr std::string_view const e_template
 {
   "<line x1 = '{}' y1 = '{}' x2 = '{}' y2 = '{}' "
-  "stroke = 'red' stroke-width = '1' marker-end='url(#arrowhead)'/>\n"
+  "stroke = 'black' stroke-width = '1'/>\n"
 };
 
 constexpr std::string_view const footer{"</svg>\n"};
@@ -191,58 +199,88 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
     tile.second = tile.second*tile_size+circle_offset;
   } // for
 
-  for (auto&& [u,tile] : vertex_tile)
+  fmt::print("Paths: {}\n", paths.size());
+
+  for (auto&& [pair,path] : paths)
   {
-    // Draw lines from predecessors of u
-    for (auto&& pred : ops.preds(u))
+    size_t size_path{path.size()};
+
+    fn(path).slide(2).ply([&,i=0](auto&& r) mutable
     {
-      if( ! vertex_tile.contains(pred) ) { continue; }
-      auto [ux,uy] = tile;
-      auto [vx,vy] = vertex_tile.at(pred);
-      // Tail offset to fit between tile and vertex
+      auto&& source{r.front()};
+      auto&& dest{r.back()};
+
+      auto [ux,uy] = source;
+      auto [vx,vy] = dest;
+
+      // Update values for drawing
+      ux = ux*tile_size+circle_offset;
+      uy = uy*tile_size+circle_offset;
+      vx = vx*tile_size+circle_offset;
+      vy = vy*tile_size+circle_offset;
+
+      // Tail offset to fit between dest and vertex
       i64 offset{tile_size/2 - (tile_size/2-vertex_radius)};
       i64 marker_width{5};
       i64 marker_height{4};
 
-      if( vx > ux )
+      if( i == 0 )
       {
-        vx -= offset;
-        ux += offset + marker_width;
-      }
-      else if( vx < ux )
-      {
-        vx += offset;
-        ux -= offset + marker_width;
-      }
+        if( ux > vx )
+        {
+          ux -= offset;
+        }
+        else if( ux < vx )
+        {
+          ux += offset;
+        }
 
-      if( uy < vy )
-      {
-        uy += offset + marker_height;
-        vy -= offset;
-      }
+        if( vy < uy )
+        {
+          uy -= offset;
+        }
+        else if( vy > uy )
+        {
+          uy += offset;
+        }
 
-      edges << fmt::format(e_template, vx, vy, ux, uy);
-    } // for
+      } // if
+
+      // -2 because slide is equal to (n-1) iterations on container
+      if (i == (size_path-2))
+      {
+        if( ux > vx )
+        {
+          vx += offset + marker_width;
+        }
+        else if( ux < vx )
+        {
+          vx -= offset + marker_width;
+        }
+
+        if( vy < uy )
+        {
+          vy += offset + marker_height;
+        }
+        else if( vy > uy )
+        {
+          vy -= offset + marker_height;
+        }
+      } // if
+
+      if( i == (size_path-2) )
+      {
+        edges << fmt::format(e_template_marker, ux, uy, vx, vy);
+      } // if
+      else
+      {
+        edges << fmt::format(e_template, ux, uy, vx, vy);
+      } // else
+
+      ++i;
+
+    }).discard();
   } // for
-
-  // // Edge Routing
-  // rg::for_each(paths, [&](auto&& e)
-  // {
-  //   auto route{e.second};
-  //
-  //   for (auto it{route.begin()}; it != std::prev(route.end()); ++it)
-  //   {
-  //     auto [ux,uy] = *it;
-  //     auto [vx,vy] = *std::next(it);
-  //
-  //     ux = ux*tile_size+circle_offset;
-  //     uy = uy*tile_size+circle_offset;
-  //     vx = vx*tile_size+circle_offset;
-  //     vy = vy*tile_size+circle_offset;
-  //
-  //     edges << fmt::format(e_template, ux, uy, vx, vy);
-  //   } // for
-  // });
 
   // @ Stream/File writting
   header << fmt::format(h_template,view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);

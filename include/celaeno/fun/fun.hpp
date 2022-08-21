@@ -152,6 +152,11 @@ struct Fun
     return view | rg::to<std::set>;
   }
 
+  [[nodiscard]] auto deque()
+  {
+    return view | rg::to<std::deque>;
+  }
+
   void discard() { return; }
 
   // Print
