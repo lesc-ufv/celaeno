@@ -115,11 +115,7 @@ using MNodeMAnnotations = std::map<Node,Annotations>;
 using MEdgeWeight = std::map<Edge,Weight>;
 using Tile = std::pair<i64,i64>;
 using Tiles = std::vector<Tile>;
-using GraphPath = std::deque<Node>;
-using GraphPaths = std::vector<GraphPath>;
-using GridPath = std::vector<std::pair<Node,Node>>;
 using Placement = std::map<Node,Tile>;
-using Occupation = std::set<Tile>;
 using Base = std::vector<Node>;
 using Basis = std::vector<Base>;
 // }}}
@@ -997,6 +993,10 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
 
   bool b_backtrack{false};
 
+  // Save lowest id to remove path-blocking nodes inserted by cycle placement
+  // algorithm
+  i64 id_lowest{lowest_node_id(ops)};
+
   i64 i{};
 
   // Loop until a solution is found for every incident cycle
@@ -1124,6 +1124,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
 
 
   // bool result{place(ops,placement,depth_view,i,p,Partition::L)};
+  std::erase_if(placement,[&](auto&& e){ return e.first < id_lowest; });
 
   return placement;
 
@@ -1180,7 +1181,6 @@ int main([[maybe_unused]] int argc, char const* argv[])
   {
     fmt::print("{}\n", e);
   } // for
-
 
   // Perform placement
   // std::cerr << "Started computation\n";
