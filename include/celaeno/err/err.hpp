@@ -8,6 +8,7 @@
 #pragma once
 
 #include <set>
+#include <filesystem>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -52,7 +53,8 @@ class Location
   // public member functions {{{
   auto get() const
   {
-    return fmt::format("{}:{} `{}`: ",str_file,str_line,str_fun);
+    std::string basename = std::filesystem::path(str_file).filename();
+    return fmt::format("{}:{} `{}`: ", basename, str_line, str_fun);
   }
   // }}}
 
@@ -79,7 +81,8 @@ class Location
 #ifdef DEBUG
     if( conds.contains(false) || conds.empty() )
     {
-      spdlog::error(loc.get() + std::forward<M>(m), std::forward<Args>(args)...);
+      auto loc_curr = loc.get() + m;
+      spdlog::error(loc_curr, std::forward<Args>(args)...);
       exit(1);
     } // if
 #endif // DEBUG
@@ -156,7 +159,8 @@ class Logger
     {
       return [&]<String M, Printable... Args>(M&& m, Args&&... args)
       {
-        logger->info(loc.get()+std::forward<M>(m), std::forward<Args>(args)...);
+        auto loc_curr = loc.get() + m;
+        logger->info(loc_curr, std::forward<Args>(args)...);
         logger->flush();
       }; // anonymous lambda
     } // fn: info

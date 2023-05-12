@@ -38,6 +38,7 @@
 #include <variant>
 
 #include <fmt/core.h>
+
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #include <spdlog/spdlog.h>
@@ -119,7 +120,34 @@ using Paths = std::map<std::pair<Node,Node>,std::deque<Tile>>;
 using Placement = std::map<Node,Tile>;
 using Base = std::vector<Node>;
 using Basis = std::vector<Base>;
+using Location = celaeno::err::Location;
 // }}}
+
+// fn: f_timer {{{
+template<typename F, typename... Args>
+auto f_timer(Location const& loc, F&& f, Args&&... args)
+{
+  if constexpr(std::is_void_v<std::invoke_result_t<F, Args...>>)
+  {
+    fmt::print("[exe] {}\n", loc.get());
+    auto start {std::chrono::system_clock::now()};
+    std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+    auto end {std::chrono::system_clock::now()};
+    std::chrono::duration<f64> dur {end-start};
+    fmt::print("[end] {} took {} seconds\n", loc.get(), dur.count());
+    return void();
+  }
+  else
+  {
+    fmt::print("[exe] {}\n", loc.get());
+    auto start {std::chrono::system_clock::now()};
+    auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+    auto end {std::chrono::system_clock::now()};
+    std::chrono::duration<f64> dur {end-start};
+    fmt::print("[end] {} took {} seconds\n", loc.get(), dur.count());
+    return result;
+  }
+}; // fn: f_timer }}}
 
 // fn: lowest_node_id {{{
 i64 lowest_node_id(Ops const& ops)
@@ -541,6 +569,7 @@ auto place_intersection(Range auto intersection)
 // fn: place_cycle {{{
 cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
   , Placement p
+  , Paths paths
   , Range auto cycle
   , Range auto inter
   , MNodeMAnnotations m_node_m_a
@@ -592,17 +621,14 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
   // Keep track of unplaced and placed elements
   std::stack<Node> placed, unplaced;
 
-  // Save paths
-  Paths paths;
-
   // Try with reverse path if fails
   bool b_reversed{false};
 
   // Push all nodes to the stack
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
-  // Check if cycle was already placced
-  if(unplaced.empty()){ co_yield std::make_pair(p,Paths{}); }
+  // Check if cycle was already placed
+  if(unplaced.empty()){ co_yield std::make_pair(p,paths); }
 
   // Helper to reverse path if current fails
   auto f_try_reverse_path = [&]
@@ -675,10 +701,6 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
                 {
                   return false;
                 }
-                // if( tn.first < t.first )
-                // {
-                //   return false;
-                // }
               }  // if
               else
               {
@@ -686,32 +708,65 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
                 {
                   return false;
                 }
-                // if( tn.first < t.first )
-                // {
-                //   return false;
-                // }
               } // else
             }
             return true;
           })
         .vec();
 
-      // Define the quality of a tiles based on annotations
-      auto f_quality = [&](Tile t)
-      {
-        // Count how many distance constraints from intersection it adheres, and
-        // use this as a method for sorting best positions
-        return - rg::count_if(inter,
-        [&](Node v)
-        {
-          auto&& targets{m_node_m_a.at(v).at(u)};
-          auto   dist{ns_heuristics::chebyshev::run(t,p[v])};
-          return fn(targets).has(dist);
-        });
-      };
+      // // Count how many fan-outs remain to be positioned for 'u'
+      // auto fan_outs = fn(ops.succs(u)).dif(p).vec();
+      // logger.info()("Fan-outs of {}: {}", u, fan_outs);
+      //
+      // // Filter out positions that do not allow enough room to place fan-outs
+      // candidates = fn(candidates).keep([&](Tile const& t)
+      // {
+      //   // Fetch sorrounding positions from 't'
+      //   auto v_positions_sorrounding = Adjacencies{t,1}.tiles();
+      //   logger.info()("Adjacencies of {}: {}", t, v_positions_sorrounding);
+      //
+      //   // Check if 'u' has placed predecessors
+      //   auto v_positioned_predecessors = fn(ops.preds(u)).in(p).as([&](auto&& n){ return p[n]; }).vec();
+      //   if( v_positioned_predecessors.size() > 0 )
+      //   {
+      //     auto y_required = fn(v_positioned_predecessors).max({}, [&](auto&& t){ return t.second; }).second;
+      //     // Filter out positions behind
+      //     v_positions_sorrounding = fn(v_positions_sorrounding).keep([&](Tile const& t)
+      //     {
+      //       return t.second >= y_required;
+      //     })
+      //     .vec();
+      //   }
+      //
+      //   // Filter out occupied tiles
+      //   auto s_occupied_positions = fn(p).val().set();
+      //   v_positions_sorrounding = fn(v_positions_sorrounding).keep([&](Tile const& t)
+      //   {
+      //     return ! s_occupied_positions.contains(t);
+      //   })
+      //   .vec();
+      //   logger.info()("Free adjacencies of {}: {}", t, v_positions_sorrounding);
+      //   
+      //   return v_positions_sorrounding.size() >= fan_outs.size() ;
+      // })
+      // .vec();
 
-      // Sort candidates by quality
-      candidates = fn(candidates).sort({},f_quality).vec();
+
+      // // Define the quality of a tiles based on annotations
+      // auto f_quality = [&](Tile t)
+      // {
+      //   // Count how many distance constraints from intersection it adheres, and
+      //   // use this as a method for sorting best positions
+      //   return fn(inter).all([&](Node v)
+      //   {
+      //     auto&& targets{m_node_m_a.at(v).at(u)};
+      //     auto   dist{ns_heuristics::chebyshev::run(t,p[v])};
+      //     return fn(targets).has(dist);
+      //   });
+      // };
+      //
+      // // Sort candidates by quality
+      // candidates = fn(candidates).keep(f_quality).vec();
 
       // For each tile in candidates, remove all that does not adhere to edge
       // constraints.
@@ -962,9 +1017,10 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
   Paths paths;
 
   // Get minimal basis
-  auto basis{minimal_basis(i64{},ops,m_crossing_nodes,logger.sink())};
+  auto basis =
+    f_timer({}, [&] { return minimal_basis(i64{},ops,m_crossing_nodes,logger.sink()); });
 
-  minimal_basis_bfs_ordering(basis);
+  f_timer({}, [&] { minimal_basis_bfs_ordering(basis); });
 
   // Process into adjacent intersection
   for (i32 i{}; auto const& base : basis)
@@ -972,7 +1028,8 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
     logger.info()("-- Base {}: {}", i++, base);
   } // for
 
-  auto pair_intersection_basis{align_intersections(basis,logger.sink())};
+  auto pair_intersection_basis =
+    f_timer({}, [&] { return align_intersections(basis,logger.sink()); });
 
   // Process into adjacent intersection
   for (auto const& base : pair_intersection_basis)
@@ -980,25 +1037,26 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
     logger.info()("-- Int-Base: {}", base);
   } // for
 
-  // return placement;
-
   // Calculate graph depth-view
-  auto depth_view{ns_views::depth::run(0,ops.preds,ops.succs).nl};
+  auto depth_view =
+    f_timer({}, [&] { return ns_views::depth::run(0,ops.preds,ops.succs).nl; });
 
-  auto prox_view{get_prox_view(ops,depth_view)};
+  auto prox_view =
+    f_timer({}, [&] { return get_prox_view(ops,depth_view); });
 
-  for (auto e : prox_view)
-  {
-    fmt::print("prox e: {}\n", e);
-  } // for
+  // for (auto e : prox_view)
+  // {
+  //   fmt::print("prox e: {}\n", e);
+  // } // for
 
-  std::reverse(pair_intersection_basis.begin(), pair_intersection_basis.end());
+  f_timer({}, [&] { std::reverse(pair_intersection_basis.begin(), pair_intersection_basis.end()); });
 
   // Get initial intersection
   auto const& [intersection,cycle] = pair_intersection_basis.back();
 
   // Place initial intersection
-  placement = place_intersection(intersection);
+  placement =
+    f_timer({}, [&] { return place_intersection(intersection); });
 
   // Stack generators
   std::stack<cppcoro::generator<std::pair<Placement,Paths>>> st_generator;
@@ -1073,15 +1131,19 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
     if( ! b_backtrack )
     {
       // Create generator
-      generator = place_cycle(ops
-        , placement
-        , cycle
-        , intersection
-        , m_n_m_a
-        , weights
-        , Partition::L
-        , logger.sink()
-      );
+      generator = f_timer({}, [&]
+      {
+        return place_cycle(ops
+            , placement
+            , paths
+            , cycle
+            , intersection
+            , m_n_m_a
+            , weights
+            , Partition::L
+            , logger.sink()
+          );
+      });
     } // if
     else
     {
@@ -1100,18 +1162,56 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
     {
       // fmt::print("Draw of {}\n", i);
 
-      // // Draw
-      // ns_draw::svg::svg(ops,fmt::format("steps/{}-0.svg", ++i)
-      //   , Placement{placement}
-      //   , std::vector<std::vector<i64>>{}
-      //   , [](auto e){ return e; }
-      // );
-
       placement = it->first;
-      for (auto&& [pair,path] : it->second)
+      paths = it->second;
+
+      if ( ! placement.empty() )
       {
-        paths[pair] = path;
-      } // for
+        Placement _placement {placement};
+        Paths _paths {paths};
+
+        // Offset coordinates to remove negative values
+        auto x_min{rg::min_element(_placement,{},[](auto e){ return e.second.first; })->second.first};
+        auto y_min{rg::min_element(_placement,{},[](auto e){ return e.second.second; })->second.second};
+
+        for (auto& [n,p] : _placement)
+        {
+          auto& [x,y] = p;
+
+          x += std::abs(x_min);
+          y += std::abs(y_min);
+        } // for
+
+        // Expand grid to solve crossings
+        for (auto& [n,p] : _placement)
+        {
+          auto& [x,y] = p;
+
+          x *= 2;
+          y *= 2;
+        } // for
+
+        for(auto& [pair,path] : _paths)
+        {
+          for(Tile& tile : path)
+          {
+            tile.first += std::abs(x_min);
+            tile.second += std::abs(y_min);
+            tile.first *= 2;
+            tile.second *= 2;
+          }
+        }
+
+        // Draw
+        logger.info()("-- Start draw");
+        ns_draw::svg::svg(ops
+            , fmt::format("out/step-{}.svg", ++i)
+            , _placement
+            , _paths
+            , [](auto e){ return e; }
+            );
+        logger.info()("-- End draw");
+      }
 
       st_generator.push(std::move(generator));
       st_solutions.push(std::make_pair(intersection,cycle));
@@ -1164,10 +1264,10 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes)
 // fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
 {
-
   // Read graph
   ns_graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
+
   auto metadata {ns_io::Reader{argv[1],emplace}};
 
   // Helpers
@@ -1180,19 +1280,24 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u);
 
-  ns_io::Writer(metadata.data(), f_p, f_s, "out/0-out.v");
+  auto f_call_writer = [&]<typename... Args>(Args&&... args)
+  {
+    ns_io::Writer(std::forward<Args>(args)...);
+  };
 
-  celaeno::graph::operations::balance::outgoing::run(0,ops);
+  f_timer({}, f_call_writer, metadata.data(), f_p, f_s, "out/0-out.v");
 
-  ns_io::Writer(metadata.data(), f_p, f_s, "out/1-out.v");
+  f_timer({}, [&]{ celaeno::graph::operations::balance::outgoing::run(0,ops); });
 
-  celaeno::graph::operations::balance::paths::run(0,ops);
+  f_timer({}, f_call_writer, metadata.data(), f_p, f_s, "out/1-out.v");
 
-  ns_io::Writer(metadata.data(), f_p, f_s, "out/2-out.v");
+  f_timer({}, [&]{ celaeno::graph::operations::balance::paths::run(0,ops); });
 
-  auto m_crossing_nodes{celaeno::graph::operations::balance::crossings::run(0,ops)};
+  f_timer({}, f_call_writer, metadata.data(), f_p, f_s, "out/2-out.v");
 
-  ns_io::Writer(metadata.data(), f_p, f_s, "out/3-out.v");
+  auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(0,ops); });
+
+  f_timer({}, f_call_writer, metadata.data(), f_p, f_s, "out/3-out.v");
 
   // unbalance(0,ops);
 
@@ -1207,11 +1312,11 @@ int main([[maybe_unused]] int argc, char const* argv[])
   //
   // ns_io::Writer(metadata.data(), f_p, f_s, "4-out.v");
 
-  fmt::print("Graph:\n");
-  for (auto e : g.data())
-  {
-    fmt::print("{}\n", e);
-  } // for
+  // fmt::print("Graph:\n");
+  // for (auto e : g.data())
+  // {
+  //   fmt::print("{}\n", e);
+  // } // for
 
   // Perform placement
   // std::cerr << "Started computation\n";
@@ -1257,9 +1362,9 @@ int main([[maybe_unused]] int argc, char const* argv[])
     }
   }
 
-  fmt::print("\n------\n");
-  for( auto&& e : placement ){ fmt::print("{}\n", e); }
-  fmt::print("------\n");
+  // fmt::print("\n------\n");
+  // for( auto&& e : placement ){ fmt::print("{}\n", e); }
+  // fmt::print("------\n");
 
   // Draw
   ns_draw::svg::svg(ops

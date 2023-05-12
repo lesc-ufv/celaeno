@@ -408,16 +408,16 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops)
 
       if( f_is_balancing_dummy(parent) )
       {
-        fmt::print("Parent {} is balancing dummy\n", parent);
+        // fmt::print("Parent {} is balancing dummy\n", parent);
         new_parent = f_get_not_balancing_dummy(parent,ops.preds);
-        fmt::print("new_parent: {}\n", new_parent);
+        // fmt::print("new_parent: {}\n", new_parent);
       } // if
 
       if( f_is_balancing_dummy(child) )
       {
-        fmt::print("Child {} is balancing dummy", child);
+        // fmt::print("Child {} is balancing dummy", child);
         new_child = f_get_not_balancing_dummy(child,ops.succs);
-        fmt::print("new_child: {}\n", new_child);
+        // fmt::print("new_child: {}\n", new_child);
       } // if
 
       m_new_cross[new_parent] = new_child;
@@ -427,10 +427,10 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops)
   } // for
 
 
-  for (auto e : out)
-  {
-    fmt::print("Crossing: {}\n", e);
-  } // for
+  // for (auto e : out)
+  // {
+  //   fmt::print("Crossing: {}\n", e);
+  // } // for
 
   return out;
 } // function: run }}}

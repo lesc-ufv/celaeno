@@ -161,6 +161,13 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
   // Output file
   std::ofstream of{filename};
 
+  // Check if map is not empty
+  if ( vertex_tile.empty() )
+  {
+    spdlog::error("{}@{} Attempt to draw empty vertex map", __FILE__,__LINE__);
+    exit(1);
+  } // if
+
   // Check output file state
   if ( ! of.good())
   {
@@ -186,11 +193,8 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
     t.second += std::abs(min_box_y);
   } // for
 
-  auto view_box_x {rg::max_element(vertex_tile,{},
-  [](auto e) { return e.second.first; })->second.first};
-
-  auto view_box_y {rg::max_element(vertex_tile,{},
-  [](auto e) { return e.second.second; })->second.second};
+  auto view_box_x = rg::max_element(vertex_tile,{}, [](auto e) { return e.second.first; })->second.first;
+  auto view_box_y = rg::max_element(vertex_tile,{}, [](auto e) { return e.second.second; })->second.second;
 
   // Adjust positions for drawing
   for (auto& [_,tile] : vertex_tile)
@@ -285,6 +289,7 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
   // @ Stream/File writting
   header << fmt::format(h_template,view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);
 
+  fmt::print("Header...\n");
 
   // Vertices and labels
   for (auto [v,tile] : vertex_tile)
@@ -303,6 +308,8 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
     } // else
   } // for
 
+  fmt::print("Vertex & labels...\n");
+
   // File writting
   of << fmt::format("{}\n", header.str());
 
@@ -310,6 +317,7 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
   of << a_head;
 
   // Draw grid
+  fmt::print("Start Grid {}x{}...\n", view_box_x, view_box_y);
   std::stringstream tiles;
   for (i64 x{}; x <= view_box_x; ++x)
   {
@@ -328,6 +336,8 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
       );
     } // for
   } // for
+
+  fmt::print("Done Grid...\n");
 
 
   of << fmt::format("{}\n", tiles.str());
