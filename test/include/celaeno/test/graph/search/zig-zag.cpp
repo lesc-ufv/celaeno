@@ -813,91 +813,27 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
       logger.info()("condidates initial: {}", candidates);
 
       // Remove candidates that are behind positioned input nodes
-      candidates = fn(candidates)
-        .keep([&](Tile const& t)
+      candidates = fn(candidates) .keep([&](Tile const& t)
+      {
+        for(Node const& n : neighbors_positioned)
+        {
+          Tile const& tn{p[n]};
+          if( fn(ops.preds(u)).has(n) )
           {
-            for(Node const& n : neighbors_positioned)
-            {
-              Tile const& tn{p[n]};
-              if( fn(ops.preds(u)).has(n) )
-              {
-                if( tn.second < t.second )
-                {
-                  return false;
-                }
-              }  // if
-              else
-              {
-                if( tn.second > t.second )
-                {
-                  return false;
-                }
-              } // else
-            }
-            return true;
-          })
-        .vec();
+            if( tn.second < t.second ) { return false; }
+          }  // if
+          else
+          {
+            if( tn.second > t.second ) { return false; }
+          } // else
+        }
+        return true;
+      }).vec();
 
       // For each tile in candidates, remove all that does not adhere to edge
       // constraints.
       auto f_target = [&](Node u, Node v) { return m_edge_weight.at({u,v}); };
       auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
-
-      // // Calculate placed predecessor weights
-      // std::map<Node, i64> m_node_dist; m_node_dist[u] = 0;
-      // auto v_neigh = ns_search::bfs::run(u
-      //   , [&](auto e)
-      //     {
-      //       auto v_neigh = fn(f_neighbors(e)).in(p).vec();
-      //       fn(v_neigh).ply([&](auto p)
-      //       {
-      //         if( m_edge_weight.contains({e,p}) )
-      //         {
-      //           auto dist = m_edge_weight.at({e,p});
-      //           m_node_dist.emplace(p, m_node_dist[e] + dist);
-      //         }
-      //         else
-      //         {
-      //           fmt::print("[{},{}] not in map\n", e, p);
-      //         }
-      //       });
-      //       return v_neigh;
-      //     }
-      //   , [](auto e){ return std::vector<Node>{}; }
-      // );
-      // m_node_dist.erase(u);
-      //
-      // fmt::print("Neigh: {}\n", v_neigh);
-      // fmt::print("Node: {}\n", u);
-      // for ( auto [k,v] : m_node_dist )
-      // {
-      //   fmt::print("Node {} Dist {}\n", k, v);
-      // }
-      //
-      // // Keep a candidate if it satisfies edges constraints to all its placed
-      // // neighbors
-      // candidates = fn(candidates)
-      //   .in_all(v_neigh
-      //     , [&](Tile t, Node v)
-      //     {
-      //       if ( ! m_node_dist.contains(v) )
-      //       {
-      //         fmt::print("Node {} not in m_node_dist\n", v);
-      //         return true;
-      //       }
-      //       // if ( ! p.contains(v) )
-      //       // {
-      //       //   fmt::print("Node {} not in p\n", v);
-      //       //   return true;
-      //       // }
-      //       return m_node_dist[v] == f_dist(t,p.at(v));
-      //         // || m_node_dist[v] == f_dist(t,p.at(v))+1
-      //         // || m_node_dist[v] == f_dist(t,p.at(v))-1;
-      //     })
-      //   .vec();
-      //   fmt::print("candidates : {}\n", candidates);
-      //
-      // // std::string s; std::cin >> s;
 
       // Keep a candidate if it satisfies edges constraints to all its placed
       // neighbors
