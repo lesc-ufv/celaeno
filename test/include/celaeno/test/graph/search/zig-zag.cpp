@@ -130,6 +130,7 @@ auto f_timer(Location const& loc, F&& f, Args&&... args)
 {
   if constexpr(std::is_void_v<std::invoke_result_t<F, Args...>>)
   {
+#ifdef DEBUG
     fmt::print("[exe] {}\n", loc.get());
     auto start {std::chrono::system_clock::now()};
     std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
@@ -137,9 +138,14 @@ auto f_timer(Location const& loc, F&& f, Args&&... args)
     std::chrono::duration<f64> dur {end-start};
     fmt::print("[end] {} took {} seconds\n", loc.get(), dur.count());
     return void();
+#else
+    std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+    return void();
+#endif
   }
   else
   {
+#ifdef DEBUG
     fmt::print("[exe] {}\n", loc.get());
     auto start {std::chrono::system_clock::now()};
     auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
@@ -147,6 +153,9 @@ auto f_timer(Location const& loc, F&& f, Args&&... args)
     std::chrono::duration<f64> dur {end-start};
     fmt::print("[end] {} took {} seconds\n", loc.get(), dur.count());
     return result;
+#else
+    return std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+#endif
   }
 }; // fn: f_timer }}}
 
@@ -246,10 +255,11 @@ template<SignedIntegral I, typename C>
   // Init logger
   err::Logger logger{sink};
 
+  std::vector<Nodes> out;
+
   auto depth_view = ns_views::depth::run(root, ops.preds, ops.succs);
 
   std::set<Node> s_visited_global;
-  std::map<Node,Node> m_cycle;
 
   for (auto [layer,nodes] : depth_view.ln)
   {
@@ -262,95 +272,83 @@ template<SignedIntegral I, typename C>
 
     for(Node n : nodes)
     {
-      // Keep a local set of visited nodes
-      // If a node is visited more than once, then a cycle was found
-      // [-14,-20]
-      // [-15,-20]
-      // [-2,-15]
-      // [-1,-14]
+      fmt::print("n: {}\n", n);
+      // Traverse predecessor tree in bfs manner
       std::set<Node> s_visited_local;
       s_visited_local.insert(n);
-      s_visited_global.insert(n);
+      std::map<Node,Node> m_cycle;
       ns_search::bfs::run(n
           // Do not backtrack previously visited nodes
-        , [&](Node n){ return fn(ops.preds(n)).dif(s_visited_global).vec(); }
+        , [&](Node n){ return ops.preds(n); }
           // Only go backwards in the directed graph
         , [](Node){ return std::vector<Node>{}; }
           // Main
         , [&](Node o)
         {
-          fmt::print("Node:: {}\n", o);
+          // Skip source node
+          if ( o == n ) { return false; }
 
-          // continue
-          if (o == n) { return false; }
-
-          auto v_parent = fn(ops.succs(o)).in(s_visited_local).vec();
-
-          fmt::print("Parents:: {}\n", v_parent);
-
-          if ( v_parent.size() > 1 )
-          {
-            fmt::print("Map: {}\n", m_cycle);
-            fmt::print("Cycle: ");
-            // Backtrack for first element
-            Node p1 = v_parent.at(0);
-            while( m_cycle.contains(p1) )
-            {
-              fmt::print("{},", p1);
-              p1 = m_cycle.at(p1);
-            }
-            fmt::print("{}\n", p1);
-            // Backtrack for second element
-            Node p2 = v_parent.at(1);
-            while( m_cycle.contains(p2) )
-            {
-              fmt::print("{},", p2);
-              p2 = m_cycle.at(p2);
-            }
-            fmt::print("{}\n", p2);
-            return true;
-          }
-
-          auto intersection = fn(ops.preds(o)).in(s_visited_global).vec();
-          if ( intersection.size() > 0 )
-          {
-            // Backtrack for first element
-            Node p1 = intersection.front();
-            Nodes cycle_half1{};
-
-            while( m_cycle.contains(p1) )
-            {
-              cycle_half1.push_back(p1);
-              p1 = m_cycle.at(p1);
-            }
-            cycle_half1.push_back(p1);
-
-            m_cycle[intersection.front()] = o;
-            s_visited_local.insert(o);
-            s_visited_global.insert(o);
-            m_cycle[o] = v_parent.front();
-            p1 = intersection.front();
-            Nodes cycle_half2{};
-            while( m_cycle.contains(p1) )
-            {
-              cycle_half2.push_back(p1);
-              p1 = m_cycle.at(p1);
-            }
-            cycle_half2.push_back(p1);
-
-            fmt::print("First half: {}\n", cycle_half1);
-            fmt::print("Second half: {}\n", cycle_half2);
-            if ( ops.adj(cycle_half1.back(), cycle_half2.back()) )
-            {
-              auto cycle = fn(cycle_half1).chain(cycle_half2).vec();
-              fmt::print("Cycle: {}\n", cycle);
-            }
-            return true;
-          }
-
+          // Add node to visited set
           s_visited_local.insert(o);
-          s_visited_global.insert(o);
-          m_cycle[o] = v_parent.front();
+
+          // Get parents of current node
+          auto v_parents = fn(ops.succs(o)).in(s_visited_local).vec();
+
+          // Update cycle map
+          fn(v_parents).ply([&](auto e){ m_cycle[o] = e; });
+
+          // Check if node has 2 parents in the visited set (possible cycle)
+          if ( v_parents.size() == 2 )
+          {
+            // Check if cycle closes in 'n'
+            Nodes v_fst_half;
+            Nodes v_snd_half;
+
+            // Create path from map
+            auto f_make_path = [&](Node n)
+            {
+              Nodes out;
+              out.push_back(n);
+              while ( m_cycle.contains(n) )
+              {
+                n = m_cycle.at(n);
+                out.push_back(n);
+              }
+              return out;
+            };
+
+            // Create path from outputs of 'o'
+            v_fst_half = f_make_path(v_parents.at(0));
+            v_snd_half = f_make_path(v_parents.at(1));
+
+            // Closes in 'n'
+            if( fn(v_fst_half).in(v_snd_half).vec().size() == 1 )
+            {
+              // Build cycle
+              Nodes cycle;
+
+              // Insert lower divergence
+              cycle.push_back(o);
+
+              // Insert cycle halves
+              v_snd_half.pop_back();
+              std::reverse(v_snd_half.begin(), v_snd_half.end());
+
+              cycle = fn(cycle)
+                .chain(v_fst_half)
+                .chain(v_snd_half)
+                .vec();
+
+              fmt::print("cycle: {} → {}\n", o, cycle);
+              out.push_back(cycle);
+              // Break
+              return true;
+            }
+
+            // Continue
+            return false;
+          }
+          // Continue
           return false;
         }
       );
@@ -358,10 +356,9 @@ template<SignedIntegral I, typename C>
 
   } // for
 
-
   exit(0);
 
-  return std::vector<std::vector<Node>>{};
+  return out;
 
 } // fn: minimal_basis_2 }}}
 
@@ -813,7 +810,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
       logger.info()("condidates initial: {}", candidates);
 
       // Remove candidates that are behind positioned input nodes
-      candidates = fn(candidates) .keep([&](Tile const& t)
+      candidates = fn(candidates).keep([&](Tile const& t)
       {
         for(Node const& n : neighbors_positioned)
         {
@@ -1127,38 +1124,38 @@ decltype(auto) detect_ears(Ops const& ops, R const& basis)
       .keep([&](auto&& e){ return e.first.size() > 1; })
       .vec();
 
-    fmt::print("Cycle: {}\n", base);
+    // fmt::print("Cycle: {}\n", base);
 
     if ( intersections.size() > 1 )
     {
       auto largest = fn(intersections).max({}, [](auto e){ return e.first.size(); });
-      for (auto&& e : intersections) { fmt::print("Intersected: {}\n", e); } // for
-      fmt::print("Largest: {}\n", largest);
+      // for (auto&& e : intersections) { fmt::print("Intersected: {}\n", e); } // for
+      // fmt::print("Largest: {}\n", largest);
 
       bool is_subsets = fn(intersections)
         .all([&](auto e){ return fn(e.first).in(largest.first).vec().size() > 1; });
 
       if ( is_subsets )
       {
-        fmt::print("Ear: {}\n", base);
+        // fmt::print("Ear: {}\n", base);
         // Largest cycle
         auto largest_cycle = largest.second;
-        fmt::print("Larger cycle: {}\n", largest_cycle);
+        // fmt::print("Larger cycle: {}\n", largest_cycle);
         // Largest intersection
         auto largest_inter = largest.first;
-        fmt::print("Larger inter: {}\n", largest_inter);
+        // fmt::print("Larger inter: {}\n", largest_inter);
         // Base intersection
         auto base_inter = fn(base).in(largest.first).rot([&](auto v){ return v.front() == largest_inter.front(); }).vec();
-        fmt::print("Base inter: {}\n", base_inter);
+        // fmt::print("Base inter: {}\n", base_inter);
         // Save position of it
         auto it_largest = std::find(out.begin(), out.end(), largest_cycle);
         err::err({it_largest != out.end()})("Could not find cycle in basis");
         // Align intersection
         largest_cycle = fn(largest_cycle).rot([&](auto&& v){ return v.front() == largest_inter.front(); }).vec();
-        fmt::print("Aligned Larger cycle: {}\n", largest_cycle);
+        // fmt::print("Aligned Larger cycle: {}\n", largest_cycle);
         // Subtract the intersection
         largest_cycle = fn(largest_cycle).dif(fn(largest_inter).pop_front(1).pop_back(1).vec()).vec();
-        fmt::print("Subtracted with largest_int: {}\n", largest_cycle);
+        // fmt::print("Subtracted with largest_int: {}\n", largest_cycle);
         // Add the dif with ear
         if ( base_inter == largest_inter )
         {
@@ -1168,7 +1165,7 @@ decltype(auto) detect_ears(Ops const& ops, R const& basis)
         {
           largest_cycle = fn(largest_cycle).rot(1).chain_front(fn(base).dif(base_inter).vec()).vec();
         } // else
-        fmt::print("Dif with ear: {}\n", largest_cycle);
+        // fmt::print("Dif with ear: {}\n", largest_cycle);
         // Replace cycle
         *it_largest = largest_cycle;
       }
@@ -1196,13 +1193,13 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
 
   // Get minimal basis
   auto basis =
-    f_timer({}, [&] { return minimal_basis(i64{},ops,m_crossing_nodes,logger.sink()); });
+    f_timer({}, [&] { return minimal_basis_2(i64{},ops,m_crossing_nodes,logger.sink()); });
 
-  basis = detect_ears(ops, basis);
+  basis = f_timer({}, [&] { return detect_ears(ops, basis); });
 
   for (auto&& base : basis)
   {
-    fmt::print("-- Base: {}\n", base);
+    // fmt::print("-- Base: {}\n", base);
   } // for
 
   f_timer({}, [&] { minimal_basis_bfs_ordering(basis); });
@@ -1388,6 +1385,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
         }
 
         // Draw
+#ifdef DEBUG
         logger.info()("-- Start draw");
         ns_draw::svg::svg(ops
             , fmt::format("out/step-{}.svg", ++i)
@@ -1396,6 +1394,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
             , [](auto e){ return e; }
             );
         logger.info()("-- End draw");
+#endif
       }
 
       st_generator.push(std::move(generator));
@@ -1618,6 +1617,23 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // fmt::print("\n------\n");
   // for( auto&& e : placement ){ fmt::print("{}\n", e); }
   // fmt::print("------\n");
+
+  // Print area
+  std::pair<int,int> pair_min = placement.begin()->second;
+  std::pair<int,int> pair_max = placement.begin()->second;
+  fn(placement).ply([&](auto const& e)
+  {
+    auto const& tile = e.second;
+    if ( tile.first < pair_min.first ) { pair_min.first = tile.first; }
+    if ( tile.second < pair_min.second ) { pair_min.second = tile.second; }
+    if ( tile.first > pair_max.first ) { pair_max.first = tile.first; }
+    if ( tile.second > pair_max.second ) { pair_max.second = tile.second; }
+  });
+
+  fmt::print("Area: {}x{}\n"
+    , std::abs(pair_max.first - pair_min.first)
+    , std::abs(pair_max.second - pair_min.second)
+  );
 
   // Draw
   ns_draw::svg::svg(ops
