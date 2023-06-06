@@ -747,25 +747,11 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
   // Keep track of unplaced and placed elements
   std::stack<Node> placed, unplaced;
 
-  // Try with reverse path if fails
-  bool b_reversed{false};
-
   // Push all nodes to the stack
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
   // Check if cycle was already placed
   if(unplaced.empty()){ co_yield std::make_pair(p,paths); }
-
-  // Helper to reverse path if current fails
-  auto f_try_reverse_path = [&]
-  {
-    m_backtrack.clear();
-    unplaced = std::stack<Node>{};
-    placed = std::stack<Node>{};
-    b_reversed = true;
-    p = p_backup;
-    fn(slice).rev().ply([&](Node v){ unplaced.push(v); });
-  };
 
   bool stop{false};
 
@@ -1020,9 +1006,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
       // Try reverse path
       if( placed.empty() )
       {
-        if( b_reversed ){ break; }
-
-        f_try_reverse_path(); continue;
+        break;
       } // if
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
@@ -1100,9 +1084,6 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
 
     if( unplaced.empty() )
     {
-      // No need to explore reverse path
-      b_reversed = true;
-
       co_yield std::make_pair(p,paths);
 
       // Remove previous node from placed stack
