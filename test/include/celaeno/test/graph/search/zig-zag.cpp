@@ -942,47 +942,59 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
       // Remove duplicate positions in candidates
       candidates = fn(candidates).sort().unique().vec();
 
-      // // Sort candidates by distance
-      // candidates = fn(candidates).sort({}, [&](Tile const& t)
-      // {
-      //   auto f_sum_abs = [](auto a, auto b)
-      //   {
-      //     return std::abs(a) + std::abs(b);
-      //   };
-      //
-      //   // +x
-      //   if ( t.first > coords_high.first )
-      //   {
-      //     // +y
-      //     if ( t.second > coords_high.second )
-      //     {
-      //       return celaeno::heuristics::chebyshev::run(t, coords_high);
-      //     }
-      //     // -y
-      //     if ( t.second < coords_low.second )
-      //     {
-      //       return celaeno::heuristics::chebyshev::run(t, Tile{coords_high.first, coords_low.second});
-      //     }
-      //   }
-      //
-      //   // -x
-      //   if ( t.first < coords_low.first )
-      //   {
-      //     // +y
-      //     if ( t.second > coords_high.second )
-      //     {
-      //       return celaeno::heuristics::chebyshev::run(t, Tile{coords_low.first, coords_high.second});
-      //     }
-      //     // -y
-      //     if ( t.second < coords_low.second )
-      //     {
-      //       return celaeno::heuristics::chebyshev::run(t, coords_low);
-      //     }
-      //   }
-      //
-      //   // Inside
-      //   return i64{};
-      // }).vec();
+      // Sort candidates by distance
+      candidates = fn(candidates).sort({}, [&](Tile const& t)
+      {
+        // +x right
+        // +y down
+
+        // +x
+        if ( t.first > coords_high.first )
+        {
+          // +y = Bottom right corner
+          if ( t.second > coords_high.second )
+          {
+            return celaeno::heuristics::chebyshev::run(t, coords_high);
+          }
+          // -y = Top right corner
+          if ( t.second < coords_low.second )
+          {
+            return celaeno::heuristics::chebyshev::run(t, Tile{coords_high.first, coords_low.second});
+          }
+          return std::abs(t.first - coords_high.first);
+        }
+
+        // -x
+        if ( t.first < coords_low.first )
+        {
+          // +y Bottom left corner
+          if ( t.second > coords_high.second )
+          {
+            return celaeno::heuristics::chebyshev::run(t, Tile{coords_low.first, coords_high.second});
+          }
+          // -y Top left corner
+          if ( t.second < coords_low.second )
+          {
+            return celaeno::heuristics::chebyshev::run(t, coords_low);
+          }
+          return std::abs(coords_low.first - t.first);
+        }
+
+        // // only +y
+        // if ( t.second > coords_high.second )
+        // {
+        //   return std::abs(t.second - coords_high.second);
+        // }
+        //
+        // // only -y
+        // if ( t.second < coords_low.second )
+        // {
+        //   return std::abs(coords_low.second - t.second);
+        // }
+
+        // Inside
+        return i64{};
+      }).vec();
 
     } // if
     else
