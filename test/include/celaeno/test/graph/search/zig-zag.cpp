@@ -69,7 +69,8 @@
 #include <celaeno/graph/operations/balance/crossings.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 
-// #include "unbalance.hpp"
+#include "unbalance.hpp"
+#include "bfs.hpp"
 
 // TODO Remove
 #include <celaeno/graph/operations/balance/outgoing.hpp>
@@ -264,38 +265,55 @@ template<SignedIntegral I, typename C>
   for (auto [layer,nodes] : depth_view.ln)
   {
     // Check for nodes with predecessors == 2 (possible cicle endpoints)
-    fmt::print("l: {} n: {}\n", layer, nodes);
+    // fmt::print("l: {} n: {}\n", layer, nodes);
 
     nodes = fn(nodes).keep([&](auto n){ return ops.preds(n).size() == 2; }).vec();
 
-    fmt::print("closes: {}\n", nodes);
+    // fmt::print("closes: {}\n", nodes);
 
     for(Node n : nodes)
     {
-      fmt::print("n: {}\n", n);
+      // fmt::print("n: {}\n", n);
       // Traverse predecessor tree in bfs manner
       std::set<Node> s_visited_local;
       s_visited_local.insert(n);
       std::map<Node,Node> m_cycle;
-      ns_search::bfs::run(n
+      experimental::bfs_repeat::run(n
+      // ns_search::bfs::run(n
           // Do not backtrack previously visited nodes
         , [&](Node n){ return ops.preds(n); }
           // Only go backwards in the directed graph
-        , [](Node){ return std::vector<Node>{}; }
+        // , [](Node){ return std::vector<Node>{}; }
           // Main
         , [&](Node o)
         {
+          // fmt::print(":: o: {}\n", o);
+
           // Skip source node
           if ( o == n ) { return false; }
 
-          // Add node to visited set
-          s_visited_local.insert(o);
+          // Check if was previously visited
+          bool is_visited{s_visited_local.contains(o)};
 
           // Get parents of current node
           auto v_parents = fn(ops.succs(o)).in(s_visited_local).vec();
 
+          // Select shortest path (parent in highest layer)
+          if ( v_parents.size() > 1 )
+          {
+            v_parents = fn(v_parents).sort({}, [&](auto e)
+            {
+              return depth_view.nl.at(e);
+            })
+            .rev()
+            .vec();
+          } // else
+
           // Update cycle map
-          fn(v_parents).ply([&](auto e){ m_cycle[o] = e; });
+          m_cycle[o] = v_parents.at(0);
+
+          // Add node to visited set
+          s_visited_local.insert(o);
 
           // Check if node has 2 parents in the visited set (possible cycle)
           if ( v_parents.size() == 2 )
@@ -327,6 +345,12 @@ template<SignedIntegral I, typename C>
               // Build cycle
               Nodes cycle;
 
+              // fmt::print("Map:");
+              // for (auto&& e : m_cycle)
+              // {
+              //   fmt::print("e: {}\n", e);
+              // } // for
+
               // Insert lower divergence
               cycle.push_back(o);
 
@@ -339,7 +363,7 @@ template<SignedIntegral I, typename C>
                 .chain(v_snd_half)
                 .vec();
 
-              fmt::print("cycle: {} → {}\n", o, cycle);
+              // fmt::print("cycle: {} → {}\n", o, cycle);
               out.push_back(cycle);
               // Break
               return true;
@@ -356,7 +380,7 @@ template<SignedIntegral I, typename C>
 
   } // for
 
-  exit(0);
+  // exit(0);
 
   return out;
 
@@ -460,7 +484,7 @@ void minimal_basis_bfs_ordering(Basis& basis)
 
 // fn: align_intersections {{{
 template<Range R>
-decltype(auto) align_intersections(R&& minimal_basis, Sink sink)
+decltype(auto) align_intersections(R minimal_basis, Sink sink)
 {
   // Init logger
   err::Logger logger{sink};
@@ -468,6 +492,16 @@ decltype(auto) align_intersections(R&& minimal_basis, Sink sink)
   err::err({ ! minimal_basis.empty() })("Minimal basis must not be empty");
 
   err::err({ minimal_basis.size() > 1 })("Minimal basis must contain at least two cycles");
+
+  // // Rotate until first two basis have intersection of size 2
+  // minimal_basis = fn(minimal_basis)
+  //   .rot([](auto const& basis)
+  //   {
+  //     auto const& fst = basis.at(0);
+  //     auto const& snd = basis.at(1);
+  //     return fn(fst).in(snd).vec().size() == 2;
+  //   })
+  //   .vec();
 
   PairsInterCycles out;
 
@@ -483,31 +517,57 @@ decltype(auto) align_intersections(R&& minimal_basis, Sink sink)
   {
     auto c2{*std::next(it)};
 
-    auto intersection{fn(c1).in(c2).sort().unique().vec()};
+    auto intersection{fn(c1).in(c2).vec()};
+
+    auto f_align_intersection = [&]()
+    {
+      intersection = fn(c1).in(c2).vec();
+      if ( intersection.size() > 1 )
+      {
+        c1 = fn(c1).rot([&](auto v)
+        {
+          return fn(v).cut(u64{}, intersection.size()).in(intersection).vec().size() == intersection.size();
+        }).vec();
+
+        c2 = fn(c2).rot([&](auto v)
+        {
+          return fn(v).cut(u64{}, intersection.size()).in(intersection).vec().size() == intersection.size();
+        }).vec();
+
+        // Check if needs reverse
+        u64 size_intersection = intersection.size();
+        if ( fn(c1).cut(u64{}, size_intersection).vec() != fn(c2).cut(u64{}, size_intersection).vec() )
+        {
+          std::ranges::reverse(c2);
+          std::ranges::rotate(c2, c2.end() - 1);
+        }
+
+        intersection = fn(c1).in(c2).vec();
+      }
+      logger.info()("c1: {}", c1);
+      logger.info()("c2: {}", c2);
+      logger.info()("in: {}", intersection);
+    };
+
+    f_align_intersection();
 
     // Log data
     // Handle first element
     if( i == 0 )
     {
-      err::err({ ! intersection.empty() })
-        ("Intersection between first two elements must not be empty");
+      err::err({ ! intersection.empty() })("Intersection between first two elements must not be empty");
 
-      err::err({ intersection.size() == 2 })("Intersection must have size of 2");
+      // err::err({ intersection.size() == 2 })("Intersection must have size of 2");
 
       // Remove last element of cycle, if it equas the first
       if( c1.front() == c1.back() ){ c1.pop_back(); }
 
       // Rotate elements until first two are the intersection
-      c1 = fn(c1)
-        .rot([&](auto v)
-          {
-            return (v.at(0) == intersection.at(0) && v.at(1) == intersection.at(1))
-              or (v.at(0) == intersection.at(1) && v.at(1) == intersection.at(0));
-          })
-        .vec();
+      f_align_intersection();
 
       logger.info()("Rotated c1: {}", c1);
 
+      intersection = fn(intersection).cut(0,2).vec();
       out.emplace_back(intersection,c1);
     } // if
 
@@ -526,7 +586,7 @@ decltype(auto) align_intersections(R&& minimal_basis, Sink sink)
       logger.info()("Trying new c1: {}", c1);
 
       // Try to form intersection
-      intersection = fn(c1).in(c2).sort().unique().vec();
+      f_align_intersection();
 
       logger.info()("new_c1 ∩ c2: {}", intersection);
 
@@ -537,6 +597,7 @@ decltype(auto) align_intersections(R&& minimal_basis, Sink sink)
       q.push(q_restore.front()); q_restore.pop();
     } // while
 
+    logger.info()("c1: {}", c1);
     logger.info()("c1 ∩ c2: {}", intersection);
 
     q.push(c2);
@@ -544,16 +605,12 @@ decltype(auto) align_intersections(R&& minimal_basis, Sink sink)
     // Remove last element of cycle, if it equals the first
     if( c2.front() == c2.back() ){ c2.pop_back(); }
 
-    c2 = fn(c2)
-      .rot([&](auto v)
-        {
-          return (v.at(0) == intersection.at(0) && v.at(1) == intersection.at(1))
-            or (v.at(0) == intersection.at(1) && v.at(1) == intersection.at(0));
-        })
-      .vec();
+    f_align_intersection();
 
-    logger.info()("Rotated c2: {}", c2);
+    logger.info()("Final c2: {}", c2);
 
+    // Only allow intersection of size 2
+    intersection = fn(intersection).cut(0,2).vec();
     out.emplace_back(intersection,c2);
 
     ++i;
@@ -666,15 +723,18 @@ auto place_intersection(Range auto intersection)
   err::err({! intersection.empty()})("Intersection must not be empty");
 
   // Intersection must have size less or eq to 2
-  err::err({intersection.size() <= 2})("Intersection size must be two or less");
+  err::err({intersection.size() >= 2})("Intersection size must at least 2");
 
-  // Place single-node intersection
-  if( intersection.size() == 1 )
-  {
-    auto u{intersection.at(0)};
-    placement[u] = std::make_pair(0,0);
-    return placement;
-  } // if
+  // Intersection must have size less or eq to 2
+  // err::err({intersection.size() <= 2})("Intersection size must be two or less");
+  
+  // // Place single-node intersection
+  // if( intersection.size() == 1 )
+  // {
+  //   auto u{intersection.at(0)};
+  //   placement[u] = std::make_pair(0,0);
+  //   return placement;
+  // } // if
 
   // Update placement
   // for (i64 i{}; auto u : intersection)
@@ -682,9 +742,8 @@ auto place_intersection(Range auto intersection)
   //   placement[u] = std::make_pair(i,--i);
   // } // for
 
-  rg::reverse(intersection);
-  placement[intersection.front()] = std::make_pair(0,0);
-  placement[intersection.back()] = std::make_pair(1,-1);
+  placement[intersection.at(0)] = std::make_pair(0,0);
+  placement[intersection.at(1)] = std::make_pair(1,-1);
   // if
 
   return placement;
@@ -1195,11 +1254,16 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
   auto basis =
     f_timer({}, [&] { return minimal_basis_2(i64{},ops,m_crossing_nodes,logger.sink()); });
 
+  for (auto&& base : basis)
+  {
+    fmt::print("-- Base: {}\n", base);
+  } // for
+
   basis = f_timer({}, [&] { return detect_ears(ops, basis); });
 
   for (auto&& base : basis)
   {
-    // fmt::print("-- Base: {}\n", base);
+    fmt::print("-- Base (ear): {}\n", base);
   } // for
 
   f_timer({}, [&] { minimal_basis_bfs_ordering(basis); });
@@ -1207,7 +1271,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
   // Process into adjacent intersection
   for (i32 i{}; auto const& base : basis)
   {
-    logger.info()("-- Base {}: {}", i++, base);
+    logger.info()("-- Base (bfs) {}: {}", i++, base);
   } // for
 
   auto pair_intersection_basis =
@@ -1216,7 +1280,7 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
   // Process into adjacent intersection
   for (auto const& base : pair_intersection_basis)
   {
-    logger.info()("-- Int-Base: {}", base);
+    logger.info()("-- Base (align): {}", base);
   } // for
 
   // Calculate graph depth-view
@@ -1249,6 +1313,10 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
   //   fmt::print("prox e: {}\n", e);
   // } // for
 
+  // Rotate while intersection has size != 2
+  // pair_intersection_basis = fn(pair_intersection_basis).rot([](auto&& e){ return e.front().first.size() != 2; }).vec();
+
+  // Reverse the pairs before processing, I don't remember why
   f_timer({}, [&] { std::reverse(pair_intersection_basis.begin(), pair_intersection_basis.end()); });
 
   // Get initial intersection
@@ -1265,15 +1333,14 @@ decltype(auto) global_backtracking(Ops const& ops, C&& m_crossing_nodes, Sink si
   std::stack<std::pair<Nodes,Nodes>> st_solutions;
 
   // Push intersection
-  if(auto [u,v] = std::make_pair(intersection.front(),intersection.back());
-    fn(ops.succs(u)).has(v) )
+  if(auto [u,v] = std::make_pair(intersection.at(0),intersection.at(1)); fn(ops.succs(u)).has(v) )
   {
-    paths[{u,v}] = std::deque<Tile>({placement.at(intersection.front()), placement.at(intersection.back())});
+    paths[{u,v}] = std::deque<Tile>({placement.at(intersection.at(0)), placement.at(intersection.at(1))});
   } // if
   else
   {
-    paths[{v,u}] = std::deque<Tile>({placement.at(intersection.back()), placement.at(intersection.front())});
-  } // else
+    paths[{v,u}] = std::deque<Tile>({placement.at(intersection.at(1)), placement.at(intersection.at(0))});
+  } // if
 
   bool b_backtrack{false};
 
@@ -1464,6 +1531,9 @@ int main([[maybe_unused]] int argc, char const* argv[])
   err::Logger logger;
 
 
+  fmt::print("Gates: {}\n", g.vertices_count());
+  fmt::print("Wires: {}\n", g.edges_count());
+
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u);
 
@@ -1484,7 +1554,12 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(0,ops); });
 
+  unbalance(0,ops);
+
+  // ops.link(8, -7);
+
   f_timer({}, f_call_writer, metadata.data(), f_p, f_s, "out/3-out.v");
+
 
   // celaeno::graph::operations::balance::paths::run(0,ops);
   //
