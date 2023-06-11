@@ -163,6 +163,9 @@ auto f_timer(Location const& loc, F&& f, Args&&... args)
 }; // fn: f_timer }}}
 
 // fn: lowest_node_id {{{
+//
+// This function uses a BFS to determine which node has the lowest id in the graph
+//
 i64 lowest_node_id(Ops const& ops)
 {
   // Dummy vertex with lowest value
@@ -176,6 +179,216 @@ i64 lowest_node_id(Ops const& ops)
 
   return --idx;
 } // function: lowest_node_id }}}
+
+// fn: find_cycle_endpoints {{{
+//
+// A cycle has two endpoints, one diverges into two edge, and the other converges two edges. This
+// function finds these endpoints
+//
+decltype(auto) find_cycle_endpoints(Ops const& ops, Range auto&& cycle)
+{
+  // Predecessors within the cycle
+  auto f_preds_in_cycle = [&](auto&& e){ return fn(ops.preds(e)).in(cycle).vec(); };
+
+  // Successors within the cycle
+  auto f_succs_in_cycle = [&](auto&& e){ return fn(ops.succs(e)).in(cycle).vec(); };
+
+  // Find node with 2 preds in cycle (endpoint 1)
+  auto it_endpoint1 = std::ranges::find_if(cycle, [&](auto e){ return f_preds_in_cycle(e).size() == 2; });
+  err::err({it_endpoint1 != std::ranges::end(cycle)})("Could not find cycle endpoint");
+
+  // Find node with 2 succs in cycle (endpoint 2)
+  auto it_endpoint2 = std::ranges::find_if(cycle, [&](auto e){ return f_succs_in_cycle(e).size() == 2; });
+  err::err({it_endpoint2 != std::ranges::end(cycle)})("Could not find cycle endpoint");
+
+  return std::make_pair(*it_endpoint2, *it_endpoint1);
+} // function: find_cycle_endpoints }}}
+
+// fn: split_cycle_in_endpoints {{{
+//
+// A cycle has two endpoints, one diverges into two edge, and the other converges two edges. This
+// function splits the cycle into two half cycles, the parents are included in both half cycles as
+// the endpoints
+//
+decltype(auto) split_cycle_in_endpoints(Ops const& ops, Range auto&& cycle)
+{
+  std::pair<Nodes,Nodes> out;
+
+  // Predecessors within the cycle
+  auto f_preds_in_cycle = [&](auto&& e){ return fn(ops.preds(e)).in(cycle).vec(); };
+
+  // Successors within the cycle
+  auto f_succs_in_cycle = [&](auto&& e){ return fn(ops.succs(e)).in(cycle).vec(); };
+
+  // Vector that contains both halves
+  Nodes whole;
+
+  // Find node with 2 preds in cycle (endpoint 1)
+  auto it_endpoint1 = std::ranges::find_if(cycle, [&](auto e){ return f_preds_in_cycle(e).size() == 2; });
+  err::err({it_endpoint1 != std::ranges::end(cycle)})("Could not find cycle endpoint");
+
+  // Push initial node
+  whole.push_back(*it_endpoint1);
+
+  // Repeat initial value
+  whole.push_back(*it_endpoint1);
+
+  // Use a bfs to construct the rest of the cycle
+  ns_search::bfs::run(*it_endpoint1, f_preds_in_cycle, [](auto e) { return Nodes{}; },
+  [&](auto e)
+  {
+    if ( auto succs = f_succs_in_cycle(e); ! succs.empty() )
+    {
+      if ( succs.front() == whole.front() ) { whole.insert(whole.begin(), e); }
+      else { whole.push_back(e); }
+    }
+    return false;
+  });
+
+  // Find node with 2 succs in cycle (endpoint 2)
+  auto it_endpoint2 = std::ranges::find_if(cycle, [&](auto e){ return f_succs_in_cycle(e).size() == 2; });
+  err::err({it_endpoint2 != std::ranges::end(cycle)})("Could not find cycle endpoint");
+
+  // Repeat the endpoint in both ends of the solution
+  if ( whole.front() == *it_endpoint2 ) { whole.push_back(*it_endpoint2); }
+  else { whole.insert(whole.begin(), *it_endpoint2); }
+
+  // Find the current position of endpoint_1 in whole
+  auto it_endpoint1_whole = std::ranges::find_if(whole, [&](auto e){ return e == *it_endpoint1; });
+  err::err({it_endpoint1_whole != std::ranges::end(whole)})("Could not find cycle endpoint");
+
+  // Split the cycle in two
+  Nodes out1(whole.begin(), std::next(it_endpoint1_whole));
+  Nodes out2(std::next(it_endpoint1_whole), whole.end());
+
+  return std::make_pair(out1,out2);
+} // function: split_cycle_in_endpoints }}}
+
+// fn: make_line_equation {{{
+//
+// This function creates a lambda that represents the line equation for two points
+//
+decltype(auto) make_line_equation(Tile const& p1, Tile const& p2)
+{
+  err::err({p1.first != p2.first})("Attempt to calculate equation of straight line");
+
+  i64 m = (p2.second - p1.second) / (p2.first - p1.first);
+  i64 b = p1.second - m * p1.first;
+
+  fmt::print("-- line m: {}\n", m);
+  fmt::print("-- line b: {}\n", b);
+
+  return [=](i64 x){ return m*x + b; };
+} // function: make_line_equation }}}
+
+// fn: cycle_has_half_separation {{{
+//
+// This function checks if a positioned cycle halves are separate, this separation consists of a
+// straight line from one endpoint to another.
+//
+decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Placement const& m_node_pos)
+{
+  for (auto e : m_node_pos)
+  {
+    fmt::print("placement: {}\n", e);
+  } // for
+
+  // Get endpoints
+  auto [epn1,epn2] = find_cycle_endpoints(ops, cycle);
+  fmt::print("Cycle endpoints: {} | {}\n", epn1, epn2);
+
+  // Split the cycle in two halves
+  auto [chf1,chf2] = split_cycle_in_endpoints(ops, cycle);
+
+  fmt::print("Cycle half 1: {}\n", chf1);
+  fmt::print("Cycle half 2: {}\n", chf2);
+
+  // Get line equation for endpoints
+  // Current plane considers:
+  // // up   == -y, down  == +y
+  // // left == -x, right == +x
+  // y sign needs to be reversed for the line equation to work
+  Tile ep1 = m_node_pos.at(epn1);
+  Tile ep2 = m_node_pos.at(epn2);
+  ep1.first *= 2; ep1.second *= 2; ep1.second = -ep1.second;
+  ep2.first *= 2; ep2.second *= 2; ep2.second = -ep2.second;
+
+
+  std::function<i64(i64)> f_equation;
+  std::function<bool(Tile)> f_is_below;
+
+  // Check if is not a vertical line
+  if( ep1.first != ep2.first )
+  {
+    f_equation = make_line_equation(ep1, ep2);
+    f_is_below = [=](Tile t){ return t.second < f_equation(t.first); };
+  }
+  else
+  {
+    auto [x_min_it,x_max_it] = fn(cycle).minmax({}, [&](Node e){ return m_node_pos.at(e); });
+    auto [x_min, x_max] = std::make_pair(m_node_pos.at(*x_min_it).first*2, m_node_pos.at(*x_max_it).first*2);
+    i64 x_mea = (x_max+x_min)/2;
+
+    fmt::print("x_mea: {}\n", x_mea);
+
+    f_is_below = [=](Tile t)
+    {
+      // i64 x_base = ep1.first;
+      // Consider 'below' being to the left
+      return t.first < x_mea;
+    };
+  } // else
+
+  std::function<bool(Tile)> f_is_above = [&](Tile const& t){ return ! f_is_below(t); };
+
+
+  fmt::print("Cycle endpoints: {} | {}\n", ep1, ep2);
+
+  // Pop endpoints of halves
+  chf1.pop_back();
+  chf1.erase(chf1.begin());
+  chf2.pop_back();
+  chf2.erase(chf2.begin());
+
+  auto f_is_crossed = [&](auto const& cycle_half)
+  {
+    if ( cycle_half.size() < 2 ) { return false; }
+    // Get first node
+    auto n = cycle_half.front();
+    // Get first point
+    auto t_fst = m_node_pos.at(n);
+    t_fst.first *= 2; t_fst.second *= 2; t_fst.second = -t_fst.second;
+    // Check if point is above or below the line
+    // > 0 above the line
+    // < 0 below the line
+    // = 0 on the line
+    bool is_below{f_is_below(t_fst)};
+    fmt::print("Node {} with Point {} is below? {}\n", n, t_fst, is_below);
+    for( auto it{std::next(cycle_half.begin())}; it != cycle_half.end(); ++it )
+    {
+      err::err({ m_node_pos.contains(*it) })("Cycle node {} not found in placement", *it);
+
+      // Other points must also be the same as the first
+      Tile t = m_node_pos.at(*it);
+      t.first *= 2; t.second *= 2; t.second = -t.second;
+
+      fmt::print("Node {} with point {} is below? {}\n", *it, t, f_is_below(t));
+
+      if ( is_below )
+      {
+        if ( f_is_above(t) ) { return true; }
+      }
+      else
+      {
+        if ( f_is_below(t) ) { return true; }
+      }
+    } // for
+
+    return false;
+  };
+
+  return f_is_crossed(chf1) or f_is_crossed(chf2);
+} // function: cycle_has_half_separation }}}
 
 // fn: e_bfs {{{
 template<typename F = std::function<bool(Edge)>>
@@ -1224,7 +1437,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
     auto u{unplaced.top()}; unplaced.pop();
 
     // Log
-    logger.info()("u: {}", u);
+    logger.info()("current node unplaced: {}", u);
 
     // Skip if placed
     if( p.contains(u) ){ continue; }
@@ -1236,7 +1449,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
     Nodes neighbors_positioned{fn(f_neighbors(u)).in(p).vec()};
 
     // Log
-    logger.info()("Nodes placed: {}", neighbors_positioned);
+    logger.info()("Neighbors of {} which are positioned: {}", u, neighbors_positioned);
 
     // Get all possible positions adjacent to positions of neighbors
     Tiles candidates;
@@ -1256,7 +1469,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
         .unique()
         .vec();
 
-      logger.info()("condidates initial: {}", candidates);
+      logger.info()("Initial candidate tiles to place {} at: {}", u, candidates);
 
       // Remove candidates that are behind positioned input nodes
       candidates = fn(candidates).keep([&](Tile const& t)
@@ -1276,6 +1489,8 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
         return true;
       }).vec();
 
+      logger.info()("Candidates that are not behind input nodes {}", candidates);
+
       // For each tile in candidates, remove all that does not adhere to edge
       // constraints.
       auto f_target = [&](Node u, Node v) { return m_edge_weight.at({u,v}); };
@@ -1288,7 +1503,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
           , [&](Tile t, Node v) { return f_target(u,v) == f_dist(t,p.at(v)); })
         .vec();
 
-      logger.info()("condidates filtered by edges: {}", candidates);
+      logger.info()("Candidates that respect edge constraints: {}", candidates);
 
       // Filter candidates by A*
       candidates = fn(candidates)
@@ -1321,8 +1536,15 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
         })
         .vec();
 
+      logger.info()("Candidates that are reachable through A*: {}", candidates);
+
+      // Remove candidates that are below the cut between the intersection with the parent cycle in
+      // the bfs tree
+
       // Remove duplicate positions in candidates
       candidates = fn(candidates).sort().unique().vec();
+
+      logger.info()("Candidates without duplicates: {}", candidates);
 
       // Sort candidates by distance
       candidates = fn(candidates).sort({}, [&](Tile const& t)
@@ -1378,6 +1600,8 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
         return i64{};
       }).vec();
 
+      logger.info()("Candidates sorted by distance: {}", candidates);
+
     } // if
     else
     {
@@ -1385,7 +1609,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
     } // else
 
     // Log
-    logger.info()("Candidates: {}", candidates);
+    logger.info()("Final Candidates: {}", candidates);
 
     // Check if candidates are empty, if so, backtrack
     if (candidates.empty())
@@ -1797,62 +2021,91 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     // - Update final solution
     // - Push generator to backtracking stack
     // - Push incident cycle to backtracking stack
-    if( auto it{generator.begin()}; it != generator.end() )
+
+    auto it_gen{generator.begin()}; 
+
+    auto check_inner_crossings = [&]
+    {
+      while ( it_gen != generator.end() )
+      {
+        placement = it_gen->first;
+        paths = it_gen->second;
+
+        // Check for half separation
+        bool has_inner_crossings = cycle_has_half_separation(ops, cycle, placement);
+
+        if ( ! placement.empty() )
+        {
+          Placement _placement {placement};
+          Paths _paths {paths};
+
+          // Offset coordinates to remove negative values
+          auto x_min{rg::min_element(_placement,{},[](auto e){ return e.second.first; })->second.first};
+          auto y_min{rg::min_element(_placement,{},[](auto e){ return e.second.second; })->second.second};
+
+          for (auto& [n,p] : _placement)
+          {
+            auto& [x,y] = p;
+
+            x += std::abs(x_min);
+            y += std::abs(y_min);
+          } // for
+
+          // Expand grid to solve crossings
+          for (auto& [n,p] : _placement)
+          {
+            auto& [x,y] = p;
+
+            x *= 2;
+            y *= 2;
+          } // for
+
+          for(auto& [pair,path] : _paths)
+          {
+            for(Tile& tile : path)
+            {
+              tile.first += std::abs(x_min);
+              tile.second += std::abs(y_min);
+              tile.first *= 2;
+              tile.second *= 2;
+            }
+          }
+
+          // Draw
+#ifdef DEBUG
+          if (! has_inner_crossings)
+          {
+            logger.info()("-- Start draw");
+            ns_draw::svg::svg(ops
+              , fmt::format("out/step-{}.svg", ++i)
+              , _placement
+              , _paths
+              , [](auto e){ return e; });
+            logger.info()("-- End draw");
+          } // if has_inner_crossings
+#endif
+        }
+
+        if ( has_inner_crossings )
+        {
+          fmt::print("Cycle {} has inner crossings\n", i);
+          it_gen = std::next(it_gen);
+        }
+        else
+        {
+          fmt::print("Cycle {} has no inner crossings\n", i);
+          break;
+        } // else
+      }
+    };
+
+    check_inner_crossings();
+
+
+    if( it_gen != generator.end() )
     {
       // fmt::print("Draw of {}\n", i);
 
-      placement = it->first;
-      paths = it->second;
-
-      if ( ! placement.empty() )
-      {
-        Placement _placement {placement};
-        Paths _paths {paths};
-
-        // Offset coordinates to remove negative values
-        auto x_min{rg::min_element(_placement,{},[](auto e){ return e.second.first; })->second.first};
-        auto y_min{rg::min_element(_placement,{},[](auto e){ return e.second.second; })->second.second};
-
-        for (auto& [n,p] : _placement)
-        {
-          auto& [x,y] = p;
-
-          x += std::abs(x_min);
-          y += std::abs(y_min);
-        } // for
-
-        // Expand grid to solve crossings
-        for (auto& [n,p] : _placement)
-        {
-          auto& [x,y] = p;
-
-          x *= 2;
-          y *= 2;
-        } // for
-
-        for(auto& [pair,path] : _paths)
-        {
-          for(Tile& tile : path)
-          {
-            tile.first += std::abs(x_min);
-            tile.second += std::abs(y_min);
-            tile.first *= 2;
-            tile.second *= 2;
-          }
-        }
-
-        // Draw
-#ifdef DEBUG
-        logger.info()("-- Start draw");
-        ns_draw::svg::svg(ops
-            , fmt::format("out/step-{}.svg", ++i)
-            , _placement
-            , _paths
-            , [](auto e){ return e; }
-            );
-        logger.info()("-- End draw");
-#endif
-      }
 
       st_generator.push(std::move(generator));
       st_solutions.push(std::make_pair(intersection,cycle));
