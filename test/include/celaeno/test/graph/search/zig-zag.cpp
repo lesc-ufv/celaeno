@@ -1338,6 +1338,7 @@ auto place_intersection(Ops const& ops, Range auto intersection)
   //   placement[u] = std::make_pair(i,--i);
   // } // for
 
+  // For b1 is (-1,-1)
   if ( fn(ops.succs(intersection.at(0))).has(intersection.at(1)) != 0 )
   {
     placement[intersection.at(1)] = std::make_pair(-1,-1);
@@ -1357,11 +1358,13 @@ struct PlaceCycleRet
 {
   Placement placement;
   Paths paths;
-  Nodes unreachable;
-  PlaceCycleRet(Placement const& placement, Paths const& paths, Nodes const& unreachable)
+  std::set<Node> unreachable;
+  bool failed;
+  PlaceCycleRet(Placement const& placement, Paths const& paths, std::set<Node> const& unreachable, bool failed)
     : placement(placement)
     , paths(paths)
     , unreachable(unreachable)
+    , failed(failed)
   {}
 };
 
@@ -1422,9 +1425,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
   // Check if cycle was already placed
-  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,{}); }
-
-  bool stop{false};
+  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,{},false); }
 
   // Wire tiles
   std::unordered_map<Node,std::unordered_map<Node,Tile>> wires_of;
@@ -1464,10 +1465,10 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     logger.info()("Neighbors of {} which are positioned: {}", u, neighbors_positioned);
 
     // Get all possible positions adjacent to positions of neighbors
-    Tiles candidates;
+    Tiles tile_candidates;
 
-    // // Keep track of unreachable nodes
-    // Nodes unreachable;
+    // Keep track of unreachable nodes
+    std::set<Node> unreachable;
 
     if( ! m_backtrack.contains(u) )
     {
@@ -1475,7 +1476,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
       // Get all candidate positions from previously positioned neighbors
       // Remove occupied positions
-      candidates = fn(neighbors_positioned)
+      tile_candidates = fn(neighbors_positioned)
         // .as([&](Node v){ return f_get_candidates(p[v],1); }) // nodes → tiles
         .as([&](Node v){ return f_get_candidates(p[v], m_edge_weight.at({u,v})); }) // nodes → tiles
         .squash() // merge [[tiles],[tiles]...] → [tiles]
@@ -1484,10 +1485,10 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         .unique()
         .vec();
 
-      logger.info()("Initial candidate tiles to place {} at: {}", u, candidates);
+      logger.info()("Initial candidate tiles to place {} at: {}", u, tile_candidates);
 
-      // Remove candidates that are behind positioned input nodes
-      candidates = fn(candidates).keep([&](Tile const& t)
+      // Remove tile_candidates that are behind positioned input nodes
+      tile_candidates = fn(tile_candidates).keep([&](Tile const& t)
       {
         for(Node const& n : neighbors_positioned)
         {
@@ -1504,24 +1505,24 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         return true;
       }).vec();
 
-      logger.info()("Candidates that are not behind input nodes {}", candidates);
+      logger.info()("Candidates that are not behind input nodes {}", tile_candidates);
 
-      // For each tile in candidates, remove all that does not adhere to edge
+      // For each tile in tile_candidates, remove all that does not adhere to edge
       // constraints.
       auto f_target = [&](Node u, Node v) { return m_edge_weight.at({u,v}); };
       auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
 
       // Keep a candidate if it satisfies edges constraints to all its placed
       // neighbors
-      candidates = fn(candidates)
+      tile_candidates = fn(tile_candidates)
         .in_all(neighbors_positioned
           , [&](Tile t, Node v) { return f_target(u,v) == f_dist(t,p.at(v)); })
         .vec();
 
-      logger.info()("Candidates that respect edge constraints: {}", candidates);
+      logger.info()("Candidates that respect edge constraints: {}", tile_candidates);
 
       // Filter candidates by A*
-      candidates = fn(candidates)
+      tile_candidates = fn(tile_candidates)
         .keep([&](Tile t)
         {
           for (auto v : neighbors_positioned)
@@ -1551,18 +1552,18 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         })
         .vec();
 
-      logger.info()("Candidates that are reachable through A*: {}", candidates);
+      logger.info()("Candidates that are reachable through A*: {}", tile_candidates);
 
-      // Remove candidates that are below the cut between the intersection with the parent cycle in
+      // Remove tile_candidates that are below the cut between the intersection with the parent cycle in
       // the bfs tree
 
-      // Remove duplicate positions in candidates
-      candidates = fn(candidates).sort().unique().vec();
+      // Remove duplicate positions in tile_candidates
+      tile_candidates = fn(tile_candidates).sort().unique().vec();
 
-      logger.info()("Candidates without duplicates: {}", candidates);
+      logger.info()("Candidates without duplicates: {}", tile_candidates);
 
-      // Sort candidates by distance
-      candidates = fn(candidates).sort({}, [&](Tile const& t)
+      // Sort tile_candidates by distance
+      tile_candidates = fn(tile_candidates).sort({}, [&](Tile const& t)
       {
         // +x right
         // +y down
@@ -1615,19 +1616,33 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         return i64{};
       }).vec();
 
-      logger.info()("Candidates sorted by distance: {}", candidates);
+      // Save unreachable nodes
+      if ( tile_candidates.empty() )
+      {
+        // Save neighbors in case they are unreachable
+        std::ranges::for_each(neighbors_positioned, [&](auto e){ unreachable.insert(e); });
+      }
+
+      logger.info()("Candidates sorted by distance: {}", tile_candidates);
 
     } // if
     else
     {
-      candidates = m_backtrack.at(u);
+      tile_candidates = m_backtrack.at(u);
+
+      // Save unreachable nodes
+      if ( tile_candidates.empty() )
+      {
+        // Save neighbors in case they are unreachable
+        std::ranges::for_each(neighbors_positioned, [&](auto e){ unreachable.insert(e); });
+      }
     } // else
 
     // Log
-    logger.info()("Final Candidates: {}", candidates);
+    logger.info()("Final Candidates: {}", tile_candidates);
 
-    // Check if candidates are empty, if so, backtrack
-    if (candidates.empty())
+    // Check if tile_candidates are empty, if so, backtrack
+    if (tile_candidates.empty())
     {
       // Revert changes made by u
       // Move it back to unplaced stack
@@ -1636,9 +1651,11 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // invalidated, since it is based on neighbors positions, which will now
       // change
       if( m_backtrack.contains(u) ){ m_backtrack.erase(u); }
-      // Try reverse path
+      // Failed
       if( placed.empty() )
       {
+        logger.info()("Unreacheable neighbors of {}: {}", u, unreachable);
+        co_yield PlaceCycleRet({},{},unreachable,true);
         break;
       } // if
       // Remove previous node from placed stack
@@ -1657,12 +1674,12 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     } // if
 
     // Get most promissing position
-    Tile chosen{candidates.front()};
+    Tile chosen{tile_candidates.front()};
 
     // Block paths between u and candidate
     for (auto v : neighbors_positioned)
     {
-      // Candidates
+      // Tile candidates
       auto f_get_candidates = [&](Tile const& t, i64 dist) { return Adjacencies{t,dist}.tiles(); };
       // Distance
       auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
@@ -1704,20 +1721,20 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     // if
 
     // Save node u in it
-    p[u] = candidates.front();
+    p[u] = tile_candidates.front();
 
     // Erase used position
-    candidates.erase(candidates.begin());
+    tile_candidates.erase(tile_candidates.begin());
 
     // Save other positions to backtracking map
-    m_backtrack[u] = candidates;
+    m_backtrack[u] = tile_candidates;
 
     // Update placed stack
     placed.push(u);
 
     if( unplaced.empty() )
     {
-      co_yield PlaceCycleRet(p,paths,{});
+      co_yield PlaceCycleRet(p,paths,{},false);
 
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
@@ -1980,35 +1997,19 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
   i64 i{};
 
   // Loop until a solution is found for every incident cycle
+  std::set<Node> nodes_unreachable;
   while ( ! pair_intersection_basis.empty() )
   {
     // Get next pair intersection/placement
     Nodes intersection;
     Nodes cycle;
+    cppcoro::generator<PlaceCycleRet> generator;
 
     if( ! b_backtrack )
     {
       intersection = pair_intersection_basis.back().first;
       cycle = pair_intersection_basis.back().second;
       pair_intersection_basis.pop_back();
-    } // if
-    else
-    {
-      err::err({ ! st_solutions.empty() })("Solution not found");
-
-      err::err({ st_solutions.size() == st_generator.size() })
-        ("Number of solutions differ from number of generators");
-
-      auto e{st_solutions.top()}; st_solutions.pop();
-
-      intersection = e.first;
-      cycle = e.second;
-    } // else
-
-    cppcoro::generator<PlaceCycleRet> generator;
-
-    if( ! b_backtrack )
-    {
       // Create generator
       generator = f_timer({}, [&]
       {
@@ -2025,11 +2026,58 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     } // if
     else
     {
-      // Get previous generator
-      generator = std::move(st_generator.top()); st_generator.pop();
+      // Progressively remove nodes from nodes_unreachable set
+      // This allows to backtrack until the earliest cycle that
+      // contains one or more unreachable nodes(s)
+      err::err({ ! st_solutions.empty() })("Solution not found");
+
+      err::err({ st_solutions.size() == st_generator.size() })
+        ("Number of solutions differ from number of generators");
+
+      logger.info()("----------------");
+      logger.info()("Unreacheable: {}", nodes_unreachable);
+      if ( ! nodes_unreachable.empty() )
+      {
+        while ( ! nodes_unreachable.empty() and ! st_solutions.empty() )
+        {
+          auto e{st_solutions.top()}; st_solutions.pop();
+
+          intersection = e.first;
+          cycle = e.second;
+
+          // Check if this cycle contains unreachable nodes
+          if ( auto intersect = fn(cycle).in(nodes_unreachable).vec(); ! intersect.empty() )
+          {
+            logger.info()("Cycle: {}", cycle);
+            logger.info()("Intersect: {}", intersect);
+            std::ranges::for_each(intersect, [&](auto e){ nodes_unreachable.erase(e); });
+          } // if
+
+          // Get previous generator
+          generator = std::move(st_generator.top()); st_generator.pop();
+
+          // Re-insert intersection and base into the to-place vector
+          if ( ! nodes_unreachable.empty() )
+          {
+            pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
+          } // if
+        } // while
+      } // if
+      else
+      {
+        auto e{st_solutions.top()}; st_solutions.pop();
+
+        intersection = e.first;
+        cycle = e.second;
+
+        // Get previous generator
+        generator = std::move(st_generator.top()); st_generator.pop();
+      } // else
 
       // Disable backtracking
       b_backtrack = false;
+
+      logger.info()("----------------");
     } // else
 
     // If a solution is found from current placement
@@ -2039,15 +2087,15 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
 
     auto it_gen{generator.begin()}; 
 
-    auto check_inner_crossings = [&]
+    auto check_half_separations = [&]
     {
-      while ( it_gen != generator.end() )
+      while ( it_gen != generator.end() && it_gen->failed == false )
       {
         placement = it_gen->placement;
         paths = it_gen->paths;
 
         // Check for half separation
-        bool has_inner_crossings = cycle_has_half_separation(ops, cycle, placement);
+        bool has_half_separations = cycle_has_half_separation(ops, cycle, placement);
 
         if ( ! placement.empty() )
         {
@@ -2088,7 +2136,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
 
           // Draw
 #ifdef DEBUG
-          if (! has_inner_crossings)
+          if (! has_half_separations)
           {
             logger.info()("-- Start draw");
             ns_draw::svg::svg(ops
@@ -2097,11 +2145,11 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
               , _paths
               , [](auto e){ return e; });
             logger.info()("-- End draw");
-          } // if has_inner_crossings
+          } // if has_half_separations
 #endif
         }
 
-        if ( has_inner_crossings )
+        if ( has_half_separations )
         {
           fmt::print("Cycle {} has inner crossings\n", i);
           it_gen = std::next(it_gen);
@@ -2114,14 +2162,14 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
       }
     };
 
-    check_inner_crossings();
+    // check_half_separations();
 
-
-    if( it_gen != generator.end() )
+    if( it_gen != generator.end() && it_gen->failed == false )
     {
+      placement = it_gen->placement;
+      paths = it_gen->paths;
       st_generator.push(std::move(generator));
       st_solutions.push(std::make_pair(intersection,cycle));
-
       logger.info()("-- Success for cycle: {}", cycle);
       logger.info()("-- Placement:");
       for (auto e : placement) { logger.info()("e: {}", e); } // for
@@ -2134,6 +2182,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     {
       pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
       b_backtrack = true;
+      nodes_unreachable = (it_gen != generator.end())? it_gen->unreachable : std::set<Node>{};
       logger.info()("-- Failed for cycle: {}", cycle);
     } // else
 
@@ -2203,8 +2252,10 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   f_timer({}, f_write_d, g.data(), f_p, f_s, "out/3-out.dimacs");
 
+  std::vector<std::vector<std::vector<Node>>> e_basis;
+
   // B1
-  std::vector<std::vector<std::vector<Node>>> e_basis =
+  std::vector<std::vector<std::vector<Node>>> e_basis_b1 =
   {
     { {26,31}, {26,23}, {23,27}, {31,27}, }, 
     { {26,23}, {20,23}, {22,20}, {22,26}, }, 
@@ -2234,6 +2285,64 @@ int main([[maybe_unused]] int argc, char const* argv[])
     { {27,32}, {40,41}, {40,36}, {36,31}, {31,27}, {41,37}, {37,32}, }, 
     { {45,42}, {45,41}, {41,37}, {42,37}, },
   };
+
+  std::vector<std::vector<std::vector<Node>>> e_basis_cm138a =
+  {
+    { {77,78}, {70,78}, {69,70}, {69,77}, } ,
+    { {70,71}, {63,71}, {62,63}, {62,70}, } ,
+    { {69,70}, {62,70}, {60,62}, {60,69}, } ,
+    { {63,61}, {53,61}, {55,53}, {55,63}, } ,
+    { {62,63}, {55,63}, {54,55}, {54,62}, } ,
+    { {60,62}, {54,62}, {51,54}, {51,60}, } ,
+    { {53,52}, {44,52}, {45,44}, {45,53}, } ,
+    { {55,53}, {45,53}, {47,45}, {47,55}, } ,
+    { {54,55}, {47,55}, {46,47}, {46,54}, } ,
+    { {51,54}, {46,54}, {43,46}, {43,51}, } ,
+    { {44,37}, {30,37}, {36,30}, {36,44}, } ,
+    { {45,44}, {36,44}, {38,36}, {38,45}, } ,
+    { {47,45}, {38,45}, {40,38}, {40,47}, } ,
+    { {46,47}, {40,47}, {39,40}, {39,46}, } ,
+    { {43,46}, {39,46}, {35,39}, {35,43}, } ,
+    { {20,12}, {20,13}, {12,8}, {8,13}, } ,
+    { {21,20}, {21,13}, {20,13}, } ,
+    { {36,30}, {21,30}, {29,21}, {29,36}, } ,
+    { {31,29}, {31,23}, {29,23}, } ,
+    { {40,38}, {31,38}, {33,31}, {33,40}, } ,
+    { {32,33}, {32,26}, {33,26}, } ,
+    { {35,39}, {32,39}, {27,32}, {27,35}, } ,
+    { {39,40}, {33,40}, {32,33}, {32,39}, } ,
+    { {38,36}, {29,36}, {31,29}, {31,38}, } ,
+    { {22,23}, {23,15}, {15,14}, {22,14}, } ,
+    { {30,28}, {20,28}, {21,20}, {21,30}, } ,
+    { {21,29}, {23,29}, {13,21}, {15,13}, {15,23}, } ,
+    { {14,15}, {9,14}, {9,15}, } ,
+    { {86,81}, {74,81}, {80,74}, {80,86}, } ,
+    { {74,65}, {56,65}, {64,56}, {64,74}, } ,
+    { {72,64}, {72,73}, {64,73}, } ,
+    { {69,60}, {76,69}, {82,76}, {60,68}, {75,68}, {81,75}, {82,81}, } ,
+    { {51,43}, {59,51}, {67,59}, {43,50}, {58,50}, {65,58}, {67,65}, } ,
+    { {35,27}, {42,35}, {49,42}, {27,34}, {41,34}, {48,41}, {49,48}, } ,
+    { {77,84}, {84,88}, {91,88}, {83,77}, {83,87}, {87,90}, {90,91}, } ,
+    { {69,77}, {86,90}, {86,81}, {76,69}, {82,76}, {83,77}, {87,83}, {81,82}, {90,87}, } ,
+    { {51,60}, {74,81}, {74,65}, {59,51}, {67,59}, {68,60}, {75,68}, {65,67}, {81,75}, } ,
+    { {35,43}, {56,65}, {56,48}, {42,35}, {49,42}, {50,43}, {58,50}, {48,49}, {65,58}, } ,
+    { {80,74}, {64,74}, {72,64}, {72,80}, } ,
+    { {48,56}, {57,48}, {57,56}, } ,
+    { {86,90}, {89,90}, {89,86}, } ,
+    { {72,80}, {79,72}, {79,80}, } ,
+    { {27,32}, {26,32}, {19,26}, {19,27}, } ,
+    { {14,22}, {18,14}, {18,22}, } ,
+    { {22,26}, {19,26}, {18,22}, {11,18}, {11,19}, } ,
+    { {33,31}, {26,33}, {23,31}, {22,23}, {22,26}, } ,
+    { {15,13}, {9,15}, {8,13}, {5,8}, {5,9}, } ,
+    { {5,6}, {3,5}, {3,6}, } ,
+    { {6,11}, {17,11}, {25,17}, {10,6}, {16,10}, {24,16}, {24,25}, } ,
+    { {6,11}, {6,5}, {18,14}, {9,14}, {5,9}, {11,18}, } ,
+    { {80,86}, {89,86}, {79,80}, {85,79}, {85,89}, } ,
+    { {56,64}, {73,64}, {57,56}, {66,57}, {66,73}, },
+  };
+
+  e_basis = e_basis_cm138a;
 
   // Read cycle output
   // Decode to original values in graph
