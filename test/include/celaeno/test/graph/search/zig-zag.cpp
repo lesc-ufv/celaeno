@@ -1353,7 +1353,19 @@ auto place_intersection(Ops const& ops, Range auto intersection)
 } // function: place_intersection }}}
 
 // fn: place_cycle {{{
-cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
+struct PlaceCycleRet
+{
+  Placement placement;
+  Paths paths;
+  Nodes unreachable;
+  PlaceCycleRet(Placement const& placement, Paths const& paths, Nodes const& unreachable)
+    : placement(placement)
+    , paths(paths)
+    , unreachable(unreachable)
+  {}
+};
+
+cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   , Placement p
   , Paths paths
   , Range auto cycle
@@ -1410,7 +1422,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
   // Check if cycle was already placed
-  if(unplaced.empty()){ co_yield std::make_pair(p,paths); }
+  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,{}); }
 
   bool stop{false};
 
@@ -1453,6 +1465,9 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
 
     // Get all possible positions adjacent to positions of neighbors
     Tiles candidates;
+
+    // // Keep track of unreachable nodes
+    // Nodes unreachable;
 
     if( ! m_backtrack.contains(u) )
     {
@@ -1702,7 +1717,7 @@ cppcoro::generator<std::pair<Placement,Paths>> place_cycle(Ops const& ops
 
     if( unplaced.empty() )
     {
-      co_yield std::make_pair(p,paths);
+      co_yield PlaceCycleRet(p,paths,{});
 
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
@@ -1941,7 +1956,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     f_timer({}, [&] { return place_intersection(ops, intersection); });
 
   // Stack generators
-  std::stack<cppcoro::generator<std::pair<Placement,Paths>>> st_generator;
+  std::stack<cppcoro::generator<PlaceCycleRet>> st_generator;
 
   // Stack of processed solutions
   std::stack<std::pair<Nodes,Nodes>> st_solutions;
@@ -1990,7 +2005,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
       cycle = e.second;
     } // else
 
-    cppcoro::generator<std::pair<Placement,Paths>> generator;
+    cppcoro::generator<PlaceCycleRet> generator;
 
     if( ! b_backtrack )
     {
@@ -2028,8 +2043,8 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     {
       while ( it_gen != generator.end() )
       {
-        placement = it_gen->first;
-        paths = it_gen->second;
+        placement = it_gen->placement;
+        paths = it_gen->paths;
 
         // Check for half separation
         bool has_inner_crossings = cycle_has_half_separation(ops, cycle, placement);
@@ -2104,30 +2119,12 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
 
     if( it_gen != generator.end() )
     {
-      // fmt::print("Draw of {}\n", i);
-
-
       st_generator.push(std::move(generator));
       st_solutions.push(std::make_pair(intersection,cycle));
 
-      // // Draw
-      // ns_draw::svg::svg(ops,fmt::format("steps/{}-1.svg", i)
-      //   , Placement{placement}
-      //   , std::vector<std::vector<i64>>{}
-      //   , [](auto e){ return e; }
-      // );
-
-      logger.info()("-- Success for:");
-      for (auto e : cycle)
-      {
-        logger.info()("e: {}", e);
-      } // for
-
+      logger.info()("-- Success for cycle: {}", cycle);
       logger.info()("-- Placement:");
-      for (auto e : placement)
-      {
-        logger.info()("e: {}", e);
-      } // for
+      for (auto e : placement) { logger.info()("e: {}", e); } // for
 
     } // if
     // Else if a solution is not found
@@ -2137,12 +2134,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     {
       pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
       b_backtrack = true;
-      logger.info()("-- Failed for:");
-      for (auto e : cycle)
-      {
-        logger.info()("e: {}", e);
-      } // for
-
+      logger.info()("-- Failed for cycle: {}", cycle);
     } // else
 
   } // while
