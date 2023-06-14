@@ -117,6 +117,12 @@ requires
 // Relationship {{{
 
 //
+// Check if a type T is a specialization of U with Args...
+//
+template<template<typename...> class T, template<typename...> class U, typename... Args>
+concept IsSpecializationOf = std::same_as<T<Args...>,U<Args...>>;
+
+//
 // Check if decayed types are the same
 //
 template<typename T, typename U>

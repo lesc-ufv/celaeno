@@ -1,7 +1,7 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : err2
+// @file        : err
 // @created     : Thursday Aug 19, 2021 12:35:25 UTC
 //
 
@@ -78,14 +78,14 @@ class Location
       [[maybe_unused]] M&& m
     , [[maybe_unused]] Args&&... args )
   {
-#ifdef DEBUG
     if( conds.contains(false) || conds.empty() )
     {
       auto loc_curr = loc.get() + m;
+#ifdef DEBUG
       spdlog::error(loc_curr, std::forward<Args>(args)...);
+#endif // DEBUG
       exit(1);
     } // if
-#endif // DEBUG
   }; // anonymous lambda
 } // fn: err }}}
 
@@ -112,12 +112,16 @@ class Fold
     Fold(std::shared_ptr<spdlog::logger> src, std::string const& suffix)
       : logger(src)
     {
+#ifdef DEBUG
       logger->info("{{{" + suffix);
+#endif
     } // Fold
 
     ~Fold()
     {
+#ifdef DEBUG
       logger->info("}}}");
+#endif
     } // ~Fold
 }; // class: Fold }}}
 
@@ -132,22 +136,28 @@ class Logger
     Logger(std::shared_ptr<spdlog::logger> logger, Location const& loc = {})
       : logger(logger)
     {
+#ifdef DEBUG
       logger->info("{{{" + loc.get()); // }}}
       logger->flush();
+#endif
     }
 
     Logger(Location const& loc = {})
       : logger(spdlog::basic_logger_st("celaeno", log_filename, true))
     {
+#ifdef DEBUG
       logger->info("{{{" + loc.get()); // }}}
       logger->flush();
+#endif
     }
 
     ~Logger()
     {
       // {{{
+#ifdef DEBUG
       logger->info("}}}");
       logger->flush();
+#endif
     }
 
     std::shared_ptr<spdlog::logger> sink()
@@ -159,9 +169,11 @@ class Logger
     {
       return [&]<String M, Printable... Args>(M&& m, Args&&... args)
       {
+#ifdef DEBUG
         auto loc_curr = loc.get() + m;
         logger->info(loc_curr, std::forward<Args>(args)...);
         logger->flush();
+#endif
       }; // anonymous lambda
     } // fn: info
 

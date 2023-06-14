@@ -1,7 +1,7 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : fun-1
+// @file        : fun
 // @created     : Monday Aug 16, 2021 13:10:35 UTC
 //
 // BSD 2-Clause License
@@ -35,6 +35,7 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/err/err.hpp>
 #include <fmt/ranges.h>
 #include <range/v3/all.hpp>
 
@@ -47,6 +48,7 @@ namespace celaeno::fun
 // using namespaces {{{
 using namespace celaeno::aliases;
 using namespace celaeno::concepts;
+using namespace celaeno::err;
 // }}}
 
 // namespaces {{{
@@ -66,6 +68,8 @@ struct Fun
     {}
 
   // Terminators
+  V value() { return view; }
+
   template<Range R, typename F = std::equal_to<> >
   decltype(auto) find_first_of(R&& r, F&& f = {})
   {
@@ -123,6 +127,12 @@ struct Fun
     return *rg::min_element(view,f,p);
   }
 
+  template<typename F = std::less<>, typename P = ranges::identity>
+  [[nodiscard]] auto minmax(F&& f = {}, P&& p = {})
+  {
+    return rg::minmax_element(view,f,p);
+  }
+
   template<typename F>
   [[nodiscard]] auto all(F&& f)
   {
@@ -133,13 +143,6 @@ struct Fun
   [[nodiscard]] auto any(F&& f)
   {
     return rg::any_of(view,f);
-  }
-
-  template<typename F>
-  [[nodiscard]] auto group(F&& f)
-  {
-    auto it{rg::partition(view,f)};
-    return std::tuple(view.begin(),it,view.end());
   }
 
   [[nodiscard]] auto vec()
@@ -213,6 +216,80 @@ struct Fun
     return *this;
   } // function: ply
 
+  // fn: mut {{{
+  //
+  // Transforms the whole container in a single pass of the unary predicate f
+  //
+  // @param f: Transformation unary predicate
+  //
+  // Synonyms:
+  //
+  template<typename Out = void, typename F>
+  [[nodiscard]] auto mut(F&& f)
+  {
+    auto v{f(this->vec())};
+
+    return Fun<decltype(v)>(v);
+  } // fn: mut }}}
+
+  // fn: in_seq {{{
+  //
+  // Compares the two containers from the start and returns a new container with
+  // the similar elements
+  //
+  // @param r: Second sequence to compare with
+  // @param f: Function to apply on each comparison
+  // @param p[1,2]: Projection to apply on each comparison
+  //
+  // Synonyms:
+  //
+  template<Range R
+    , typename F = std::equal_to<>
+    , typename P1 = ranges::identity
+    , typename P2 = ranges::identity>
+  [[nodiscard]] auto in_seq(R&& r, F&& f = {}, P1&& p1 = {}, P2&& p2 = {})
+  {
+    using Out = std::decay_t<R>;
+
+    auto out{this->vec()};
+
+    auto end = std::ranges::mismatch(out, r, f, p1, p2);
+
+    return Fun<Out>(Out(out.begin(), end.in1));
+  } // fn: in_seq }}}
+
+  // fn: push_front {{{
+  //
+  // Pushes an element to the front of the container
+  //
+  // Synonyms:
+  //
+  template<typename Out = void, typename T>
+  [[nodiscard]] auto push_front(T&& t)
+  {
+    auto v{this->vec()};
+
+    v.insert(v.begin(), t);
+
+    return Fun<decltype(v)>(v);
+  } // fn: push_front }}}
+
+  // fn: push_back {{{
+  //
+  // Pushes an element to the back of the container
+  //
+  // Synonyms:
+  //
+  template<typename Out = void, typename T>
+  [[nodiscard]] auto push_back(T&& t)
+  {
+    auto v{this->vec()};
+
+    v.insert(v.end(), t);
+
+    return Fun<decltype(v)>(v);
+  } // fn: push_back }}}
+
   // Views {{{
 
   // fn: make_view {{{
@@ -246,9 +323,76 @@ struct Fun
     return make_view<Out>(view | rv::transform(f));
   } // fn: as }}}
 
+
+  // fn: group_by {{{
+  //
+  // Removes n elements of range starting from front
+  //
+  // Synonyms:
+  //
+  template<typename F>
+  [[nodiscard]] auto group_by(F&& f)
+  {
+    auto it{rg::partition(view,f)};
+    return std::tuple(view.begin(),it,view.end());
+  } // fn: group_by }}}
+
+  // fn: pop_front {{{
+  //
+  // Removes n elements of range starting from front
+  //
+  // Synonyms:
+  //
+  template<typename Out = void>
+  [[nodiscard]] auto pop_front(u64 n)
+  {
+    return make_view<Out>(rv::drop(view, n));
+  } // fn: pop_front }}}
+
+  // fn: pop_back {{{
+  //
+  // Removes n elements of range starting from front
+  //
+  // Synonyms:
+  //
+  template<typename Out = void>
+  [[nodiscard]] auto pop_back(u64 n)
+  {
+    return make_view<Out>(rv::drop_last(view, n));
+  } // fn: pop_back }}}
+
+  // fn: zip {{{
+  //
+  // Zips two ranges together
+  //
+  // @param r: Range to zip with
+  //
+  // Synonyms:
+  //
+  template<typename Out = void, Range R>
+  [[nodiscard]] auto zip(R&& r)
+  {
+    return make_view<Out>(rv::zip(view,r));
+  } // fn: zip }}}
+
+  // fn: chain_front {{{
+  //
+  // Adds all elements of range r to the begining of the current one
+  // e.g.: [1,2,3].chain_front([4,5]) == [4,5,1,2,3]
+  //
+  // @param r: A range to chain_front current one with
+  //
+  // Synonyms: Concat, Append
+  //
+  template<typename Out = void, Range R>
+  [[nodiscard]] decltype(auto) chain_front(R&& r)
+  {
+    return make_view<Out>(rv::concat(r,view));
+  } // fn: chain_front }}}
+
   // fn: chain {{{
   //
-  // Adds all elements of range r to the end of the current
+  // Adds all elements of range r to the end of the current one
   // e.g.: [1,2,3].chain([4,5]) == [1,2,3,4,5]
   //
   // @param r: A range to chain current one with
@@ -474,6 +618,18 @@ struct Fun
   } // fn: enu }}}
 
   // Views }}}
+
+  // Test {{{
+  
+  // fn: assert {{{
+  template<typename F, typename S>
+  decltype(auto) test(F&& f, S&& s)
+  {
+    rg::for_each(view, [&](auto e) { err::err(f(e))(s); });
+  } // function: assert
+  // }}}
+
+  // }}}
 
 }; // class: fun }}}
 

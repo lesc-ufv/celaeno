@@ -203,8 +203,6 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
     tile.second = tile.second*tile_size+circle_offset;
   } // for
 
-  fmt::print("Paths: {}\n", paths.size());
-
   for (auto&& [pair,path] : paths)
   {
     size_t size_path{path.size()};
@@ -289,8 +287,6 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
   // @ Stream/File writting
   header << fmt::format(h_template,view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);
 
-  fmt::print("Header...\n");
-
   // Vertices and labels
   for (auto [v,tile] : vertex_tile)
   {
@@ -308,8 +304,6 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
     } // else
   } // for
 
-  fmt::print("Vertex & labels...\n");
-
   // File writting
   of << fmt::format("{}\n", header.str());
 
@@ -317,7 +311,6 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
   of << a_head;
 
   // Draw grid
-  fmt::print("Start Grid {}x{}...\n", view_box_x, view_box_y);
   std::stringstream tiles;
   for (i64 x{}; x <= view_box_x; ++x)
   {
@@ -336,9 +329,6 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
       );
     } // for
   } // for
-
-  fmt::print("Done Grid...\n");
-
 
   of << fmt::format("{}\n", tiles.str());
   of << fmt::format("{}\n", vertices.str());

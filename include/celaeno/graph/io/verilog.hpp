@@ -321,6 +321,7 @@ void Reader<T>::update(auto&& _lhs, GateType const& _type, auto&&... _ops) const
 
 // class Reader }}}
 
+// class: Writer {{{
 class Writer
 {
   private:
@@ -476,5 +477,6 @@ Writer::Writer( std::map<i64,GateType> m_id_type
 
   ofile.close();
 }
+// }}}
 
 } // namespace celaeno::graph::io::verilog }}}

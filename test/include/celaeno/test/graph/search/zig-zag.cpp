@@ -48,6 +48,7 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/err/err.hpp>
 #include <celaeno/fun/fun.hpp>
+#include <celaeno/fun/multimap.hpp>
 
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/io/verilog.hpp>
@@ -93,6 +94,7 @@ namespace err = celaeno::err;
 namespace fp = fplus;
 namespace rg = ranges;
 namespace rv = ranges::views;
+namespace fun = celaeno::fun;
 
 namespace ns_graph = celaeno::graph;
 namespace ns_draw = celaeno::graph::draw;
@@ -1536,11 +1538,18 @@ struct PlaceCycleRet
 {
   Placement placement;
   Paths paths;
+  std::multimap<Node,Node> edges;
   std::set<Node> unreachable;
   bool failed;
-  PlaceCycleRet(Placement const& placement, Paths const& paths, std::set<Node> const& unreachable, bool failed)
+  PlaceCycleRet(Placement const& placement
+    , Paths const& paths
+    , std::multimap<Node,Node> const& edges
+    , std::set<Node> const& unreachable
+    , bool failed
+    )
     : placement(placement)
     , paths(paths)
+    , edges(edges)
     , unreachable(unreachable)
     , failed(failed)
   {}
@@ -1549,6 +1558,7 @@ struct PlaceCycleRet
 cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   , Placement p
   , Paths paths
+  , std::multimap<Node,Node> edges
   , Range auto cycle
   , Range auto inter
   , MEdgeWeight m_edge_weight
@@ -1603,7 +1613,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
   // Check if cycle was already placed
-  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,{},false); }
+  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,edges,{},false); }
 
   // Wire tiles
   std::unordered_map<Node,std::unordered_map<Node,std::unordered_map<Node,Tile>>> wires_of;
@@ -1833,20 +1843,40 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       if( placed.empty() )
       {
         logger.info()("Unreacheable neighbors of {}: {}", u, unreachable);
-        co_yield PlaceCycleRet({},{},unreachable,true);
+        co_yield PlaceCycleRet({},{},edges,unreachable,true);
         break;
       } // if
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
-      // // Remove wires of the previous node from placed stack
-      // for (auto&& [node_target,map_dummy] : wires_of[v])
-      // {
-      //   for (auto&& [node_dummy, tile] : map_dummy)
-      //   {
-      //     p.erase(node_dummy);
-      //   } // for
-      // } // for
-      // wires_of[v].clear();
+      // Remove wires of the previous node from placed stack
+      for (auto&& [node_target,map_dummy] : wires_of[v])
+      {
+        // Remove from placed map
+        for (auto&& [node_dummy,tile] : map_dummy) { p.erase(node_dummy); } // for
+        // Remove from edges map
+        bool is_path_u_to_v{!fn(ops.succs(v)).has(node_target)};
+        if ( is_path_u_to_v )
+        {
+          fn(map_dummy)
+            .key()
+            .sort()
+            .push_front(v)
+            .push_back(node_target)
+            .slide(2)
+            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
+        }
+        else
+        {
+          fn(map_dummy)
+            .key()
+            .sort()
+            .push_front(node_target)
+            .push_back(v)
+            .slide(2)
+            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
+        }
+      } // for
+      wires_of[v].clear();
       // Remove previous node from placement map
       if( p.contains(v) ){ p.erase(v); }
       // Include previous node in unplaced stack
@@ -1891,17 +1921,38 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
       if( fn(ops.succs(u)).has(v) )
       {
+        // Save new dummy nodes in-between
+        // These are were introduced by A* to block paths
         for (Tile tile : fn(*d_astar).rev().deque())
         {
           wires_of[u][v][--lowest] = tile;
         } // for
+
+        // Update edges from u to v
+        fn(wires_of[u][v])
+          .key()
+          .sort()
+          .push_front(u)
+          .push_back(v)
+          .slide(2)
+          .ply([&](auto&& e){ fun::multimap::emplace_if_not_exists(edges,e.at(0), e.at(1)); });
       }
       else
       {
+        // Save new dummy nodes in-between
+        // These are were introduced by A* to block paths
         for (Tile tile : *d_astar)
         {
           wires_of[u][v][--lowest] = tile;
         } // for
+        // Update edges from v to u
+        fn(wires_of[u][v])
+          .key()
+          .sort()
+          .push_front(v)
+          .push_back(u)
+          .slide(2)
+          .ply([&](auto&& e){ fun::multimap::emplace_if_not_exists(edges,e.at(0), e.at(1)); });
       } // else
     } // for
 
@@ -1968,26 +2019,46 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       logger.info()("Cycle: {}\n", cycle);
       logger.info()("Dummy Cycle: {}\n", cycle_with_dummy);
 
-      co_yield PlaceCycleRet(p,paths,{},false);
+      co_yield PlaceCycleRet(p,paths,edges,{},false);
 
       // Remove previous node from placed stack
-      auto v{placed.top()}; placed.pop();
+      placed.pop();
 
-      // Remove wires
-      for (auto&& [node_target,map_dummy] : wires_of[v])
+      // Remove wires between uv placed by A*
+      for (auto&& [node_target,map_dummy] : wires_of[u])
       {
-        for (auto&& [node_dummy,tile] : map_dummy)
+        // Remove from placed map
+        for (auto&& [node_dummy,tile] : map_dummy) { p.erase(node_dummy); } // for
+        // Remove from edges map
+        bool is_path_u_to_v{!fn(ops.succs(u)).has(node_target)};
+        if ( is_path_u_to_v )
         {
-          p.erase(node_dummy);
-        } // for
+          fn(map_dummy)
+            .key()
+            .sort()
+            .push_front(u)
+            .push_back(node_target)
+            .slide(2)
+            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
+        }
+        else
+        {
+          fn(map_dummy)
+            .key()
+            .sort()
+            .push_front(node_target)
+            .push_back(u)
+            .slide(2)
+            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
+        }
       } // for
-      wires_of[v].clear();
+      wires_of[u].clear();
 
       // Remove previous node from placement map
-      if( p.contains(v) ){ p.erase(v); }
+      if( p.contains(u) ){ p.erase(u); }
 
       // Include previous node in unplaced stack
-      unplaced.push(v);
+      unplaced.push(u);
     } // if
   } // while
 
@@ -2209,6 +2280,9 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
   placement =
     f_timer({}, [&] { return place_intersection(ops, intersection); });
 
+  // Currently placed edges
+  std::multimap<Node,Node> m_edges;
+
   // Stack generators
   std::stack<cppcoro::generator<PlaceCycleRet>> st_generator;
 
@@ -2219,10 +2293,12 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
   if(auto [u,v] = std::make_pair(intersection.at(0),intersection.at(1)); fn(ops.succs(u)).has(v) )
   {
     paths[{u,v}] = std::deque<Tile>({placement.at(intersection.at(0)), placement.at(intersection.at(1))});
+    m_edges.emplace(u,v);
   } // if
   else
   {
     paths[{v,u}] = std::deque<Tile>({placement.at(intersection.at(1)), placement.at(intersection.at(0))});
+    m_edges.emplace(v,u);
   } // if
 
   bool b_backtrack{false};
@@ -2253,6 +2329,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
         return place_cycle(ops
             , placement
             , paths
+            , m_edges
             , cycle
             , intersection
             , m_edge_weight
@@ -2330,6 +2407,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
       {
         placement = it_gen->placement;
         paths = it_gen->paths;
+        m_edges = it_gen->edges;
 
         // Check for half separation
         bool has_inner_crossings = cycle_has_inner_crossings(ops, cycle, placement, sink);
@@ -2338,6 +2416,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
         {
           Placement _placement {placement};
           Paths _paths {paths};
+          std::multimap<Node,Node> _m_edges{m_edges};
 
           // Offset coordinates to remove negative values
           auto x_min{rg::min_element(_placement,{},[](auto e){ return e.second.first; })->second.first};
@@ -2390,6 +2469,8 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
               , _paths
               , [](auto e){ return e; });
             logger.info()("-- End draw");
+            logger.info()("-- Placed edges:");
+            std::ranges::for_each(_m_edges, [&](auto e){ logger.info()("e: {}", e); });
           } // if has_inner_crossings
 #endif
         }
