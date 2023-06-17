@@ -32,9 +32,9 @@ class Location
 {
   private:
   // Private members {{{
-    char const* str_file=__builtin_FILE();
-    u32 str_line=__builtin_LINE();
-    char const* str_fun=__builtin_FUNCTION();
+    char const* m_str_file=__builtin_FILE();
+    u32 m_str_line=__builtin_LINE();
+    char const* m_str_fun=__builtin_FUNCTION();
   // }}}
 
   public:
@@ -44,17 +44,17 @@ class Location
       , u32 str_line = __builtin_LINE()
       , char const* str_fun = __builtin_FUNCTION()
     )
-      : str_file(str_file)
-      , str_line(str_line)
-      , str_fun(str_fun)
+      : m_str_file(str_file)
+      , m_str_line(str_line)
+      , m_str_fun(str_fun)
     {}
   // }}}
 
   // public member functions {{{
   auto get() const
   {
-    std::string basename = std::filesystem::path(str_file).filename();
-    return fmt::format("{}:{} `{}`: ", basename, str_line, str_fun);
+    std::string basename = std::filesystem::path(m_str_file).filename();
+    return fmt::format("{}:{} `{}`: ", basename, m_str_line, m_str_fun);
   }
   // }}}
 
@@ -106,21 +106,21 @@ class Location
 class Fold
 {
   private:
-    std::shared_ptr<spdlog::logger> logger;
+    std::shared_ptr<spdlog::logger> m_logger;
 
   public:
-    Fold(std::shared_ptr<spdlog::logger> src, std::string const& suffix)
-      : logger(src)
+    Fold(std::shared_ptr<spdlog::logger> logger, std::string const& suffix)
+      : m_logger(logger)
     {
 #ifdef DEBUG
-      logger->info("{{{" + suffix);
+      m_logger->info("{{{" + suffix);
 #endif
     } // Fold
 
     ~Fold()
     {
 #ifdef DEBUG
-      logger->info("}}}");
+      m_logger->info("}}}");
 #endif
     } // ~Fold
 }; // class: Fold }}}
@@ -129,25 +129,25 @@ class Fold
 class Logger
 {
   private:
-    static char const * const log_filename;
-    std::shared_ptr<spdlog::logger> logger;
+    static char const * const m_log_filename;
+    std::shared_ptr<spdlog::logger> m_logger;
 
   public:
     Logger(std::shared_ptr<spdlog::logger> logger, Location const& loc = {})
-      : logger(logger)
+      : m_logger(logger)
     {
 #ifdef DEBUG
-      logger->info("{{{" + loc.get()); // }}}
-      logger->flush();
+      m_logger->info("{{{" + loc.get()); // }}}
+      m_logger->flush();
 #endif
     }
 
     Logger(Location const& loc = {})
-      : logger(spdlog::basic_logger_st("celaeno", log_filename, true))
+      : m_logger(spdlog::basic_logger_st("celaeno", m_log_filename, true))
     {
 #ifdef DEBUG
-      logger->info("{{{" + loc.get()); // }}}
-      logger->flush();
+      m_logger->info("{{{" + loc.get()); // }}}
+      m_logger->flush();
 #endif
     }
 
@@ -155,14 +155,14 @@ class Logger
     {
       // {{{
 #ifdef DEBUG
-      logger->info("}}}");
-      logger->flush();
+      m_logger->info("}}}");
+      m_logger->flush();
 #endif
     }
 
     std::shared_ptr<spdlog::logger> sink()
     {
-      return logger;
+      return m_logger;
     }
 
     decltype(auto) info([[maybe_unused]] Location const& loc = {})
@@ -171,22 +171,22 @@ class Logger
       {
 #ifdef DEBUG
         auto loc_curr = loc.get() + m;
-        logger->info(loc_curr, std::forward<Args>(args)...);
-        logger->flush();
+        m_logger->info(loc_curr, std::forward<Args>(args)...);
+        m_logger->flush();
 #endif
       }; // anonymous lambda
     } // fn: info
 
     decltype(auto) fold(Location const& loc = {})
     {
-      return Fold{logger,loc.get()};
+      return Fold{m_logger,loc.get()};
     } // fold
 
 }; // class: Logger }}}
 
 // class: Logger {{{
 
-char const * const Logger::log_filename = "celaeno.log";
+char const * const Logger::m_log_filename = "celaeno.log";
 
 // class: Logger }}}
 

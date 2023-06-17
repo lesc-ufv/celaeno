@@ -74,6 +74,7 @@ class Ops
   using Adj = std::function<bool(i64,i64)>;
   using Link = std::function<void(i64,i64)>;
   using Unlink = std::function<void(i64,i64)>;
+  using Has = std::function<bool(i64)>;
 
   public:
     Preds preds;
@@ -81,14 +82,16 @@ class Ops
     Adj adj;
     Link link;
     Unlink unlink;
+    Has has;
 
   public:
-    Ops(Preds&& p, Succs&& s, Adj&& a, Link&& l, Unlink&& u)
+    Ops(Preds&& p, Succs&& s, Adj&& a, Link&& l, Unlink&& u, Has&& h)
       : preds(std::forward<Preds>(p))
       , succs(std::forward<Succs>(s))
       , adj(std::forward<Adj>(a))
       , link(std::forward<Link>(l))
       , unlink(std::forward<Unlink>(u))
+      , has(std::forward<Has>(h))
     {}
 };
 // }}}
@@ -120,15 +123,27 @@ class Graph
 
   // Public Methods {{{
     // Element Access {{{
+    // // Get the successors of a node u
     template<typename U> requires ConvertibleTo<T,U>
     std::vector<T> successors(U u) const;
+    // // Get the predecessors of a node u
     template<typename U> requires ConvertibleTo<T,U>
     std::vector<T> predecessors(U u) const;
+    // // Get the successors and predecessors of a node u
     template<typename U> requires ConvertibleTo<T,U>
     std::vector<T> neighbors(U u) const;
+    // // Check if node u leads to v
     template<typename U> requires ConvertibleTo<T,U>
     bool adjacent(U u1, U u2) const;
+    // // Check if node u leads to v or node v leads to u
+    template<typename U> requires ConvertibleTo<T,U>
+    bool adjacent_eitherway(U u1, U u2) const;
+    // // Check if node u exists in the graph
+    template<typename U> requires ConvertibleTo<T,U>
+    bool has(U u) const;
+    // // Get the bare data from the graph
     Vertices<T>& data() noexcept;
+    // // Get the bare data from the graph
     Vertices<T> const& data() const noexcept;
     // }}}
 
@@ -199,6 +214,30 @@ bool Graph<T>::adjacent(U u1, U u2) const
     if( it->second ==  u2 ){ return true; }
   } // for
 
+  return false;
+}
+
+template<Arithmetic T>
+template<typename U> requires ConvertibleTo<T,U>
+bool Graph<T>::has(U u) const
+{
+  auto rng{g->equal_range(u)};
+  
+  // Did not find as key
+  if ( rng.first == rng.second )
+  {
+    // Search as value
+    auto it = std::ranges::find_if(*(this->g), [&](auto&& e){ return e.second == u; });
+    // Found as value
+    if ( it != std::ranges::end(*(this->g)) ) { return true; }
+  } // if
+  else
+  {
+    // Found as key
+    return true;
+  } // else
+
+  // Did not find as key or as value
   return false;
 }
 

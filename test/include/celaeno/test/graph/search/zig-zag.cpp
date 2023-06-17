@@ -55,9 +55,7 @@
 #include <celaeno/graph/io/dimacs.hpp>
 
 #include <celaeno/graph/views/depth.hpp>
-
 #include <celaeno/graph/draw/svg.hpp>
-#include <celaeno/graph/representations/grid.hpp>
 
 #include <celaeno/graph/search/a-star.hpp>
 #include <celaeno/graph/search/bfs.hpp>
@@ -73,6 +71,7 @@
 
 #include "unbalance.hpp"
 #include "bfs.hpp"
+#include "cycles.hpp"
 
 // TODO Remove
 #include <celaeno/graph/operations/balance/outgoing.hpp>
@@ -111,6 +110,7 @@ using Sink = std::shared_ptr<spdlog::logger>;
 using Ops = ns_graph::Ops;
 using Node = i64;
 using Nodes = std::vector<Node>;
+using NodeMMap = std::multimap<Node,Node>;
 using Edge = std::pair<Node,Node>;
 using Edges = std::vector<Edge>;
 using Weight = i64;
@@ -164,6 +164,74 @@ auto f_timer(Location const& loc, F&& f, Args&&... args)
   }
 }; // fn: f_timer }}}
 
+// fn: rev {{{
+template<typename T1, typename T2>
+decltype(auto) rev(std::pair<T1,T2> const& pair)
+{
+  return std::make_pair(pair.second,pair.first);
+} // function: rev }}}
+
+// fn: view_draw {{{
+decltype(auto) view_draw(Map auto&& map_vertex_layer)
+{
+  // , Map auto&& map_vertex_tile, Range auto&& range_edge_path)
+  // Get max layer id
+  constexpr u64 const size_spacing = 4;
+
+  u64 max_layer_id = fn(map_vertex_layer).as([](auto&& e){ return e.second; }).max();
+
+  // Create layers
+  ns_views::depth::LayerNodes<i64> map_layer_vertices;
+  std::ranges::for_each(map_vertex_layer, [&](auto&& e)
+  {
+    u64 layer_curr = max_layer_id - e.second;
+    if ( ! map_layer_vertices.contains(layer_curr) )
+    {
+      map_layer_vertices.emplace(layer_curr, Nodes{e.first});
+    }
+    else
+    {
+      map_layer_vertices.at(layer_curr).push_back(e.first);
+    }
+  });
+
+  for (auto&& [l,v] : map_layer_vertices)
+  {
+    fmt::print("l: {} - v: {}\n", l, v);
+  } // for
+
+  // Find out the size of the largest layer
+  u64 const size_max_layer = fn(map_layer_vertices).as([](auto&& e){ return e.second.size(); }).max();
+  fmt::print("Max layer size: {}\n", size_max_layer);
+
+  // Shift layers left by (size_max_layer-size_cur_layer)/2
+  std::map<u64, u64> map_layer_shift = fn(map_layer_vertices)
+    .as([&](auto&& e){ return std::make_pair(e.first, (size_max_layer - e.second.size()) / 2); })
+    .as([&](auto&& e){ if (e.second == 0) { e.second = 1; } return e; })
+    .map();
+
+  // Convert layers into collections of xy positions
+  std::map<Node, Tile> map_vertex_tile = fn(map_layer_vertices)
+  .as([&](auto&& _1)
+  {
+    i64 y_pos = _1.first;
+    i64 x_pos = 0;
+    return fn(_1.second)
+      .as([&](auto __1)
+      {
+        return std::make_pair(__1, Tile((++x_pos)*(map_layer_shift.at(y_pos)), y_pos));
+      })
+      .vec();
+  })
+  .squash()
+  .map();
+
+  std::vector<std::pair<Edge,Tiles>> path;
+
+  ns_draw::svg::svg("out/celaeno.svg", map_vertex_tile, path, [](auto e){ return e; });
+
+} // function: view_draw }}}
+
 // fn: lowest_node_id {{{
 //
 // This function uses a BFS to determine which node has the lowest id in the graph
@@ -182,12 +250,84 @@ i64 lowest_node_id(Ops const& ops)
   return --idx;
 } // function: lowest_node_id }}}
 
-// fn: find_cycle_endpoints {{{
+// fn: path_from_multimap {{{
+//
+// This function searches for a path between u and v in a multimap
+//
+template<typename F = std::function<void(Edges&)>>
+std::optional<Nodes> path_from_multimap(std::multimap<Node,Node> const& mm
+    , Node u
+    , Node v
+    , F&& remove_by = [](Edges&){ })
+{
+  // Return path in vec
+  Nodes out;
+
+  // Map to backtrack paths
+  std::map<Node,Node> m_backtrack;
+
+  // Fetch next edges
+  auto f_fetch_edge = [&](Node w)
+  {
+    // Adjacent to w
+    auto r = mm.equal_range(w);
+    // Edges (w,x1),(w,x2),...,(w,xn)
+    Edges edges(r.first, r.second);
+    // Do not explore edges based on condition
+    remove_by(edges);
+    // Return modification of remove_by
+    return edges;
+  };
+
+  // Include edges in backtrack map
+  auto f_backtrack_add = [&](auto&& e){ m_backtrack[e.second] = e.first; };
+
+  // Get initial edges
+  Edges edges_initial = f_fetch_edge(u);
+
+  // Add initial edges to backtrack map
+  std::ranges::for_each(edges_initial, f_backtrack_add);
+
+  // Check if solution was found
+  bool has_solution{false};
+
+  // Make an edge-based bfs search until reaches v or ends
+  ns_search::bfs::run(edges_initial
+    , [](auto){ return std::vector<Edge>{}; }
+    , [&](Edge e) { return f_fetch_edge(e.second); }
+    , [&](Edge e)
+    {
+      // Update path
+      f_backtrack_add(e);
+      // If reached destination edge v, stop
+      if ( e.second == v ) { has_solution = true; return true; }
+      // Continue processing
+      return false;
+    });
+
+  if ( ! has_solution ) { return std::nullopt; }
+
+  // Rebuild path in backtrack map
+  Node curr{v};
+  out.push_back(curr);
+  while ( m_backtrack.contains(curr) )
+  {
+    out.push_back(m_backtrack.at(curr));
+    curr = m_backtrack.at(curr);
+  } // while
+  
+  // Reverse to be from u to v
+  std::ranges::reverse(out);
+
+  return out;
+} // function: path_from_multimap }}}
+
+// fn: cycle_find_endpoints {{{
 //
 // A cycle has two endpoints, one diverges into two edge, and the other converges two edges. This
 // function finds these endpoints
 //
-decltype(auto) find_cycle_endpoints(Ops const& ops, Range auto&& cycle)
+decltype(auto) cycle_find_endpoints(Ops const& ops, Range auto&& cycle)
 {
   // Predecessors within the cycle
   auto f_preds_in_cycle = [&](auto&& e){ return fn(ops.preds(e)).in(cycle).vec(); };
@@ -204,15 +344,15 @@ decltype(auto) find_cycle_endpoints(Ops const& ops, Range auto&& cycle)
   err::err({it_endpoint2 != std::ranges::end(cycle)})("Could not find cycle endpoint");
 
   return std::make_pair(*it_endpoint2, *it_endpoint1);
-} // function: find_cycle_endpoints }}}
+} // function: cycle_find_endpoints }}}
 
-// fn: split_cycle_in_endpoints {{{
+// fn: cycle_split_in_endpoints {{{
 //
 // A cycle has two endpoints, one diverges into two edge, and the other converges two edges. This
 // function splits the cycle into two half cycles, the parents are included in both half cycles as
 // the endpoints
 //
-decltype(auto) split_cycle_in_endpoints(Ops const& ops, Range auto&& cycle)
+decltype(auto) cycle_split_in_endpoints(Ops const& ops, Range auto&& cycle)
 {
   std::pair<Nodes,Nodes> out;
 
@@ -236,12 +376,12 @@ decltype(auto) split_cycle_in_endpoints(Ops const& ops, Range auto&& cycle)
   whole.push_back(*it_endpoint1);
 
   // Use a bfs to construct the rest of the cycle
-  ns_search::bfs::run(*it_endpoint1, f_preds_in_cycle, [](auto e) { return Nodes{}; },
+  ns_search::bfs::run(*it_endpoint1, f_preds_in_cycle, [](auto&&) { return Nodes{}; },
   [&](auto e)
   {
     if ( auto succs = f_succs_in_cycle(e); ! succs.empty() )
     {
-      if ( succs.front() == whole.front() ) { whole.insert(whole.begin(), e); }
+      if ( fn(succs).has(whole.front()) ) { whole.insert(whole.begin(), e); }
       else { whole.push_back(e); }
     }
     return false;
@@ -264,7 +404,68 @@ decltype(auto) split_cycle_in_endpoints(Ops const& ops, Range auto&& cycle)
   Nodes out2(std::next(it_endpoint1_whole), whole.end());
 
   return std::make_pair(out1,out2);
-} // function: split_cycle_in_endpoints }}}
+} // function: cycle_split_in_endpoints }}}
+
+// cycle_find_nodes_in_between {{{
+//
+// Given two nodes uv and a cycle, find the nodes (w1,...,wn) in-between uv
+//
+decltype(auto) cycle_find_nodes_in_between(Ops const& ops, Node u, Node v, Range auto&& cycle, Sink sink)
+{
+  // err::Logger logger{sink};
+  //
+  // Nodes cycle_with_dummy = fn(cycle)
+  //   .mut([](auto e){ e.push_back(e.front()); return e; })
+  //   .slide(2)
+  //   .as([&](auto e)
+  //   {
+  //     Nodes out;
+  //     i64 u = e.at(0);
+  //     i64 v = e.at(1);
+  //
+  //     // u must be sucessor of v
+  //     bool is_reversed{false};
+  //     if ( ! fn(ops.succs(u)).has(v) ) { is_reversed = true; v = std::exchange(u,v); }
+  //     logger.info()("u,v: {},{}\n", u, v);
+  //     
+  //     // If endpoint is not v and is not introduced by A*, remove
+  //     auto remove_by = [&](Edges& e)
+  //     {
+  //       e = fn(e).keep([&](Edge const& e)
+  //       {
+  //         // Check if is goal 'v'
+  //         if ( e.second == v )       { return true; }
+  //         // Check if is introduced by A*
+  //         if ( ! ops.has(e.second) ) { return true; }
+  //         // Discard
+  //         return false;
+  //       }).vec();
+  //     };
+  //
+  //     if ( auto opt_nodes = path_from_multimap(mmap_node, u, v, remove_by) )
+  //     {
+  //       logger.info()("Nodes between uv: {}\n", *opt_nodes);
+  //       if ( is_reversed ) { std::ranges::reverse(*opt_nodes); }
+  //       return *opt_nodes;
+  //     }
+  //
+  //     return (is_reversed)? Nodes{v,u} : Nodes{u,v};
+  //   })
+  //   .squash()
+  //   .unique()
+  //   .vec();
+} // function: cycle_find_nodes_in_between }}}
+
+// fn: merge_cycles_in_outer_cycle {{{
+//
+// Given two cycles and an intersection, merge the cycles in a new outer cycles without the
+// intersection
+//
+decltype(auto) merge_cycles(Placement const& p, Range auto&& c1, Range auto&& c2, Range auto&& cint)
+{
+  // Fetch nodes in-between cint.front() and cint.back()
+
+} // function: merge_cycles }}}
 
 // fn: make_line_equation {{{
 //
@@ -277,15 +478,17 @@ struct MakeLineEquationRet
   i64 b;
 };
 
-decltype(auto) make_line_equation(Tile const& p1, Tile const& p2)
+decltype(auto) make_line_equation(Tile const& p1, Tile const& p2, Sink sink)
 {
+  err::Logger logger{sink};
+
   err::err({p1.first != p2.first})("Attempt to calculate equation of straight line");
 
   i64 m = (p2.second - p1.second) / (p2.first - p1.first);
   i64 b = p1.second - m * p1.first;
 
-  fmt::print("-- line m: {}\n", m);
-  fmt::print("-- line b: {}\n", b);
+  logger.info()("-- line m: {}\n", m);
+  logger.info()("-- line b: {}\n", b);
 
   return MakeLineEquationRet{.fun=[=](i64 x){ return m*x + b; }, .m=m, .b=b};
 } // function: make_line_equation }}}
@@ -295,22 +498,24 @@ decltype(auto) make_line_equation(Tile const& p1, Tile const& p2)
 // This function checks if a positioned cycle halves are separate, this separation consists of a
 // straight line from one endpoint to another.
 //
-decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Placement const& m_node_pos)
+decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Placement const& m_node_pos, Sink sink)
 {
+  err::Logger logger{sink};
+
   for (auto e : m_node_pos)
   {
-    fmt::print("placement: {}\n", e);
+    logger.info()("placement: {}\n", e);
   } // for
 
   // Get endpoints
-  auto [epn1,epn2] = find_cycle_endpoints(ops, cycle);
-  fmt::print("Cycle endpoints: {} | {}\n", epn1, epn2);
+  auto [epn1,epn2] = cycle_find_endpoints(ops, cycle);
+  logger.info()("Cycle endpoints: {} | {}\n", epn1, epn2);
 
   // Split the cycle in two halves
-  auto [chf1,chf2] = split_cycle_in_endpoints(ops, cycle);
+  auto [chf1,chf2] = cycle_split_in_endpoints(ops, cycle);
 
-  fmt::print("Cycle half 1: {}\n", chf1);
-  fmt::print("Cycle half 2: {}\n", chf2);
+  logger.info()("Cycle half 1: {}\n", chf1);
+  logger.info()("Cycle half 2: {}\n", chf2);
 
   // Get line equation for endpoints
   // Current plane considers:
@@ -329,7 +534,7 @@ decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Pla
   // Check if is not a vertical line
   if( ep1.first != ep2.first )
   {
-    f_equation = make_line_equation(ep1, ep2).fun;
+    f_equation = make_line_equation(ep1, ep2, sink).fun;
     f_is_below = [=](Tile t){ return t.second < f_equation(t.first); };
   }
   else
@@ -338,7 +543,7 @@ decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Pla
     auto [x_min, x_max] = std::make_pair(m_node_pos.at(*x_min_it).first*2, m_node_pos.at(*x_max_it).first*2);
     i64 x_mea = (x_max+x_min)/2;
 
-    fmt::print("x_mea: {}\n", x_mea);
+    logger.info()("x_mea: {}\n", x_mea);
 
     f_is_below = [=](Tile t)
     {
@@ -351,7 +556,7 @@ decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Pla
   std::function<bool(Tile)> f_is_above = [&](Tile const& t){ return ! f_is_below(t); };
 
 
-  fmt::print("Cycle endpoints: {} | {}\n", ep1, ep2);
+  logger.info()("Cycle endpoints: {} | {}\n", ep1, ep2);
 
   // Pop endpoints of halves
   chf1.pop_back();
@@ -372,7 +577,7 @@ decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Pla
     // < 0 below the line
     // = 0 on the line
     bool is_below{f_is_below(t_fst)};
-    fmt::print("Node {} with Point {} is below? {}\n", n, t_fst, is_below);
+    logger.info()("Node {} with Point {} is below? {}\n", n, t_fst, is_below);
     for( auto it{std::next(cycle_half.begin())}; it != cycle_half.end(); ++it )
     {
       err::err({ m_node_pos.contains(*it) })("Cycle node {} not found in placement", *it);
@@ -381,7 +586,7 @@ decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Pla
       Tile t = m_node_pos.at(*it);
       t.first *= 2; t.second *= 2; t.second = -t.second;
 
-      fmt::print("Node {} with point {} is below? {}\n", *it, t, f_is_below(t));
+      logger.info()("Node {} with point {} is below? {}\n", *it, t, f_is_below(t));
 
       if ( is_below )
       {
@@ -403,8 +608,7 @@ decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Pla
 //
 // This function checks if a positioned cycle halves cross between themselves
 //
-decltype(auto) cycle_has_inner_crossings(Ops const& ops
-    , Nodes cycle
+decltype(auto) cycle_has_inner_crossings(Nodes cycle
     , Placement const& m_node_pos
     , Sink sink)
 {
@@ -444,25 +648,25 @@ decltype(auto) cycle_has_inner_crossings(Ops const& ops
     logger.info()("placement: {}", e);
   } // for
 
-  // Given three collinear points p, q, r, the function checks if 
-  // point q lies on line segment 'pr' 
-  auto f_on_segment = [](Tile p, Tile q, Tile r)
-  {
-    if ( q == p or q == r )
-    {
-      return false;
-    }
-
-    if ( (q.first <= std::max(p.first, r.first))
-        and (q.first >= std::min(p.first, r.first))
-        and (q.second <= std::max(p.second, r.second))
-        and (q.second >= std::min(p.second, r.second)))
-    {
-      return true;
-    }
-
-    return false;
-  };
+  // // Given three collinear points p, q, r, the function checks if 
+  // // point q lies on line segment 'pr' 
+  // auto f_on_segment = [](Tile p, Tile q, Tile r)
+  // {
+  //   if ( q == p or q == r )
+  //   {
+  //     return false;
+  //   }
+  //
+  //   if ( (q.first <= std::max(p.first, r.first))
+  //       and (q.first >= std::min(p.first, r.first))
+  //       and (q.second <= std::max(p.second, r.second))
+  //       and (q.second >= std::min(p.second, r.second)))
+  //   {
+  //     return true;
+  //   }
+  //
+  //   return false;
+  // };
 
   auto f_orientation = [](Tile p, Tile q, Tile r)
   {
@@ -611,10 +815,10 @@ template<typename F = std::function<bool(Edge)>>
     auto neighbors = [&](Node v){ return fn(ops.preds(v)).chain(ops.succs(v)).vec(); };
 
     // Helper to check if a set of edges has been visited
-    auto contains = []<Range R, typename... E>(R&& r, E&&... e)
+    auto contains = []<Range R, typename... E>(R&& _1, E&&... _2)
       requires IsPairsOf<Node,E...> // Edges must be node pairs
     {
-      return (r.contains(e) or ...);
+      return (_1.contains(_2) or ...);
     };
 
     // Retrieve neighbors of 'u', remove ones that form visited edges
@@ -643,590 +847,6 @@ template<typename F = std::function<bool(Edge)>>
 
   return h;
 } // function: e_bfs }}}
-
-// fn: minimal_basis_3 {{{
-template<SignedIntegral I, typename C>
-[[nodiscard]] decltype(auto) minimal_basis_3(I root, Ops const& ops, C&& m_crossing_nodes, Sink sink)
-{
-  // Init logger
-  err::Logger logger{sink};
-
-  std::vector<Nodes> out;
-  std::queue<Nodes> q_cycles;
-
-  auto depth_view = ns_views::depth::run(root, ops.preds, ops.succs);
-
-  // std::set<Node> s_visited_global;
-  //
-  // Find first cycle
-  //
-  for (auto [layer,nodes] : depth_view.ln)
-  {
-    if ( ! q_cycles.empty() ) { break; }
-
-    // Check for nodes with predecessors == 2 (possible cicle endpoints)
-    fmt::print("l: {} n: {}\n", layer, nodes);
-
-    nodes = fn(nodes).keep([&](auto n){ return ops.preds(n).size() == 2; }).vec();
-
-    fmt::print("closes: {}\n", nodes);
-
-    for(Node n : nodes)
-    {
-      if ( ! q_cycles.empty() ) { break; }
-
-      fmt::print("n: {}\n", n);
-      // Traverse predecessor tree in bfs manner
-      std::set<Node> s_visited_local;
-      s_visited_local.insert(n);
-      std::map<Node,Node> m_cycle;
-
-      // Queue of vertices
-      std::queue<Node> queue;
-
-      // Push initial vertex into the queue
-      queue.push(n);
-
-      while( ! queue.empty() )
-      {
-        // Get next vertex
-        auto vertex {queue.front()}; queue.pop();
-
-        // Get the vertices
-        auto v_vertices = ops.preds(vertex);
-
-        // Enqueue next
-        for( auto e : v_vertices ) { queue.push(e); }
-
-        //
-        // Perform operations
-        //
-        fmt::print(":: vertex: {}\n", vertex);
-
-        // Skip source node
-        if ( vertex == n ) { continue; }
-
-        // // Check if was previously visited
-        // bool is_visited{s_visited_local.contains(vertex)};
-
-        // Get parents of current node
-        auto v_parents = fn(ops.succs(vertex)).in(s_visited_local).vec();
-
-        // Select shortest path (parent in highest layer)
-        if ( v_parents.size() > 1 )
-        {
-          v_parents = fn(v_parents).sort({}, [&](auto e) { return depth_view.nl.at(e); }).rev().vec();
-        } // else if
-        else if ( v_parents.size() == 0 )
-        {
-          continue;
-        } // else parents == 1
-
-        // Update cycle map
-        m_cycle[vertex] = v_parents.at(0);
-
-        // Add node to visited set
-        s_visited_local.insert(vertex);
-
-        // Check if node has 2 parents in the visited set (possible cycle)
-        if ( v_parents.size() == 2 )
-        {
-          // Check if cycle closes in 'n'
-          Nodes v_fst_half;
-          Nodes v_snd_half;
-
-          // Create path from map
-          auto f_make_path = [&](Node n)
-          {
-            Nodes out;
-            out.push_back(n);
-            while ( m_cycle.contains(n) )
-            {
-              n = m_cycle.at(n);
-              out.push_back(n);
-            }
-            return out;
-          };
-
-          // Create path from outputs of 'vertex'
-          v_fst_half = f_make_path(v_parents.at(0));
-          v_snd_half = f_make_path(v_parents.at(1));
-
-          // Closes in 'n'
-          if( fn(v_fst_half).in(v_snd_half).vec().size() == 1 )
-          {
-            // Build cycle
-            Nodes cycle;
-
-            // fmt::print("Map:");
-            // for (auto&& e : m_cycle)
-            // {
-            //   fmt::print("e: {}\n", e);
-            // } // for
-
-            // Insert lower divergence
-            cycle.push_back(vertex);
-
-            // Insert cycle halves
-            v_snd_half.pop_back();
-            std::reverse(v_snd_half.begin(), v_snd_half.end());
-
-            cycle = fn(cycle).chain(v_fst_half).chain(v_snd_half).vec();
-
-            fmt::print("cycle: {} → {}\n", vertex, cycle);
-
-            out.push_back(cycle);
-
-            // Mark initial cycle as found
-            q_cycles.push(cycle);
-
-            // Found cycle for current node 'n'
-            break;
-          } // if fn(v_fst_half).in(v_snd_half).vec().size() == 1
-        } // if parents == 2
-      } // while
-    } // for
-  } // for
-
-
-  //
-  // Use cycle adjacencies to find other cycles
-  //
-
-  // Keep track of visited edges
-  std::set<Edge> s_edge_visited;
-
-  // Check if edge is visited
-  auto f_is_edge_visited = [&](Edge e)
-  {
-    return s_edge_visited.contains(e)
-      || s_edge_visited.contains(Edge{e.second, e.first});
-  };
-
-  // Visit edges in a cycle
-  auto f_visit_edges = [&](auto const& cycle)
-  {
-    fn(cycle)
-      .mut([](auto e){ e.push_back(e.front()); return e; }) // Duplicate first element in last position
-      .pairs() // Make pairs [a,b,c,d,a] → [[a,b],[b,c],[c,d],[d,a]]
-      .ply([&](Edge e){ s_edge_visited.insert(e); });
-  };
-
-  // Visit first cycle edges
-  f_visit_edges(q_cycles.front());
-
-  // Lambda to split subranges that might contains new cycles
-  // Split cycle into paths in-between unvisited edges
-  // // 1. Check if node has successors not in cycle
-  // //   1.1 If it does mark as 'u'
-  // // 2. Check if another node not in cycle
-  // //   2.1 If it does mark as 'v'
-  // // 3. Save the path from 'u' to 'v', mark 'v' as 'u' and goto 2
-  auto f_split_subranges = [&](auto const& cycle)
-  {
-    // Return subranges
-    std::vector<Nodes> out;
-    // Subrange markers
-    std::vector<int> subrange_indices;
-    for( auto it{cycle.begin()}; it != cycle.end(); ++it )
-    {
-      if ( fn(ops.succs(*it)).dif(cycle).vec().size() != 0 )
-      {
-        subrange_indices.push_back(std::distance(cycle.begin(), it));
-      }
-    }
-    // Create subranges
-    if ( subrange_indices.size() > 1)
-    {
-      auto f_next = [&](auto e){  return std::next(cycle.begin(), e); };
-      out = fn(subrange_indices)
-        .pairs()
-        .as([&](auto e){ return Nodes( f_next(e.first), f_next(e.second+1) ); })
-        .vec();
-
-      // Last subrange
-      // Nodes subrange_last( f_next(subrange_indices.back()), cycle.end() );
-      // subrange_last.insert(subrange_last.end(), cycle.begin(), f_next(subrange_indices.front()+1));
-      // out.push_back(subrange_last);
-    }
-    return out;
-  };
-
-  auto f_find_cycle = [&](auto const& path)
-  {
-    fmt::print("Path: {}\n", path);
-
-    std::vector<Nodes> _out;
-
-    // Keep path map
-    std::map<Node,Node> m_cycle;
-
-    // Cycle must be formed from path endpoints
-    std::queue<Node> q;
-    q.push(path.front());
-    q.push(path.back());
-
-    // Keep track of visited nodes
-    std::set<Node> s_visited;
-
-    // Start main loop
-    while( ! q.empty() )
-    {
-      auto u = q.front(); q.pop();
-      fmt::print("Node: {}\n", u);
-
-      // Get non-visited successors
-      auto succs = fn(ops.succs(u)).keep([&](auto e){ return ! f_is_edge_visited(Edge{u,e}); }).vec();
-      fmt::print("Succs: {}\n", succs);
-
-      // Enqueue unvisited successors
-      for (auto e : succs) { q.push(e); } // for
-
-      // Mark u as visited
-      s_visited.insert(u);
-
-      // Ignore initial endpoints
-      if ( u == path.front() or u == path.back() ) { continue; }
-
-      // Get children of current node
-      auto v_children = fn(ops.preds(u)).in(s_visited).vec();
-
-      // Select shortest path (parent in lowest layer)
-      if ( v_children.size() > 1 )
-      {
-        v_children = fn(v_children).sort({}, [&](auto e) { return depth_view.nl.at(e); }).vec();
-      } // else if
-      else if ( v_children.size() == 0 )
-      {
-        continue;
-      } // else children == 1
-
-      fmt::print("v_children: {}\n", v_children);
-
-      // Update cycle map
-      m_cycle[u] = v_children.at(0);
-
-      // Check if node has 2 children in the visited set (possible cycle)
-      if ( v_children.size() == 2 )
-      {
-        // Check if cycle closes in 'n'
-        Nodes v_fst_half;
-        Nodes v_snd_half;
-
-        // Create path from map
-        auto f_make_path = [&](Node n)
-        {
-          Nodes _out;
-          _out.push_back(n);
-          while ( m_cycle.contains(n) )
-          {
-            n = m_cycle.at(n);
-            _out.push_back(n);
-          }
-          return _out;
-        };
-
-        // Create path from outputs of 'vertex'
-        v_fst_half = f_make_path(v_children.at(0));
-        v_snd_half = f_make_path(v_children.at(1));
-        fmt::print("v_fst_half: {}\n", v_fst_half);
-        fmt::print("v_snd_half: {}\n", v_snd_half);
-
-        // Closes in path endpoints
-        if(
-            (v_fst_half.back() == path.front() && v_snd_half.back() == path.back())
-            ||
-            (v_fst_half.back() == path.back() && v_snd_half.back() == path.front())
-          )
-        {
-          // Build cycle
-          Nodes cycle;
-
-          // Check which half has first element of path
-          if ( v_fst_half.back()  !=  path.front() &&
-               v_fst_half.front() !=  path.front()
-             ) { v_snd_half = std::exchange(v_fst_half, v_snd_half); }
-          if ( v_fst_half.back() !=  path.front() ) { std::ranges::reverse(v_fst_half); }
-          if ( v_snd_half.front() !=  path.back() ) { std::ranges::reverse(v_snd_half); }
-
-          cycle = fn(cycle)
-            .chain(v_fst_half)
-            .pop_back(1)
-            .chain(path)
-            .pop_back(1)
-            .chain(v_snd_half)
-            .mut([&](auto v){ v.push_back(u); return v; })
-            .vec();
-
-          // Found cycle for current node 'n'
-          fmt::print("cycle: {} → {}\n", u, cycle);
-
-          _out.push_back(cycle);
-
-          break;
-        } // if fn(v_fst_half).in(v_snd_half).vec().size() == 1
-      } // if children == 2
-    }
-
-    return _out;
-  };
-
-  // Start cycle detection
-  while( ! q_cycles.empty() )
-  {
-    auto cycle_curr = q_cycles.front(); q_cycles.pop();
-    fmt::print("cycle_curr: {}\n", cycle_curr);
-
-    // Split subranges
-    auto subranges = f_split_subranges(cycle_curr);
-    fmt::print("subranges: {}\n", subranges);
-
-    // Search each subrange for a cycle with bfs
-    std::vector<Nodes> cycles_new;
-    for (auto&& subrange : subranges)
-    {
-      auto tmp = f_find_cycle(subrange);
-      cycles_new.insert(cycles_new.end(), tmp.begin(), tmp.end());
-    } // for
-
-    // Include new cycles in queue
-    for(auto const& e : cycles_new) { q_cycles.push(e); }
-
-    // Mark new cycle edges as visited
-    for(auto const& e : cycles_new) { f_visit_edges(e); }
-
-    // Update result with new cycles
-    out.insert(out.end(), std::make_move_iterator(cycles_new.begin()), std::make_move_iterator(cycles_new.end()));
-  }
-
-  for (auto const& cycle : out)
-  {
-    fmt::print("cycle: {}\n", cycle);
-  } // for
-
-  exit(0);
-
-  return out;
-
-} // fn: minimal_basis_3 }}}
-
-// fn: minimal_basis_2 {{{
-template<SignedIntegral I, typename C>
-[[nodiscard]] decltype(auto) minimal_basis_2(I root, Ops const& ops, C&& m_crossing_nodes, Sink sink)
-{
-  // Init logger
-  err::Logger logger{sink};
-
-  std::vector<Nodes> out;
-
-  auto depth_view = ns_views::depth::run(root, ops.preds, ops.succs);
-
-  std::set<Node> s_visited_global;
-
-  for (auto [layer,nodes] : depth_view.ln)
-  {
-    // Check for nodes with predecessors == 2 (possible cicle endpoints)
-    // fmt::print("l: {} n: {}\n", layer, nodes);
-
-    nodes = fn(nodes).keep([&](auto n){ return ops.preds(n).size() == 2; }).vec();
-
-    // fmt::print("closes: {}\n", nodes);
-
-    for(Node n : nodes)
-    {
-      // fmt::print("n: {}\n", n);
-      // Traverse predecessor tree in bfs manner
-      std::set<Node> s_visited_local;
-      s_visited_local.insert(n);
-      std::map<Node,Node> m_cycle;
-      experimental::bfs_repeat::run(n
-      // ns_search::bfs::run(n
-          // Do not backtrack previously visited nodes
-        , [&](Node n){ return ops.preds(n); }
-          // Only go backwards in the directed graph
-        // , [](Node){ return std::vector<Node>{}; }
-          // Main
-        , [&](Node o)
-        {
-          // fmt::print(":: o: {}\n", o);
-
-          // Skip source node
-          if ( o == n ) { return false; }
-
-          // Check if was previously visited
-          bool is_visited{s_visited_local.contains(o)};
-
-          // Get parents of current node
-          auto v_parents = fn(ops.succs(o)).in(s_visited_local).vec();
-
-          // Select shortest path (parent in highest layer)
-          if ( v_parents.size() > 1 )
-          {
-            v_parents = fn(v_parents).sort({}, [&](auto e)
-            {
-              return depth_view.nl.at(e);
-            })
-            .rev()
-            .vec();
-          } // else
-
-          // Update cycle map
-          m_cycle[o] = v_parents.at(0);
-
-          // Add node to visited set
-          s_visited_local.insert(o);
-
-          // Check if node has 2 parents in the visited set (possible cycle)
-          if ( v_parents.size() == 2 )
-          {
-            // Check if cycle closes in 'n'
-            Nodes v_fst_half;
-            Nodes v_snd_half;
-
-            // Create path from map
-            auto f_make_path = [&](Node n)
-            {
-              Nodes out;
-              out.push_back(n);
-              while ( m_cycle.contains(n) )
-              {
-                n = m_cycle.at(n);
-                out.push_back(n);
-              }
-              return out;
-            };
-
-            // Create path from outputs of 'o'
-            v_fst_half = f_make_path(v_parents.at(0));
-            v_snd_half = f_make_path(v_parents.at(1));
-
-            // Closes in 'n'
-            if( fn(v_fst_half).in(v_snd_half).vec().size() == 1 )
-            {
-              // Build cycle
-              Nodes cycle;
-
-              // fmt::print("Map:");
-              // for (auto&& e : m_cycle)
-              // {
-              //   fmt::print("e: {}\n", e);
-              // } // for
-
-              // Insert lower divergence
-              cycle.push_back(o);
-
-              // Insert cycle halves
-              v_snd_half.pop_back();
-              std::reverse(v_snd_half.begin(), v_snd_half.end());
-
-              cycle = fn(cycle)
-                .chain(v_fst_half)
-                .chain(v_snd_half)
-                .vec();
-
-              // fmt::print("cycle: {} → {}\n", o, cycle);
-              out.push_back(cycle);
-              // Break
-              return true;
-            }
-
-            // Continue
-            return false;
-          }
-          // Continue
-          return false;
-        }
-      );
-    }
-
-  } // for
-
-  // exit(0);
-
-  return out;
-
-} // fn: minimal_basis_2 }}}
-
-// fn: minimal_basis {{{
-template<SignedIntegral I, typename C>
-[[nodiscard]] decltype(auto) minimal_basis(I root, Ops const& ops, C&& m_crossing_nodes, Sink sink)
-{
-  // Init logger
-  err::Logger logger{sink};
-
-  // Start interpreter
-  py::scoped_interpreter guard{};
-
-  // Import networkx
-  py::module_ networkx = py::module_::import("networkx");
-
-  // Create networkx graph
-  auto gnx{networkx.attr("Graph")()};
-
-  // Insert edges
-  auto bfs = ns_search::bfs::run(root,ops.preds,ops.succs,
-    [&](Node u)
-    {
-      for( Node v : ops.succs(u) )
-      {
-        gnx.attr("add_edge")(u,v);
-      }
-      return false;
-    });
-
-  // Calculate basis
-  auto basis {py::cast<std::vector<std::vector<Node>>>(networkx.attr("minimum_cycle_basis")(gnx))};
-
-  // Adjust each base, such that, for [u,v], u is a predecessor of v
-  for(auto& base : basis)
-  {
-    std::vector<Node> out;
-
-    auto f_succs = [&](Node u){ return fn(ops.succs(u)).in(base).vec(); };
-
-    // Get node with two outgoing edges that belong to base
-    auto it{rg::find_if(base,[&](Node u){ return f_succs(u).size() == 2; })};
-
-    err::err({ it != base.end() })("Outgoing base not found");
-
-    // Include node with two outgoing edges in result
-    out.push_back(*it);
-
-    // Get both successors
-    auto succs {f_succs(*it)};
-
-    // For each create paths in out
-    auto succ_fst{succs.front()};
-    auto succ_snd{succs.back()};
-
-    out.push_back(succ_fst);
-
-    for(succs = f_succs(succ_fst); succs.size() != 0; succs = f_succs(succ_fst))
-    {
-      succ_fst = succs.front();
-      out.push_back(succ_fst);
-    }
-
-    out.insert(out.begin(), succ_snd);
-
-    for(succs = f_succs(succ_snd); succs.size() != 0; succs = f_succs(succ_snd))
-    {
-      succ_snd = succs.front();
-      out.insert(out.begin(),succ_snd);
-    }
-
-    out.pop_back();
-
-    base = out;
-  }
-
-  for (u64 i{}; auto e : basis)
-  {
-    logger.info()("Basis {}: {}", i++, e);
-  } // for
-
-  return basis;
-} // fn: minimal_basis }}}
 
 // fn: minimal_basis_bfs_ordering {{{
 void minimal_basis_bfs_ordering(Ops const& ops, Basis& basis)
@@ -1298,17 +918,22 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
     auto f_align_intersection = [&]()
     {
       intersection = fn(c1).in(c2).vec();
+      logger.info()("c1 (pre): {}", c1);
+      logger.info()("c2 (pre): {}", c2);
+      logger.info()("in (pre): {}", intersection);
       if ( intersection.size() > 1 )
       {
         c1 = fn(c1).rot([&](auto v)
         {
           return fn(v).cut(u64{}, intersection.size()).in(intersection).vec().size() == intersection.size();
         }).vec();
+        logger.info()("Rotated c1");
 
         c2 = fn(c2).rot([&](auto v)
         {
           return fn(v).cut(u64{}, intersection.size()).in(intersection).vec().size() == intersection.size();
         }).vec();
+        logger.info()("Rotated c2");
 
         // Check if needs reverse
         u64 size_intersection = intersection.size();
@@ -1317,6 +942,7 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
           std::ranges::reverse(c2);
           std::ranges::rotate(c2, c2.end() - 1);
         }
+        logger.info()("Checked if requires reverse");
 
         intersection = fn(c1).in(c2).vec();
       }
@@ -1392,8 +1018,78 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
     ++i;
   } // for
 
+  logger.info()("Finished align_intersections");
+
   return out;
 } // fn: align_intersections }}}
+
+// fn: get_cycle_supports {{{
+decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& basis, Map auto&& prox_view)
+{
+  Edges out;
+
+  auto f_make_cuts = [&](Range auto&& _1, Range auto&& _2) -> Edges
+  {
+    Edges _1_out;
+
+    // For each node, try to connect to another node of _2
+    for (auto it_c1{_1.begin()}; it_c1 != _1.end(); ++it_c1)
+    {
+      auto it_c2 = std::ranges::find_if(_2, [&](auto&& __1){ return prox_view.at(__1) > prox_view.at(*it_c1); });
+      if ( it_c2 == std::ranges::end(_2) ) { break; } // if
+      _1_out.push_back(Edge{*it_c1, *it_c2});
+    } // for
+
+    return _1_out;
+  };
+
+  // Create additional edges for cycles with size > 4
+  for(auto const& base : basis)
+  {
+    if (base.size() > 4)
+    {
+      // Split in half cycles
+      auto [c1,c2] = cycle_split_in_endpoints(ops, base);
+
+      fmt::print("c1 (pre): {}\n", c1);
+      fmt::print("c2 (pre): {}\n", c2);
+
+      std::ranges::reverse(c2);
+      c1.pop_back();
+      c2.pop_back();
+      c1.erase(c1.begin());
+      c2.erase(c2.begin());
+
+      if ( c1.empty() or c2.empty() ) { continue; }
+
+      fmt::print("Base: {}\n", base);
+      fmt::print("c1: {}\n", c1);
+      fmt::print("c2: {}\n", c2);
+
+      // Insert additional edges
+      auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
+      auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
+
+      // Check which yields most cuts (c1 → c2 or c2 → c1)
+      Edges cuts_c1 = f_make_cuts(c1,c2);
+      Edges cuts_c2 = f_make_cuts(c2,c1);
+
+      fmt::print("c1|c2: {}\n", cuts_c1);
+      fmt::print("c1|c2: {}\n", cuts_c2);
+
+      if ( cuts_c1.empty() && cuts_c2.empty() ) { continue; }
+
+      auto cuts = ( cuts_c1.size() >= cuts_c2.size() )? cuts_c1 : cuts_c2;
+
+      fn(cuts).ply([&](auto c){ out.emplace_back(c.first, c.second); });
+    } // if base.size() > 4
+  } // for
+
+  fmt::print("Supports:\n");
+  rg::for_each(out, [](auto _1){ fmt::print("s: {}\n", _1); });
+
+  return out;
+} // function: get_cycle_supports }}}
 
 // fn: edge_weights {{{
 [[nodiscard]] std::map<Edge,Weight>
@@ -1417,19 +1113,12 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
   return out;
 } // function: edge_weights }}}
 
-// enum: Partition {{{
-enum class Partition
-{
-  L,
-  R,
-}; // enum: Partition }}}
-
 // struct: Adjacencies {{{
 struct Adjacencies
 {
-  Tile src;
-  i64 dist_exact;
-  Tiles adjacencies;
+  Tile m_src;
+  i64 m_dist_exact;
+  Tiles m_adjacencies;
 
   template<typename T>
   Adjacencies(T&& src, i64 dist_exact);
@@ -1438,9 +1127,9 @@ struct Adjacencies
 
 template<typename T>
 Adjacencies::Adjacencies(T&& src, i64 dist_exact)
-  : src(src)
-  , dist_exact(dist_exact)
-  , adjacencies({})
+  : m_src(src)
+  , m_dist_exact(dist_exact)
+  , m_adjacencies({})
 {};
 
 Tiles Adjacencies::tiles()
@@ -1463,34 +1152,36 @@ Tiles Adjacencies::tiles()
   // Stop when a tile with distance > dist_exact is found, as all the following are increasingly more
   // distant
   (void) ns_search::bfs::run(
-      this->src
+      m_src
     , f_tiles_adjacent
-    , [](Tile t){ return Tiles{}; }
+    , [](auto&&){ return Tiles{}; }
     , [&](Tile t)
       {
-        auto dist_cur{ns_heuristics::chebyshev::run(this->src,t)};
+        auto dist_cur{ns_heuristics::chebyshev::run(m_src,t)};
 
-        if( dist_cur > this->dist_exact+1 )
+        if( dist_cur > m_dist_exact+1 )
         {
           return true; // stop
         } // if
 
-        if( dist_cur == this->dist_exact )
+        if( dist_cur == m_dist_exact )
         {
-          this->adjacencies.push_back(t);
+          m_adjacencies.push_back(t);
         } // else if
 
         return false; // continue
       }
   );
 
-  return this->adjacencies;
+  return m_adjacencies;
 }
 
 // struct: Adjacencies }}}
 
 // fn: place_intersection {{{
-auto place_intersection(Ops const& ops, Range auto intersection)
+auto place_intersection(Ops const& ops
+  , Range auto intersection
+  , [[maybe_unused]] MEdgeWeight const& m_edge_weight)
 {
   // Initialize new placement
   Placement placement;
@@ -1519,15 +1210,21 @@ auto place_intersection(Ops const& ops, Range auto intersection)
   // } // for
 
   // For b1 is (-1,-1)
-  if ( fn(ops.succs(intersection.at(0))).has(intersection.at(1)) != 0 )
+  auto [u,v] = std::tie(intersection.at(0), intersection.at(1));
+
+  // Edge weight for the first edge must equal 1
+  // err::err({m_edge_weight.at({u,v}) == 1})("Initial intersection weight must be exactly 1");
+
+  if ( fn(ops.succs(u)).has(v) != 0 )
   {
-    placement[intersection.at(1)] = std::make_pair(-1,-1);
-    placement[intersection.at(0)] = std::make_pair(0,0);
+
+    placement[v] = std::make_pair( -1,-1);
+    placement[u] = std::make_pair( 0, 0);
   } // if
   else
   {
-    placement[intersection.at(1)] = std::make_pair(0,0);
-    placement[intersection.at(0)] = std::make_pair(-1,-1);
+    placement[v] = std::make_pair( 0, 0);
+    placement[u] = std::make_pair( -1,-1);
   } // else
 
   return placement;
@@ -1536,43 +1233,244 @@ auto place_intersection(Ops const& ops, Range auto intersection)
 // fn: place_cycle {{{
 struct PlaceCycleRet
 {
-  Placement placement;
-  Paths paths;
-  std::multimap<Node,Node> edges;
-  std::set<Node> unreachable;
-  bool failed;
+  Placement m_placement;
+  Paths m_paths;
+  NodeMMap m_mmap_node;
+  std::set<Node> m_unreachable;
+  bool m_failed;
   PlaceCycleRet(Placement const& placement
     , Paths const& paths
-    , std::multimap<Node,Node> const& edges
+    , std::multimap<Node,Node> const& mmap_node
     , std::set<Node> const& unreachable
     , bool failed
     )
-    : placement(placement)
-    , paths(paths)
-    , edges(edges)
-    , unreachable(unreachable)
-    , failed(failed)
+    : m_placement(placement)
+    , m_paths(paths)
+    , m_mmap_node(mmap_node)
+    , m_unreachable(unreachable)
+    , m_failed(failed)
   {}
 };
 
 cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   , Placement p
   , Paths paths
-  , std::multimap<Node,Node> edges
+  , std::multimap<Node,Node> mmap_node
   , Range auto cycle
   , Range auto inter
   , MEdgeWeight m_edge_weight
-  , Partition r
   , Sink sink)
 {
   // Init logger
   err::Logger logger{sink};
 
+  // Edge operations {{{
+
+  // // Insert dummy nodes in edge map if not exists
+  auto f_edge_update_dummy = [&]<typename M>(M& m, Node u, Node v, Nodes const& dummies)
+  {
+    fn(dummies)
+      .sort()
+      .push_front(u)
+      .push_back(v)
+      .slide(2)
+      .ply([&](auto&& e){ fun::multimap::emplace_if_not_exists(m,e.at(0), e.at(1)); });
+  };
+
+  // // Erase dummy nodes from edge map
+  auto f_edge_erase_dummy = [&]<typename M>(M& m, Node u, Node v, Nodes const& dummies)
+  {
+    fn(dummies)
+      .sort()
+      .push_front(u)
+      .push_back(v)
+      .slide(2)
+      .ply([&](auto&& e){ fun::multimap::erase(m,e.at(0),e.at(1)); });
+  };
+
+  // // Erase dummy node paths created by A* from u to all neighbors
+  auto f_erase_dummy = [&](Node u, auto& wires_of)
+  {
+    // Remove wires between uv placed by A*
+    for (auto&& [node_target,map_dummy] : wires_of[u])
+    {
+      logger.info()("Node u          : {}", u);
+      logger.info()("Node target     : {}", node_target);
+      logger.info()("Dummies to erase: {}", fn(map_dummy).key().vec());
+      // Remove from placed map
+      for (auto&& [node_dummy,tile] : map_dummy) { p.erase(node_dummy); } // for
+      // Remove from mmap_node map
+      bool is_path_u_to_v{fn(ops.succs(u)).has(node_target)};
+      logger.info()("Path is {} to {}? {}", u, node_target, is_path_u_to_v);
+      f_edge_erase_dummy(mmap_node
+        , (is_path_u_to_v)? u : node_target
+        , (is_path_u_to_v)? node_target : u
+        , fn(map_dummy).key().vec());
+    } // for
+    wires_of[u].clear();
+  };
+  // }}}
+
+  // Tile operations {{{
+
+  // // Check if a tile is occupied
+  auto f_is_free = [&](Tile const& t){ return ! fn(p).val().has(t); };
+
+  // // Get tiles sorrounding 't' until a distance 'dist' is reached
+  auto f_get_candidates = [&](Tile const& t, i64 dist) { return Adjacencies{t,dist}.tiles(); };
+
+  // // Actual distance by chebyshev distance
+  auto f_dist_chebyshev = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
+
+  // // For each neighbor v of u, get all available tile positions that are at a max dist of WEIGHT(u,v)
+  auto f_tiles_by_positioned_edge_weight = [&](Node u, Nodes const& neighbors_positioned)
+  {
+    return fn(neighbors_positioned)
+      .as([&](Node v){ return f_get_candidates(p[v], m_edge_weight.at({u,v})); }) // nodes → tiles
+      .squash() // merge [[tiles],[tiles]...] → [tiles]
+      .drop([&](Tile t){ return ! f_is_free(t); })
+      .sort()
+      .unique()
+      .vec();
+  };
+
+  // // A good position for a node u, is a tile that is after its positioned inputs, or before its
+  // // positioned outputs
+  auto f_tiles_keep_by_y = [&](Node u, Nodes const& neighbors_positioned, Tiles const& tile_candidates)
+  {
+    // The graph is placed 'upwards' which is -y
+    return fn(tile_candidates).keep([&](Tile const& t)
+    {
+      for(Node const& n : neighbors_positioned)
+      {
+        Tile const& tn{p[n]};
+        // A position before the placed incoming edges is not good
+        if( fn(ops.preds(u)).has(n) && tn.second < t.second ) { return false; }  // if
+        // A position after the placed outgoing edges is not good
+        else if( fn(ops.succs(u)).has(n) && tn.second > t.second ) { return false; } // else if
+      }
+      return true;
+    }).vec();
+  };
+
+  // // Only keep tiles that respect the distance heuristic
+  auto f_tiles_keep_by_chebyshev_distance = [&](Node u, Nodes const& neighbors_positioned, Tiles const& tile_candidates)
+  {
+    // Target distance by edge weight
+    auto f_target = [&](Node _1, Node _2) { return m_edge_weight.at({_1,_2}); };
+
+    // For each tile, check if it adheres the distance constraint to every placed neighbor of u
+    return fn(tile_candidates)
+      .in_all(neighbors_positioned , [&](Tile t, Node v) { return f_target(u,v) == f_dist_chebyshev(t,p.at(v)); })
+      .vec();
+  };
+
+  // // Only keep tiles that are reacheable. A pair of tiles (t1,t2) are reacheable when it is
+  // // possible to create a path from t1 to t2, and this path has the same size as the chebyshev
+  // // distance from (t1,t2)
+  auto f_tiles_keep_by_astar = [&](Nodes const& neighbors_positioned, Tiles const& tile_candidates)
+  {
+    return fn(tile_candidates).keep([&](Tile t)
+    {
+      for (auto v : neighbors_positioned)
+      {
+        // Calculate chebyshev distance
+        auto d_chebyshev{f_dist_chebyshev(t,p.at(v))};
+        // Calculate chebyshev-based A* path
+        auto d_astar{ns_search::a_star::run(t
+          , p.at(v)
+          , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
+          , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
+          , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
+        )};
+        // Check if path exists, and it is eq to chebyshev
+        if( ! d_astar || static_cast<size_t>(d_chebyshev+1) != d_astar->size() ) { return false; } // if
+      } // for
+      return true;
+    })
+    .vec();
+  };
+
+  // // Get the maxmin values for x and for y
+  auto f_tiles_maxmin_xy = [&]
+  {
+    // Save lowest & highest x coords
+    std::pair<i64,i64> coords_low = p.begin()->second;
+    std::pair<i64,i64> coords_high = p.begin()->second;
+    fn(p).ply([&](auto const& e)
+    {
+      auto const& tile = e.second;
+      if ( tile.first < coords_low.first ) { coords_low.first = tile.first; }
+      if ( tile.second < coords_low.second ) { coords_low.second = tile.second; }
+      if ( tile.first > coords_high.first ) { coords_high.first = tile.first; }
+      if ( tile.second > coords_high.second ) { coords_high.second = tile.second; }
+    });
+
+    return std::make_pair(coords_low, coords_high);
+  };
+
+  // // Sort candidate tiles by area overhead relative to current placed tiles
+  auto f_tiles_sort_by_overhead = [&](Tiles const& tile_candidates)
+  {
+    auto [coords_low, coords_high] = f_tiles_maxmin_xy();
+
+    return fn(tile_candidates).sort({}, [&](Tile const& t)
+    {
+      // +x right
+      // +y down
+
+      // +x
+      if ( t.first > coords_high.first )
+      {
+        // +y = Bottom right corner
+        if ( t.second > coords_high.second )
+        {
+          return celaeno::heuristics::chebyshev::run(t, coords_high);
+        }
+        // -y = Top right corner
+        if ( t.second < coords_low.second )
+        {
+          return celaeno::heuristics::chebyshev::run(t, Tile{coords_high.first, coords_low.second});
+        }
+        return std::abs(t.first - coords_high.first);
+      }
+
+      // -x
+      if ( t.first < coords_low.first )
+      {
+        // +y Bottom left corner
+        if ( t.second > coords_high.second )
+        {
+          return celaeno::heuristics::chebyshev::run(t, Tile{coords_low.first, coords_high.second});
+        }
+        // -y Top left corner
+        if ( t.second < coords_low.second )
+        {
+          return celaeno::heuristics::chebyshev::run(t, coords_low);
+        }
+        return std::abs(coords_low.first - t.first);
+      }
+
+      // // only +y
+      // if ( t.second > coords_high.second )
+      // {
+      //   return std::abs(t.second - coords_high.second);
+      // }
+      //
+      // // only -y
+      // if ( t.second < coords_low.second )
+      // {
+      //   return std::abs(coords_low.second - t.second);
+      // }
+
+      // Inside
+      return i64{};
+    }).vec();
+  };
+  // }}}
+
   // Get lowest node id
   static i64 lowest{lowest_node_id(ops)};
-
-  // Save old state of p
-  Placement p_backup{p};
 
   // Log
   {
@@ -1585,10 +1483,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     } // for
   }
 
-  // Check if a tile is occupied
-  auto f_is_free = [&](Tile const& t){ return ! fn(p).val().has(t); };
-
-  // TODO: Replace this O(n^2) function
+  // Get unique element without changing the order
   auto path{fp::nub(cycle)};
 
   // It is desirable to start from the intersection nodes in the cycle,
@@ -1613,7 +1508,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
   // Check if cycle was already placed
-  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,edges,{},false); }
+  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,mmap_node,{},false); }
 
   // Wire tiles
   std::unordered_map<Node,std::unordered_map<Node,std::unordered_map<Node,Tile>>> wires_of;
@@ -1621,18 +1516,6 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   while( ! unplaced.empty() )
   {
     [[maybe_unused]] auto fold{logger.fold()};
-
-    // Save lowest & highest x coords
-    std::pair<i64,i64> coords_low = p.begin()->second;
-    std::pair<i64,i64> coords_high = p.begin()->second;
-    fn(p).ply([&](auto const& e)
-    {
-      auto const& tile = e.second;
-      if ( tile.first < coords_low.first ) { coords_low.first = tile.first; }
-      if ( tile.second < coords_low.second ) { coords_low.second = tile.second; }
-      if ( tile.first > coords_high.first ) { coords_high.first = tile.first; }
-      if ( tile.second > coords_high.second ) { coords_high.second = tile.second; }
-    });
 
     // Get current node
     auto u{unplaced.top()}; unplaced.pop();
@@ -1660,174 +1543,44 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
     if( ! m_backtrack.contains(u) )
     {
-      auto f_get_candidates = [&](Tile const& t, i64 dist) { return Adjacencies{t,dist}.tiles(); };
-
-      // Get all candidate positions from previously positioned neighbors
-      // Remove occupied positions
-      tile_candidates = fn(neighbors_positioned)
-        // .as([&](Node v){ return f_get_candidates(p[v],1); }) // nodes → tiles
-        .as([&](Node v){ return f_get_candidates(p[v], m_edge_weight.at({u,v})); }) // nodes → tiles
-        .squash() // merge [[tiles],[tiles]...] → [tiles]
-        .drop([&](Tile t){ return ! f_is_free(t); })
-        .sort()
-        .unique()
-        .vec();
-
+      // Fetch initial candidates with a max distance of weight(u,v), for each neighbor
+      tile_candidates = f_tiles_by_positioned_edge_weight(u, neighbors_positioned);
       logger.info()("Initial candidate tiles to place {} at: {}", u, tile_candidates);
 
-      // Remove tile_candidates that are behind positioned input nodes
-      tile_candidates = fn(tile_candidates).keep([&](Tile const& t)
-      {
-        for(Node const& n : neighbors_positioned)
-        {
-          Tile const& tn{p[n]};
-          if( fn(ops.preds(u)).has(n) )
-          {
-            if( tn.second < t.second ) { return false; }
-          }  // if
-          else
-          {
-            if( tn.second > t.second ) { return false; }
-          } // else
-        }
-        return true;
-      }).vec();
-
+      // Remove tiles behind u inputs or after u outputs
+      tile_candidates = f_tiles_keep_by_y(u, neighbors_positioned, tile_candidates);
       logger.info()("Candidates that are not behind input nodes {}", tile_candidates);
 
-      // For each tile in tile_candidates, remove all that does not adhere to edge
-      // constraints.
-      auto f_target = [&](Node u, Node v) { return m_edge_weight.at({u,v}); };
-      auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
-
-      // Keep a candidate if it satisfies edges constraints to all its placed
-      // neighbors
-      tile_candidates = fn(tile_candidates)
-        .in_all(neighbors_positioned
-          , [&](Tile t, Node v) { return f_target(u,v) == f_dist(t,p.at(v)); })
-        .vec();
-
+      // Remove tiles that do not ahere to edge distance constraints
+      tile_candidates = f_tiles_keep_by_chebyshev_distance(u, neighbors_positioned, tile_candidates);
       logger.info()("Candidates that respect edge constraints: {}", tile_candidates);
 
       // Filter candidates by A*
-      tile_candidates = fn(tile_candidates)
-        .keep([&](Tile t)
-        {
-          for (auto v : neighbors_positioned)
-          {
-            // Calculate chebyshev distance
-            auto d_chebyshev{f_dist(t,p.at(v))};
-            // Calculate chebyshev-based A* path
-            auto d_astar{ns_search::a_star::run(t
-              , p.at(v)
-              , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
-              , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
-              , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
-            )};
-            // Log
-            if( d_astar )
-            {
-              logger.info()("Tile {} Node {} - Neighbor {} - A*: {}", t, u, v, *d_astar);
-            } // if
-            // Check if path exists, and it is eq to chebyshev
-            if( ! d_astar || static_cast<size_t>(d_chebyshev+1) != d_astar->size() )
-            {
-              return false;
-            } // if
-          } // for
-
-          return true;
-        })
-        .vec();
-
+      tile_candidates = f_tiles_keep_by_astar(neighbors_positioned, tile_candidates);
       logger.info()("Candidates that are reachable through A*: {}", tile_candidates);
-
-      // Remove tile_candidates that are below the cut between the intersection with the parent cycle in
-      // the bfs tree
 
       // Remove duplicate positions in tile_candidates
       tile_candidates = fn(tile_candidates).sort().unique().vec();
-
       logger.info()("Candidates without duplicates: {}", tile_candidates);
 
-      // Sort tile_candidates by distance
-      tile_candidates = fn(tile_candidates).sort({}, [&](Tile const& t)
-      {
-        // +x right
-        // +y down
-
-        // +x
-        if ( t.first > coords_high.first )
-        {
-          // +y = Bottom right corner
-          if ( t.second > coords_high.second )
-          {
-            return celaeno::heuristics::chebyshev::run(t, coords_high);
-          }
-          // -y = Top right corner
-          if ( t.second < coords_low.second )
-          {
-            return celaeno::heuristics::chebyshev::run(t, Tile{coords_high.first, coords_low.second});
-          }
-          return std::abs(t.first - coords_high.first);
-        }
-
-        // -x
-        if ( t.first < coords_low.first )
-        {
-          // +y Bottom left corner
-          if ( t.second > coords_high.second )
-          {
-            return celaeno::heuristics::chebyshev::run(t, Tile{coords_low.first, coords_high.second});
-          }
-          // -y Top left corner
-          if ( t.second < coords_low.second )
-          {
-            return celaeno::heuristics::chebyshev::run(t, coords_low);
-          }
-          return std::abs(coords_low.first - t.first);
-        }
-
-        // // only +y
-        // if ( t.second > coords_high.second )
-        // {
-        //   return std::abs(t.second - coords_high.second);
-        // }
-        //
-        // // only -y
-        // if ( t.second < coords_low.second )
-        // {
-        //   return std::abs(coords_low.second - t.second);
-        // }
-
-        // Inside
-        return i64{};
-      }).vec();
-
-      // Save unreachable nodes
-      if ( tile_candidates.empty() )
-      {
-        // Save neighbors in case they are unreachable
-        std::ranges::for_each(neighbors_positioned, [&](auto e){ unreachable.insert(e); });
-      }
-
-      logger.info()("Candidates sorted by distance: {}", tile_candidates);
-
+      // Sort tile_candidates by distance x (or/and) y, to reduce area overhead
+      tile_candidates = f_tiles_sort_by_overhead(tile_candidates);
+      logger.info()("Candidates sorted by area overhead: {}", tile_candidates);
     } // if
     else
     {
       tile_candidates = m_backtrack.at(u);
-
-      // Save unreachable nodes
-      if ( tile_candidates.empty() )
-      {
-        // Save neighbors in case they are unreachable
-        std::ranges::for_each(neighbors_positioned, [&](auto e){ unreachable.insert(e); });
-      }
     } // else
 
+    // Save unreachable nodes
+    if ( tile_candidates.empty() )
+    {
+      // Save neighbors in case they are unreachable
+      std::ranges::for_each(neighbors_positioned, [&](auto e){ unreachable.insert(e); });
+    }
+
     // Log
-    logger.info()("Final Candidates: {}", tile_candidates);
+    logger.info()("Chosen candidates by order: {}", tile_candidates);
 
     // Check if tile_candidates are empty, if so, backtrack
     if (tile_candidates.empty())
@@ -1843,40 +1596,13 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       if( placed.empty() )
       {
         logger.info()("Unreacheable neighbors of {}: {}", u, unreachable);
-        co_yield PlaceCycleRet({},{},edges,unreachable,true);
+        co_yield PlaceCycleRet({},{},mmap_node,unreachable,true);
         break;
       } // if
       // Remove previous node from placed stack
       auto v{placed.top()}; placed.pop();
-      // Remove wires of the previous node from placed stack
-      for (auto&& [node_target,map_dummy] : wires_of[v])
-      {
-        // Remove from placed map
-        for (auto&& [node_dummy,tile] : map_dummy) { p.erase(node_dummy); } // for
-        // Remove from edges map
-        bool is_path_u_to_v{!fn(ops.succs(v)).has(node_target)};
-        if ( is_path_u_to_v )
-        {
-          fn(map_dummy)
-            .key()
-            .sort()
-            .push_front(v)
-            .push_back(node_target)
-            .slide(2)
-            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
-        }
-        else
-        {
-          fn(map_dummy)
-            .key()
-            .sort()
-            .push_front(node_target)
-            .push_back(v)
-            .slide(2)
-            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
-        }
-      } // for
-      wires_of[v].clear();
+      // Remove A* intermediate dummy nodes between v and all its neighbors
+      f_erase_dummy(v, wires_of);
       // Remove previous node from placement map
       if( p.contains(v) ){ p.erase(v); }
       // Include previous node in unplaced stack
@@ -1890,12 +1616,6 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     // Block paths between u and candidate
     for (auto v : neighbors_positioned)
     {
-      // Tile candidates
-      auto f_get_candidates = [&](Tile const& t, i64 dist) { return Adjacencies{t,dist}.tiles(); };
-      // Distance
-      auto f_dist = [&](Tile a, Tile b) { return ns_heuristics::chebyshev::run(a,b); };
-      // Calculate chebyshev distance
-      auto d_chebyshev{f_dist(chosen,p.at(v))};
       // Calculate chebyshev-based A* path
       auto d_astar{ns_search::a_star::run(chosen
           , p.at(v)
@@ -1909,11 +1629,11 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // Check if path is reversed or not
       if( fn(ops.succs(u)).has(v) )
       {
-        paths[{u,v}] = *d_astar;
+        paths[std::make_pair(u,v)] = *d_astar;
       } // if
       else
       {
-        paths[{v,u}] = fn(*d_astar).rev().deque();
+        paths[std::make_pair(v,u)] = fn(*d_astar).rev().deque();
       } // else
 
       d_astar->pop_front();
@@ -1923,36 +1643,17 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       {
         // Save new dummy nodes in-between
         // These are were introduced by A* to block paths
-        for (Tile tile : fn(*d_astar).rev().deque())
-        {
-          wires_of[u][v][--lowest] = tile;
-        } // for
-
-        // Update edges from u to v
-        fn(wires_of[u][v])
-          .key()
-          .sort()
-          .push_front(u)
-          .push_back(v)
-          .slide(2)
-          .ply([&](auto&& e){ fun::multimap::emplace_if_not_exists(edges,e.at(0), e.at(1)); });
+        for (Tile tile : fn(*d_astar).rev().deque()) { wires_of[u][v][--lowest] = tile; } // for
+        // Update mmap_node from u to v
+        f_edge_update_dummy(mmap_node, u, v, fn(wires_of[u][v]).key().vec());
       }
       else
       {
         // Save new dummy nodes in-between
         // These are were introduced by A* to block paths
-        for (Tile tile : *d_astar)
-        {
-          wires_of[u][v][--lowest] = tile;
-        } // for
-        // Update edges from v to u
-        fn(wires_of[u][v])
-          .key()
-          .sort()
-          .push_front(v)
-          .push_back(u)
-          .slide(2)
-          .ply([&](auto&& e){ fun::multimap::emplace_if_not_exists(edges,e.at(0), e.at(1)); });
+        for (Tile tile : *d_astar) { wires_of[u][v][--lowest] = tile; } // for
+        // Update mmap_node from v to u
+        f_edge_update_dummy(mmap_node, v, u, fn(wires_of[u][v]).key().vec());
       } // else
     } // for
 
@@ -1979,80 +1680,14 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
     if( unplaced.empty() )
     {
-      // Test resulting cycle, to see if it hasn't twisted within itself
-      // // Re-create cycle with dummy nodes
-      Nodes cycle_with_dummy = fn(cycle)
-        .mut([](auto e){ e.push_back(e.front()); return e; })
-        .slide(2)
-        .as([&](auto e)
-        {
-          Nodes out;
-          i64 u = e.at(0);
-          i64 v = e.at(1);
-
-          logger.info()("u,v: {},{}\n", u, v);
-
-          std::deque<Tile> node_dummy_path;
-
-          if ( wires_of.contains(u) && wires_of.at(u).contains(v) )
-          {
-            out = fn(wires_of.at(u).at(v)).key().sort().vec();
-            logger.info()("wires (sort) if: {}\n", out);
-          } // if
-          else if ( wires_of.contains(v) && wires_of.at(v).contains(u) )
-          {
-            out = fn(wires_of.at(v).at(u)).key().sort().vec();
-            logger.info()("wires (sort) el: {}\n", out);
-          }
-
-          if ( fn(ops.preds(u)).has(v) ) { std::ranges::reverse(out); }
-          logger.info()("wires (final) {}\n", out);
-
-          out.insert(out.begin(), u);
-          out.push_back(v);
-
-          return fn(out).unique().vec();
-        })
-        .squash()
-        .vec();
-
       logger.info()("Cycle: {}\n", cycle);
-      logger.info()("Dummy Cycle: {}\n", cycle_with_dummy);
-
-      co_yield PlaceCycleRet(p,paths,edges,{},false);
+      co_yield PlaceCycleRet(p,paths,mmap_node,{},false);
 
       // Remove previous node from placed stack
       placed.pop();
 
-      // Remove wires between uv placed by A*
-      for (auto&& [node_target,map_dummy] : wires_of[u])
-      {
-        // Remove from placed map
-        for (auto&& [node_dummy,tile] : map_dummy) { p.erase(node_dummy); } // for
-        // Remove from edges map
-        bool is_path_u_to_v{!fn(ops.succs(u)).has(node_target)};
-        if ( is_path_u_to_v )
-        {
-          fn(map_dummy)
-            .key()
-            .sort()
-            .push_front(u)
-            .push_back(node_target)
-            .slide(2)
-            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
-        }
-        else
-        {
-          fn(map_dummy)
-            .key()
-            .sort()
-            .push_front(node_target)
-            .push_back(u)
-            .slide(2)
-            .ply([&](auto&& e){ fun::multimap::erase(edges,e.at(0),e.at(1)); });
-        }
-      } // for
-      wires_of[u].clear();
+      // Remove A* intermediate dummy nodes between v and all its neighbors
+      f_erase_dummy(u, wires_of);
 
       // Remove previous node from placement map
       if( p.contains(u) ){ p.erase(u); }
@@ -2066,9 +1701,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
 } // function: place_cycle }}}
 
-// fn: prox_view {{{
-template<typename T>
-decltype(auto) get_prox_view(Ops const& ops, T const& view)
+// fn: get_prox_view {{{
+template<typename T, typename U>
+decltype(auto) get_prox_view(Ops const& ops, T const& view, [[maybe_unused]] U const& view_ln)
 {
   T out{view};
 
@@ -2119,7 +1754,8 @@ decltype(auto) get_prox_view(Ops const& ops, T const& view)
 
   return out;
 
-} // fn: prox_view }}}
+
+} // fn: get_prox_view }}}
 
 // fn: detect_ears {{{
 template<Range R>
@@ -2196,7 +1832,11 @@ decltype(auto) detect_ears(Ops const& ops, R const& basis)
 
 // fn: global_backtracking {{{
 template<typename C>
-decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_nodes, Sink sink)
+decltype(auto) global_backtracking(Ops const& ops
+  , Basis& basis
+  , [[maybe_unused]] C&& m_crossing_nodes
+  , Edges const& cycle_supports
+  , Sink sink)
 {
   err::Logger logger{sink};
 
@@ -2210,14 +1850,55 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
 
   for (auto&& base : basis)
   {
-    fmt::print("-- Base: {}\n", base);
+    logger.info()("-- Base: {}\n", base);
+  } // for
+
+  // Calculate graph depth-view
+  auto depth_view =
+    f_timer({}, [&] { return ns_views::depth::run(0,ops.preds,ops.succs); });
+  logger.info()("-- Built depth view");
+
+  auto prox_view =
+    f_timer({}, [&] { return get_prox_view(ops,depth_view.nl,depth_view.ln); });
+  logger.info()("-- Built prox view");
+
+  for (auto e : prox_view)
+  {
+    fmt::print("prox e: {}\n", e);
+  } // for
+
+  // Get edge weights for each basis
+
+  MEdgeWeight m_edge_weight;
+  for( auto const& cycle : basis )
+  {
+    auto m_cycle_edge_weight {edge_weights(ops, cycle, prox_view)};
+    fn(m_cycle_edge_weight).ply([&](auto e)
+    {
+      m_edge_weight[e.first] = e.second;
+    });
+  }
+
+  // // Get edge weights for supports
+  // for (auto const& edge : cycle_supports)
+  // {
+  //   auto [u,v] = edge;
+  //   err::err({ prox_view.at(v) > prox_view.at(u) })("v is not sucessor of u");
+  //   m_edge_weight[edge]      = prox_view.at(v) - prox_view.at(u);
+  //   m_edge_weight[rev(edge)] = prox_view.at(v) - prox_view.at(u);
+  // } // for
+
+  // Log
+  for (auto e : m_edge_weight)
+  {
+    logger.info()("Weight: {}", e);
   } // for
 
   basis = f_timer({}, [&] { return detect_ears(ops, basis); });
 
   for (auto&& base : basis)
   {
-    fmt::print("-- Base (ear): {}\n", base);
+    logger.info()("-- Base (ear): {}\n", base);
   } // for
 
   f_timer({}, [&] { minimal_basis_bfs_ordering(ops, basis); });
@@ -2237,36 +1918,6 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     logger.info()("-- Base (align): {}", base);
   } // for
 
-  // Calculate graph depth-view
-  auto depth_view =
-    f_timer({}, [&] { return ns_views::depth::run(0,ops.preds,ops.succs).nl; });
-
-  auto prox_view =
-    f_timer({}, [&] { return get_prox_view(ops,depth_view); });
-
-  // Get edge weights for each basis
-  MEdgeWeight m_edge_weight;
-  for( auto const& cycle : basis )
-  {
-    auto m_cycle_edge_weight {edge_weights(ops, cycle, prox_view)};
-    fn(m_cycle_edge_weight).ply([&](auto e)
-    {
-      m_edge_weight[e.first] = e.second;
-    });
-  }
-
-  // Log
-  for (auto e : m_edge_weight)
-  {
-    logger.info()("Weight: {}", e);
-  } // for
-
-
-  // for (auto e : prox_view)
-  // {
-  //   fmt::print("prox e: {}\n", e);
-  // } // for
-
   // Rotate while intersection has size != 2
   // pair_intersection_basis = fn(pair_intersection_basis).rot([](auto&& e){ return e.front().first.size() != 2; }).vec();
 
@@ -2274,14 +1925,15 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
   f_timer({}, [&] { std::reverse(pair_intersection_basis.begin(), pair_intersection_basis.end()); });
 
   // Get initial intersection
-  auto const& [intersection,cycle] = pair_intersection_basis.back();
+  auto const& intersection_initial = pair_intersection_basis.back().first;
 
   // Place initial intersection
   placement =
-    f_timer({}, [&] { return place_intersection(ops, intersection); });
+    f_timer({}, [&] { return place_intersection(ops, intersection_initial, m_edge_weight); });
 
-  // Currently placed edges
-  std::multimap<Node,Node> m_edges;
+  // Currently placed node relationship
+  // Nodes on this map are always point to their successors
+  NodeMMap mmap_node;
 
   // Stack generators
   std::stack<cppcoro::generator<PlaceCycleRet>> st_generator;
@@ -2290,15 +1942,15 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
   std::stack<std::pair<Nodes,Nodes>> st_solutions;
 
   // Push intersection
-  if(auto [u,v] = std::make_pair(intersection.at(0),intersection.at(1)); fn(ops.succs(u)).has(v) )
+  if(auto [u,v] = std::make_pair(intersection_initial.at(0),intersection_initial.at(1)); fn(ops.succs(u)).has(v) )
   {
-    paths[{u,v}] = std::deque<Tile>({placement.at(intersection.at(0)), placement.at(intersection.at(1))});
-    m_edges.emplace(u,v);
+    paths[{u,v}] = std::deque<Tile>({placement.at(u), placement.at(v)});
+    mmap_node.emplace(u,v);
   } // if
   else
   {
-    paths[{v,u}] = std::deque<Tile>({placement.at(intersection.at(1)), placement.at(intersection.at(0))});
-    m_edges.emplace(v,u);
+    paths[{v,u}] = std::deque<Tile>({placement.at(v), placement.at(u)});
+    mmap_node.emplace(v,u);
   } // if
 
   bool b_backtrack{false};
@@ -2329,11 +1981,10 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
         return place_cycle(ops
             , placement
             , paths
-            , m_edges
+            , mmap_node
             , cycle
             , intersection
             , m_edge_weight
-            , Partition::L
             , logger.sink()
           );
       });
@@ -2364,7 +2015,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
           {
             logger.info()("Cycle: {}", cycle);
             logger.info()("Intersect: {}", intersect);
-            std::ranges::for_each(intersect, [&](auto e){ nodes_unreachable.erase(e); });
+            std::ranges::for_each(intersect, [&](auto _1){ nodes_unreachable.erase(_1); });
           } // if
 
           // Get previous generator
@@ -2403,20 +2054,64 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
 
     auto check_half_separations = [&]
     {
-      while ( it_gen != generator.end() && it_gen->failed == false )
+      while ( it_gen != generator.end() && it_gen->m_failed == false )
       {
-        placement = it_gen->placement;
-        paths = it_gen->paths;
-        m_edges = it_gen->edges;
+        placement = it_gen->m_placement;
+        paths = it_gen->m_paths;
+        mmap_node = it_gen->m_mmap_node;
 
         // Check for half separation
-        bool has_inner_crossings = cycle_has_inner_crossings(ops, cycle, placement, sink);
+        // Test resulting cycle, to see if it hasn't twisted within itself
+        // // Re-create cycle with dummy nodes
+        Nodes cycle_with_dummy = fn(cycle)
+          .mut([](auto e){ e.push_back(e.front()); return e; })
+          .slide(2)
+          .as([&](auto e)
+          {
+            Nodes out;
+            i64 u = e.at(0);
+            i64 v = e.at(1);
+
+            // u must be sucessor of v
+            bool is_reversed{false};
+            if ( ! fn(ops.succs(u)).has(v) ) { is_reversed = true; v = std::exchange(u,v); }
+            logger.info()("u,v: {},{}\n", u, v);
+            
+            // If endpoint is not v and is not introduced by A*, remove
+            auto remove_by = [&](Edges& _1)
+            {
+              _1 = fn(_1).keep([&](Edge const& __1)
+              {
+                // Check if is goal 'v'
+                if ( __1.second == v )       { return true; }
+                // Check if is introduced by A*
+                if ( ! ops.has(__1.second) ) { return true; }
+                // Discard
+                return false;
+              }).vec();
+            };
+
+            if ( auto opt_nodes = path_from_multimap(mmap_node, u, v, remove_by) )
+            {
+              logger.info()("Nodes between uv: {}\n", *opt_nodes);
+              if ( is_reversed ) { std::ranges::reverse(*opt_nodes); }
+              return *opt_nodes;
+            }
+
+            return (is_reversed)? Nodes{v,u} : Nodes{u,v};
+          })
+          .squash()
+          .unique()
+          .vec();
+        logger.info()("Dummy Cycle: {}\n", cycle_with_dummy);
+
+        bool has_inner_crossings = cycle_has_inner_crossings(cycle_with_dummy, placement, sink);
 
         if ( ! placement.empty() )
         {
           Placement _placement {placement};
           Paths _paths {paths};
-          std::multimap<Node,Node> _m_edges{m_edges};
+          std::multimap<Node,Node> _node_map{mmap_node};
 
           // Offset coordinates to remove negative values
           auto x_min{rg::min_element(_placement,{},[](auto e){ return e.second.first; })->second.first};
@@ -2463,26 +2158,25 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
               logger.info()("-- e: {}", e);
             } // for
             logger.info()("-- Start draw");
-            ns_draw::svg::svg(ops
-              , fmt::format("out/step-{}.svg", ++i)
+            ns_draw::svg::svg(fmt::format("out/step-{}.svg", ++i)
               , _placement
               , _paths
               , [](auto e){ return e; });
             logger.info()("-- End draw");
             logger.info()("-- Placed edges:");
-            std::ranges::for_each(_m_edges, [&](auto e){ logger.info()("e: {}", e); });
+            std::ranges::for_each(_node_map, [&](auto e){ logger.info()("e: {}", e); });
           } // if has_inner_crossings
 #endif
         }
 
         if ( has_inner_crossings )
         {
-          fmt::print("Cycle {} has inner crossings\n", i);
+          logger.info()("Cycle {} has inner crossings\n", i);
           it_gen = std::next(it_gen);
         }
         else
         {
-          fmt::print("Cycle {} has no inner crossings\n", i);
+          logger.info()("Cycle {} has no inner crossings\n", i);
           break;
         } // else
       }
@@ -2490,7 +2184,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
 
     check_half_separations();
 
-    if( it_gen != generator.end() && it_gen->failed == false )
+    if( it_gen != generator.end() && it_gen->m_failed == false )
     {
       // placement = it_gen->placement;
       // paths = it_gen->paths;
@@ -2508,14 +2202,13 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, C&& m_crossing_
     {
       pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
       b_backtrack = true;
-      nodes_unreachable = (it_gen != generator.end())? it_gen->unreachable : std::set<Node>{};
+      nodes_unreachable = (it_gen != generator.end())? it_gen->m_unreachable : std::set<Node>{};
       logger.info()("-- Failed for cycle: {}", cycle);
     } // else
 
   } // while
 
 
-  // bool result{place(ops,placement,depth_view,i,p,Partition::L)};
   std::erase_if(placement,[&](auto&& e){ return e.first < id_lowest; });
 
   return std::make_pair(placement,paths);
@@ -2537,6 +2230,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   auto f_a = [&g](auto u, auto v){ return g.adjacent(u,v); };
   auto f_l = [&g](auto u, auto v){ g.emplace(std::make_pair(u,v)); };
   auto f_u = [&g](auto u, auto v){ g.erase(std::make_pair(u,v)); };
+  auto f_h = [&g](auto u){ return g.has(u); };
 
   err::Logger logger;
 
@@ -2545,7 +2239,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   fmt::print("Wires: {}\n", g.edges_count());
 
   // Create ops
-  Ops ops(f_p, f_s, f_a, f_l, f_u);
+  Ops ops(f_p, f_s, f_a, f_l, f_u, f_h);
 
   auto f_write_v = [&]<typename... Args>(Args&&... args)
   {
@@ -2571,104 +2265,15 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   // unbalance(0,ops);
 
-  // ops.link(8, -7);
-
-
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/3-out.v");
 
   f_timer({}, f_write_d, g.data(), f_p, f_s, "out/3-out.dimacs");
 
-  std::vector<std::vector<std::vector<Node>>> e_basis;
-
-  // B1
-  std::vector<std::vector<std::vector<Node>>> e_basis_b1 =
-  {
-    { {26,31}, {26,23}, {23,27}, {31,27}, }, 
-    { {26,23}, {20,23}, {22,20}, {22,26}, }, 
-    { {22,20}, {13,20}, {18,13}, {18,22}, }, 
-    { {19,20}, {13,19}, {13,20}, }, 
-    { {26,31}, {30,36}, {30,29}, {29,26}, {36,31}, }, 
-    { {45,42}, {42,46}, {45,46}, }, 
-    { {41,45}, {40,41}, {40,44}, {45,44}, }, 
-    { {44,45}, {47,43}, {47,46}, {46,45}, {43,44}, }, 
-    { {40,36}, {30,36}, {35,30}, {35,40}, }, 
-    { {44,40}, {35,40}, {39,35}, {39,44}, }, 
-    { {39,44}, {43,39}, {43,44}, }, 
-    { {12,17}, {17,16}, {12,16}, }, 
-    { {12,14}, {14,11}, {11,9}, {12,9}, }, 
-    { {11,14}, {11,15}, {15,18}, {14,18}, }, 
-    { {9,11}, {7,11}, {8,7}, {8,9}, }, 
-    { {18,22}, {12,17}, {12,14}, {14,18}, {17,22}, }, 
-    { {8,7}, {4,8}, {3,7}, {1,3}, {1,4}, }, 
-    { {27,32}, {33,27}, {33,38}, {38,32}, }, 
-    { {35,39}, {34,39}, {34,35}, }, 
-    { {29,30}, {25,29}, {25,30}, }, 
-    { {18,13}, {11,14}, {7,10}, {7,11}, {10,13}, {14,18}, }, 
-    { {8,9}, {6,9}, {5,8}, {2,5}, {2,6}, }, 
-    { {22,26}, {21,16}, {21,25}, {25,29}, {16,17}, {17,22}, {29,26}, }, 
-    { {5,8}, {4,8}, {2,5}, {1,4}, {0,1}, {0,2}, }, 
-    { {35,30}, {28,34}, {21,25}, {34,35}, {25,30}, {24,21}, {24,28}, }, 
-    { {27,32}, {40,41}, {40,36}, {36,31}, {31,27}, {41,37}, {37,32}, }, 
-    { {45,42}, {45,41}, {41,37}, {42,37}, },
-  };
-
-  std::vector<std::vector<std::vector<Node>>> e_basis_cm138a =
-  {
-    { {77,78}, {70,78}, {69,70}, {69,77}, } ,
-    { {70,71}, {63,71}, {62,63}, {62,70}, } ,
-    { {69,70}, {62,70}, {60,62}, {60,69}, } ,
-    { {63,61}, {53,61}, {55,53}, {55,63}, } ,
-    { {62,63}, {55,63}, {54,55}, {54,62}, } ,
-    { {60,62}, {54,62}, {51,54}, {51,60}, } ,
-    { {53,52}, {44,52}, {45,44}, {45,53}, } ,
-    { {55,53}, {45,53}, {47,45}, {47,55}, } ,
-    { {54,55}, {47,55}, {46,47}, {46,54}, } ,
-    { {51,54}, {46,54}, {43,46}, {43,51}, } ,
-    { {44,37}, {30,37}, {36,30}, {36,44}, } ,
-    { {45,44}, {36,44}, {38,36}, {38,45}, } ,
-    { {47,45}, {38,45}, {40,38}, {40,47}, } ,
-    { {46,47}, {40,47}, {39,40}, {39,46}, } ,
-    { {43,46}, {39,46}, {35,39}, {35,43}, } ,
-    { {20,12}, {20,13}, {12,8}, {8,13}, } ,
-    { {21,20}, {21,13}, {20,13}, } ,
-    { {36,30}, {21,30}, {29,21}, {29,36}, } ,
-    { {31,29}, {31,23}, {29,23}, } ,
-    { {40,38}, {31,38}, {33,31}, {33,40}, } ,
-    { {32,33}, {32,26}, {33,26}, } ,
-    { {35,39}, {32,39}, {27,32}, {27,35}, } ,
-    { {39,40}, {33,40}, {32,33}, {32,39}, } ,
-    { {38,36}, {29,36}, {31,29}, {31,38}, } ,
-    { {22,23}, {23,15}, {15,14}, {22,14}, } ,
-    { {30,28}, {20,28}, {21,20}, {21,30}, } ,
-    { {21,29}, {23,29}, {13,21}, {15,13}, {15,23}, } ,
-    { {14,15}, {9,14}, {9,15}, } ,
-    { {86,81}, {74,81}, {80,74}, {80,86}, } ,
-    { {74,65}, {56,65}, {64,56}, {64,74}, } ,
-    { {72,64}, {72,73}, {64,73}, } ,
-    { {69,60}, {76,69}, {82,76}, {60,68}, {75,68}, {81,75}, {82,81}, } ,
-    { {51,43}, {59,51}, {67,59}, {43,50}, {58,50}, {65,58}, {67,65}, } ,
-    { {35,27}, {42,35}, {49,42}, {27,34}, {41,34}, {48,41}, {49,48}, } ,
-    { {77,84}, {84,88}, {91,88}, {83,77}, {83,87}, {87,90}, {90,91}, } ,
-    { {69,77}, {86,90}, {86,81}, {76,69}, {82,76}, {83,77}, {87,83}, {81,82}, {90,87}, } ,
-    { {51,60}, {74,81}, {74,65}, {59,51}, {67,59}, {68,60}, {75,68}, {65,67}, {81,75}, } ,
-    { {35,43}, {56,65}, {56,48}, {42,35}, {49,42}, {50,43}, {58,50}, {48,49}, {65,58}, } ,
-    { {80,74}, {64,74}, {72,64}, {72,80}, } ,
-    { {48,56}, {57,48}, {57,56}, } ,
-    { {86,90}, {89,90}, {89,86}, } ,
-    { {72,80}, {79,72}, {79,80}, } ,
-    { {27,32}, {26,32}, {19,26}, {19,27}, } ,
-    { {14,22}, {18,14}, {18,22}, } ,
-    { {22,26}, {19,26}, {18,22}, {11,18}, {11,19}, } ,
-    { {33,31}, {26,33}, {23,31}, {22,23}, {22,26}, } ,
-    { {15,13}, {9,15}, {8,13}, {5,8}, {5,9}, } ,
-    { {5,6}, {3,5}, {3,6}, } ,
-    { {6,11}, {17,11}, {25,17}, {10,6}, {16,10}, {24,16}, {24,25}, } ,
-    { {6,11}, {6,5}, {18,14}, {9,14}, {5,9}, {11,18}, } ,
-    { {80,86}, {89,86}, {79,80}, {85,79}, {85,89}, } ,
-    { {56,64}, {73,64}, {57,56}, {66,57}, {66,73}, },
-  };
-
-  e_basis = e_basis_cm138a;
+  //
+  // Balance cycles
+  //
+  
+  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_b1;
 
   // Read cycle output
   // Decode to original values in graph
@@ -2683,12 +2288,14 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   Basis basis = fn(e_basis)
     .as([](auto&& e){  return fn(e).squash().sort().unique().vec(); })
-    .as([&](auto&& e){ return fn(e).as([&](auto e) { return m_nodes_norm.at(e); }).vec(); })
+    .as([&](auto&& e){ return fn(e).as([&](auto _1) { return m_nodes_norm.at(_1); }).vec(); })
     .vec();
 
   // Align cycles from upper node to bottom node
   auto f_align_cycle = [&](auto const& cycle)
   {
+    // auto [fst,snd] = cycle_split_in_endpoints(ops, cycle);
+    // return fn(fst).pop_back(1).chain(snd).pop_back(1).vec();
     Nodes out;
 
     // Find node with 2 preds in cycle
@@ -2716,96 +2323,25 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   basis = fn(basis).as([&](auto&& e){ return f_align_cycle(e); }).vec();
 
-  fn(basis).ply([](auto&& e){ fmt::print("Basis: {}\n", e); });
-  
-  // celaeno::graph::operations::balance::paths::run(0,ops);
-  //
-  // f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/4-out.v");
-  //
-  // // Get minimal basis
-  // auto basis = f_timer({}, [&] { return minimal_basis(i64{},ops,m_crossing_nodes,logger.sink()); });
-  // basis = f_timer({}, [&] { return detect_ears(ops, basis); });
-  //
-  // // Include additional edges for cycles with size > 4
-  // for(auto const& base : basis)
-  // {
-  //   if (base.size() > 4)
-  //   {
-  //     auto c1 = fn(base)
-  //       .take_while(
-  //         [&](auto n){ return fn(ops.succs(n)).in(base).vec().size() < 2; })
-  //       .rev()
-  //       .vec();
-  //
-  //     auto c2 = fn(base).dif(c1).vec();
-  //
-  //     c1.pop_back();
-  //     c2.erase(c2.begin());
-  //
-  //     fmt::print("Base: {}\n", base);
-  //     fmt::print("c1: {}\n", c1);
-  //     fmt::print("c2: {}\n", c2);
-  //
-  //     // Insert additional edges
-  //     // // Check which yields most cuts (c1 → c2 or c2 → c1)
-  //     auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
-  //     auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
-  //     auto f_degree = [&](Node n) { return f_degree_out(n) + f_degree_in(n); };
-  //     auto cuts_c1 = fn(c1)
-  //       .zip(fn(c2).pop_front(1).vec())
-  //       .keep([&](auto e){ return f_degree_out(e.first) < 2 && f_degree_in(e.second) < 2; })
-  //       .vec();
-  //     auto cuts_c2 = fn(c2)
-  //       .zip(fn(c1).pop_front(1).vec())
-  //       .keep([&](auto e){ return f_degree_out(e.first) < 2 && f_degree_in(e.second) < 2; })
-  //       .vec();
-  //     fmt::print("c1|c2: {}\n", cuts_c1);
-  //     fmt::print("c1|c2: {}\n", cuts_c2);
-  //
-  //     if ( cuts_c1.empty() && cuts_c2.empty() ) { continue; }
-  //
-  //     auto cuts = ( cuts_c1.size() > cuts_c2.size() )? cuts_c1 : cuts_c2;
-  //
-  //     fn(cuts).ply([&](auto c){ ops.link(c.first, c.second); });
-  //
-  //     // :
-  //   } // if base.size() > 4
-  // }
-  //
-  // // Process into adjacent intersection
-  // for (i32 i{}; auto const& base : basis)
-  // {
-  //   logger.info()("-- Base {}: {}", i++, base);
-  // } // for
-  //
-  // f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/5-out.v");
-
-  // exit(0);
+  fn(basis).ply([&](auto&& e){ logger.info()("Basis: {}\n", e); });
 
 
-  // unbalance(0,ops);
+  // Calculate graph depth-view and prox-view
+  auto depth_view = f_timer({}, [&] { return ns_views::depth::run(0,ops.preds,ops.succs); });
+  logger.info()("-- Built depth view");
 
-  // ns_io_verilog::Writer(metadata.data(), f_p, f_s, "out/3-out.v");
+  auto prox_view = f_timer({}, [&] { return get_prox_view(ops,depth_view.nl,depth_view.ln); });
+  logger.info()("-- Built prox view");
 
-  // celaeno::graph::operations::balance::paths::run(0,ops);
-  //
-  // ns_io_verilog::Writer(metadata.data(), f_p, f_s, "4-out.v");
-  //
-  // auto layers{ns_ops::minimize::crossings::run(0, ops.preds, ops.succs, ops.adj, ops.link, ops.unlink)};
+  auto cycle_supports = f_timer({}, [&] { return get_cycle_supports(ops, basis, prox_view); });
+  logger.info()("-- Built cycle supports");
 
-  //
-  // ns_io_verilog::Writer(metadata.data(), f_p, f_s, "4-out.v");
-
-  // fmt::print("Graph:\n");
-  // for (auto e : g.data())
-  // {
-  //   fmt::print("{}\n", e);
-  // } // for
+  view_draw(prox_view);
 
   // Perform placement
   // std::cerr << "Started computation\n";
   auto start {std::chrono::system_clock::now()};
-  auto [placement, routing] {global_backtracking(ops,basis,m_crossing_nodes,logger.sink())};
+  auto [placement, routing] {global_backtracking(ops,basis,m_crossing_nodes,cycle_supports,logger.sink())};
   auto end {std::chrono::system_clock::now()};
   // std::cerr << "Finished computation\n";
   std::chrono::duration<f64> dur {end-start};
@@ -2868,8 +2404,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   );
 
   // Draw
-  ns_draw::svg::svg(ops
-    , "out/out.svg"
+  ns_draw::svg::svg("out/out.svg"
     , placement
     , routing
     , [](auto i){ return i; }

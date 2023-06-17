@@ -37,6 +37,7 @@
 #include <set>
 #include <tuple>
 #include <concepts>
+#include <type_traits>
 
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
@@ -66,12 +67,32 @@ using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
+// BaseType {{{
+template<typename T, typename = void>
+struct BaseType { using type = T; };
+
+template<typename T>
+struct BaseType<T, std::enable_if_t< std::is_same<T, std::vector<typename T::value_type>>::value >>
+{
+  using type = typename T::value_type;
+};
+// }}}
+
+// CbType {{{
+template<typename T>
+using CbType = std::function<bool(typename BaseType<T>::type)>;
+// }}}
+
 // Algorithm {{{
-template<typename T, typename P, typename S, typename C = std::function<bool(i64)>>
-std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return false;})
-  requires CallableWith<P,T>
-  && CallableWith<S,T>
-  && CallableWith<C,T>
+template<typename T , typename P , typename S , typename C = CbType<T>>
+decltype(auto) run(T root
+    , P&& f_pred
+    , S&& f_succ
+    , C&& f_cb = [](auto&&){ return false; })
+  requires (CallableWith<P,T> or CallableWith<P,typename T::value_type>)
+  && (CallableWith<S,T> or CallableWith<S,typename T::value_type>)
+  && (CallableWith<C,T> or CallableWith<C,typename T::value_type>)
+
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
@@ -82,18 +103,28 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return 
   // Create adjacent helper
   auto f_nb = [&](auto&& u){ return fp::append(f_pred(u),f_succ(u)); };
 
+  // Select basetype
+  using Type = typename BaseType<T>::type;
+
   // Queue of vertices
-  std::queue<T> queue;
+  std::queue<Type> queue;
 
   // Visited vertices
-  std::set<T> visited; // Using std::set for log(n) query
+  std::set<Type> visited; // Using std::set for log(n) query
 
   // Result that contains all the visited vertices
   // until callback returns true
-  std::vector<T> result;
+  std::vector<Type> result;
 
-  // Push initial vertex into the queue
-  queue.push(root);
+  // Push initial vertex/vertices into the queue
+  if constexpr ( Range<T> )
+  {
+    std::ranges::for_each(root, [&](auto e){ queue.push(e); });
+  } // if
+  else
+  {
+    queue.push(root);
+  } // else
 
   while( ! queue.empty() )
   {
@@ -124,8 +155,8 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& f_cb = [](auto&&){return 
 } // function: run }}}
 
 // function: run {{{
-template<SignedIntegral T, typename C = std::function<bool(i64)>>
-std::vector<T> run(T root, Ops const& ops, C&& f_cb = [](auto&&){return false;})
+template<typename T, typename C = CbType<T>>
+decltype(auto) run(T root, Ops const& ops, C&& f_cb = [](auto&&){return false;})
 {
   return run(root, ops.preds, ops.succs, f_cb);
 } // }}}

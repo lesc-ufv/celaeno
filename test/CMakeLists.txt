@@ -50,7 +50,6 @@ function(add_test target)
   target_compile_options(${target}
     PRIVATE
       -std=c++2a
-      -O3
       $<IF:$<CONFIG:Debug>,
         -Wall
         -Wextra
@@ -59,6 +58,7 @@ function(add_test target)
         -Weffc++
         ,
         -DNDEBUG
+        -O3
       >
   )
 

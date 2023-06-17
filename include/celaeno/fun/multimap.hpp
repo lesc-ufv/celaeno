@@ -48,13 +48,13 @@ using namespace celaeno::err;
 
 // fn: find {{{
 template<template<typename...> typename M, typename K, typename V>
-std::optional<typename M<K,V>::iterator> find(M<K,V> const& m, K k, V v)
+std::optional<typename M<K,V>::iterator> find(M<K,V>& m, K k, V v)
   requires IsSpecializationOf<M,std::multimap,std::remove_reference<K>,std::remove_reference<V>>
 {
   if ( ! m.contains(k) ) { return std::nullopt; }
   auto it = std::ranges::find_if(m, [&](auto&& e){ return e.first == k && e.second == v; });
   if ( it == m.end() ) { return std::nullopt; }
-  return it;
+  return std::make_optional(it);
 } // function: find }}}
 
 // fn: erase {{{

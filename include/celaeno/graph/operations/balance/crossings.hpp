@@ -205,13 +205,13 @@ std::map<T,Cross<T>> run(R&& l1, R&& l2, Ops const& ops)
           // Unlink parent & child
           ops.unlink(n_parent,n_child);
 
-          err::err({! set_id_crossings.contains(n_child)})
+          err::err({! f_is_crossing(n_child)})
             ("Set id crossings must not contain n_child");
 
           // Update children in result
-          if( set_id_crossings.contains(n_parent) )
+          if( f_is_crossing(n_parent) )
           {
-            if( set_id_crossings.contains(n_parent) )
+            if( f_is_crossing(n_parent) )
             {
               for (auto& [u,v] : out[n_parent])
               {
@@ -234,11 +234,11 @@ std::map<T,Cross<T>> run(R&& l1, R&& l2, Ops const& ops)
           ops.unlink(parent,child);
           // Save in crossing map
 
-          err::err({! set_id_crossings.contains(n_child)})
+          err::err({! f_is_crossing(n_child)})
             ("Set id crossings must not contain n_child");
 
           // Update children in result
-          if( set_id_crossings.contains(parent) )
+          if( f_is_crossing(parent) )
           {
             for (auto& [u,v] : out[parent])
             {

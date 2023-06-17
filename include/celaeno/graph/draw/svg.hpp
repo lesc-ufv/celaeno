@@ -58,7 +58,6 @@
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/operations/minimize/pseudo.hpp>
 #include <celaeno/graph/operations/minimize/edge-length.hpp>
-#include <celaeno/graph/representations/grid.hpp>
 
 // namespace celaeno::graph::draw::svg {{{
 namespace celaeno::graph::draw::svg
@@ -74,14 +73,6 @@ using Ops = celaeno::graph::Ops;
 
 // namespaces {{{
 namespace rg = ranges;
-namespace rv = ranges::views;
-namespace fp = fplus;
-
-namespace ns_balance = celaeno::graph::operations::balance;
-namespace ns_minimize = celaeno::graph::operations::minimize;
-namespace ns_representations = celaeno::graph::representations;
-namespace ns_search = celaeno::graph::search;
-namespace ns_views = celaeno::graph::views;
 // }}}
 
 // Using namespaces {{{
@@ -156,7 +147,7 @@ constexpr i32 const circle_offset{tile_size/2};
 
 // fn: svg {{{
 template<String S, typename Map, typename Paths, typename F>
-void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
+void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
 {
   // Output file
   std::ofstream of{filename};
@@ -207,7 +198,7 @@ void svg(Ops const& ops, S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_l
   {
     size_t size_path{path.size()};
 
-    fn(path).slide(2).ply([&,i=0](auto&& r) mutable
+    fn(path).slide(2).ply([&,i=u64{}](auto&& r) mutable
     {
       auto&& source{r.front()};
       auto&& dest{r.back()};

@@ -160,6 +160,11 @@ struct Fun
     return view | rg::to<std::deque>;
   }
 
+  [[nodiscard]] auto map()
+  {
+    return view | rg::to<std::map>;
+  }
+
   void discard() { return; }
 
   // Print
