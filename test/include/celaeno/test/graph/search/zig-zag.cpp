@@ -232,6 +232,56 @@ decltype(auto) view_draw(Map auto&& map_vertex_layer)
 
 } // function: view_draw }}}
 
+// fn: get_prox_view {{{
+decltype(auto) get_prox_view(Ops const& ops)
+{
+  std::map<Node,u64> m_node_layer;
+
+  // Get inputs
+  Nodes vec_node_curr;
+  ns_search::bfs::run(0
+    , ops
+    , [&](auto&& e){ if ( ops.preds(e).size() == 0 ) { vec_node_curr.push_back(e); } ; return false; });
+
+  // Keep track of current layer
+  i64 idx_current_layer = 0;
+
+  while( ! vec_node_curr.empty() )
+  {
+    // Push initial layer
+    rg::for_each(vec_node_curr, [&](auto&& _1){ m_node_layer[_1] = idx_current_layer; });
+
+    // Increment layer counter
+    idx_current_layer++;
+
+    // Transform into next layer
+    vec_node_curr = fn(vec_node_curr)
+      .as([&](auto&& e){ return ops.succs(e); })
+      .squash()
+      .vec();
+  }
+
+  std::map<u64, Nodes> m_layer_nodes;
+  fn(m_node_layer).ply([&](auto&& e)
+  {
+    if ( ! m_layer_nodes.contains(e.second) )
+    {
+      m_layer_nodes.emplace(e.second, Nodes{e.first});
+    } // if
+    else
+    {
+      m_layer_nodes.at(e.second).push_back(e.first);
+    } // else
+  });
+
+  for (auto [l,nds] : m_layer_nodes)
+  {
+    fmt::print("l: {} - n: {}\n", l, nds);
+  } // for
+
+  return m_node_layer;
+} // fn: get_prox_view }}}
+
 // fn: lowest_node_id {{{
 //
 // This function uses a BFS to determine which node has the lowest id in the graph
@@ -1024,7 +1074,7 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
 } // fn: align_intersections }}}
 
 // fn: get_cycle_supports {{{
-decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& basis, Map auto&& prox_view)
+decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&& prox_view)
 {
   Edges out;
 
@@ -1044,46 +1094,44 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& basis, Map auto&&
   };
 
   // Create additional edges for cycles with size > 4
-  for(auto const& base : basis)
+  if (cycle.size() > 4)
   {
-    if (base.size() > 4)
-    {
-      // Split in half cycles
-      auto [c1,c2] = cycle_split_in_endpoints(ops, base);
+    // Split in half cycles
+    auto [c1,c2] = cycle_split_in_endpoints(ops, cycle);
 
-      fmt::print("c1 (pre): {}\n", c1);
-      fmt::print("c2 (pre): {}\n", c2);
+    fmt::print("c1 (pre): {}\n", c1);
+    fmt::print("c2 (pre): {}\n", c2);
 
-      std::ranges::reverse(c2);
-      c1.pop_back();
-      c2.pop_back();
-      c1.erase(c1.begin());
-      c2.erase(c2.begin());
+    std::ranges::reverse(c2);
+    c1.pop_back();
+    c2.pop_back();
+    c1.erase(c1.begin());
+    c2.erase(c2.begin());
 
-      if ( c1.empty() or c2.empty() ) { continue; }
+    if ( c1.empty() or c2.empty() ) { return Edges{}; }
 
-      fmt::print("Base: {}\n", base);
-      fmt::print("c1: {}\n", c1);
-      fmt::print("c2: {}\n", c2);
+    fmt::print("cycle: {}\n", cycle);
+    fmt::print("c1: {}\n", c1);
+    fmt::print("c2: {}\n", c2);
 
-      // Insert additional edges
-      auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
-      auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
+    // Insert additional edges
+    auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
+    auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
 
-      // Check which yields most cuts (c1 → c2 or c2 → c1)
-      Edges cuts_c1 = f_make_cuts(c1,c2);
-      Edges cuts_c2 = f_make_cuts(c2,c1);
+    // Check which yields most cuts (c1 → c2 or c2 → c1)
+    Edges cuts_c1 = f_make_cuts(c1,c2);
+    Edges cuts_c2 = f_make_cuts(c2,c1);
 
-      fmt::print("c1|c2: {}\n", cuts_c1);
-      fmt::print("c1|c2: {}\n", cuts_c2);
+    fmt::print("c1|c2: {}\n", cuts_c1);
+    fmt::print("c1|c2: {}\n", cuts_c2);
 
-      if ( cuts_c1.empty() && cuts_c2.empty() ) { continue; }
+    if ( cuts_c1.empty() && cuts_c2.empty() ) { return Edges{}; }
 
-      auto cuts = ( cuts_c1.size() >= cuts_c2.size() )? cuts_c1 : cuts_c2;
+    auto cuts = ( cuts_c1.size() >= cuts_c2.size() )? cuts_c1 : cuts_c2;
 
-      fn(cuts).ply([&](auto c){ out.emplace_back(c.first, c.second); });
-    } // if base.size() > 4
-  } // for
+    fn(cuts).ply([&](auto c){ out.emplace_back(c.first, c.second); });
+  } // if cycle.size() > 4
+    // for
 
   fmt::print("Supports:\n");
   rg::for_each(out, [](auto _1){ fmt::print("s: {}\n", _1); });
@@ -1213,7 +1261,8 @@ auto place_intersection(Ops const& ops
   auto [u,v] = std::tie(intersection.at(0), intersection.at(1));
 
   // Edge weight for the first edge must equal 1
-  // err::err({m_edge_weight.at({u,v}) == 1})("Initial intersection weight must be exactly 1");
+  i64 weight = m_edge_weight.at({u,v});
+  // err::err({weight == 1})("Initial intersection of {} and {} is {}, should be 1", u, v, weight);
 
   if ( fn(ops.succs(u)).has(v) != 0 )
   {
@@ -1263,6 +1312,18 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 {
   // Init logger
   err::Logger logger{sink};
+
+  // // Get edge weights for supports
+  auto view_prox = get_prox_view(ops);
+  std::map<Edge, i64> m_edge_weight_supports;
+  for (auto const& edge : get_cycle_supports(ops, cycle, view_prox))
+  {
+    auto [u,v] = edge;
+    err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
+    m_edge_weight_supports[edge]      = view_prox.at(v) - view_prox.at(u);
+    m_edge_weight_supports[rev(edge)] = view_prox.at(v) - view_prox.at(u);
+  } // for
+
 
   // Edge operations {{{
 
@@ -1354,15 +1415,40 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   };
 
   // // Only keep tiles that respect the distance heuristic
-  auto f_tiles_keep_by_chebyshev_distance = [&](Node u, Nodes const& neighbors_positioned, Tiles const& tile_candidates)
+  auto f_tiles_keep_by_chebyshev_distance = [&](Node u, Nodes const& neighbors_positioned, Tiles tile_candidates)
   {
     // Target distance by edge weight
     auto f_target = [&](Node _1, Node _2) { return m_edge_weight.at({_1,_2}); };
 
     // For each tile, check if it adheres the distance constraint to every placed neighbor of u
-    return fn(tile_candidates)
+    tile_candidates = fn(tile_candidates)
       .in_all(neighbors_positioned , [&](Tile t, Node v) { return f_target(u,v) == f_dist_chebyshev(t,p.at(v)); })
       .vec();
+
+    // auto f_has_support = [&](Node __1) -> std::optional<Node>
+    // {
+    //   auto __1_it = rg::find_if(m_edge_weight_supports, [&](auto&& ___1){ return ___1.first.first == __1; });
+    //   if ( __1_it !=  rg::end(m_edge_weight_supports) ) { return __1_it->first.second; }
+    //   return std::nullopt;
+    // };
+    // // Check if 'u' has support
+    // if ( auto opt_support = f_has_support(u); opt_support )
+    // {
+    //   logger.info()("Node {} has support {}", u, *opt_support);
+    //   // If it does check if it is placed
+    //   if ( p.contains(*opt_support) )
+    //   {
+    //     // If it is, check if the distance equals to chebyshev
+    //     auto tile_support = p.at(*opt_support);
+    //     logger.info()("Support tile: {}", tile_support);
+    //     tile_candidates = fn(tile_candidates).keep([&](auto&& __1)
+    //     {
+    //       return f_dist_chebyshev(__1, tile_support) >= m_edge_weight_supports.at({u,*opt_support});
+    //     }).vec();
+    //   } // if
+    // } // if
+
+    return tile_candidates;
   };
 
   // // Only keep tiles that are reacheable. A pair of tiles (t1,t2) are reacheable when it is
@@ -1712,59 +1798,6 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
 } // function: place_cycle }}}
 
-// fn: get_prox_view {{{
-template<typename T, typename U>
-decltype(auto) get_prox_view(Ops const& ops, T const& view, [[maybe_unused]] U const& view_ln)
-{
-  std::map<Node,u64> m_node_layer;
-
-  // Get inputs
-  Nodes vec_node_curr;
-  ns_search::bfs::run(0
-    , ops
-    , [&](auto&& e){ if ( ops.preds(e).size() == 0 ) { vec_node_curr.push_back(e); } ; return false; });
-
-  // Keep track of current layer
-  i64 idx_current_layer = 0;
-
-  while( ! vec_node_curr.empty() )
-  {
-    // Push initial layer
-    rg::for_each(vec_node_curr, [&](auto&& _1){ m_node_layer[_1] = idx_current_layer; });
-
-    // Increment layer counter
-    idx_current_layer++;
-
-    // Transform into next layer
-    vec_node_curr = fn(vec_node_curr)
-      .as([&](auto&& e){ return ops.succs(e); })
-      .squash()
-      .vec();
-  }
-
-  std::map<u64, Nodes> m_layer_nodes;
-  fn(m_node_layer).ply([&](auto&& e)
-  {
-    if ( ! m_layer_nodes.contains(e.second) )
-    {
-      m_layer_nodes.emplace(e.second, Nodes{e.first});
-    } // if
-    else
-    {
-      m_layer_nodes.at(e.second).push_back(e.first);
-    } // else
-  });
-
-  for (auto [l,nds] : m_layer_nodes)
-  {
-    fmt::print("l: {} - n: {}\n", l, nds);
-  } // for
-
-  // exit(0);
-
-  return m_node_layer;
-} // fn: get_prox_view }}}
-
 // fn: detect_ears {{{
 template<Range R>
 decltype(auto) detect_ears(Ops const& ops, R const& basis)
@@ -1843,7 +1876,6 @@ template<typename C>
 decltype(auto) global_backtracking(Ops const& ops
   , Basis& basis
   , [[maybe_unused]] C&& m_crossing_nodes
-  , Edges const& cycle_supports
   , Sink sink)
 {
   err::Logger logger{sink};
@@ -1862,14 +1894,8 @@ decltype(auto) global_backtracking(Ops const& ops
   } // for
 
   // Calculate graph depth-view
-  auto depth_view =
-    f_timer({}, [&] { return ns_views::depth::run(0,ops.preds,ops.succs); });
-  logger.info()("-- Built depth view");
-
-  auto prox_view =
-    f_timer({}, [&] { return get_prox_view(ops,depth_view.nl,depth_view.ln); });
+  auto prox_view = f_timer({}, [&] { return get_prox_view(ops); });
   logger.info()("-- Built prox view");
-
   for (auto e : prox_view)
   {
     fmt::print("prox e: {}\n", e);
@@ -1886,15 +1912,6 @@ decltype(auto) global_backtracking(Ops const& ops
       m_edge_weight[e.first] = e.second;
     });
   }
-
-  // Get edge weights for supports
-  for (auto const& edge : cycle_supports)
-  {
-    auto [u,v] = edge;
-    err::err({ prox_view.at(v) > prox_view.at(u) })("v is not sucessor of u");
-    m_edge_weight[edge]      = prox_view.at(v) - prox_view.at(u);
-    m_edge_weight[rev(edge)] = prox_view.at(v) - prox_view.at(u);
-  } // for
 
   // Log
   for (auto e : m_edge_weight)
@@ -1926,8 +1943,23 @@ decltype(auto) global_backtracking(Ops const& ops
     logger.info()("-- Base (align): {}", base);
   } // for
 
-  // Rotate while intersection has size != 2
-  // pair_intersection_basis = fn(pair_intersection_basis).rot([](auto&& e){ return e.front().first.size() != 2; }).vec();
+  // // Check if it has intersection.size() == 2
+  // err::err({ fn(pair_intersection_basis).any([&](auto&& _1)
+  // {
+  //   auto const& __1_intersection = _1.first;
+  //   return m_edge_weight.at({__1_intersection.front(),__1_intersection.back()}) == 1; })
+  // })
+  // ("The algorithm requires an intersection with weight 1");
+  //
+  // // Rotate while intersection has weight != 1
+  // pair_intersection_basis = fn(pair_intersection_basis)
+  //   .rot([&](auto&& _1)
+  //   {
+  //     auto const& __1_intersection = _1.front().first;
+  //     return m_edge_weight.at({__1_intersection.front(),__1_intersection.back()}) == 1;
+  //   })
+  //   .vec();
+  // logger.info()("-- Rotated pair_intersection_basis");
 
   // Reverse the pairs before processing, I don't remember why
   f_timer({}, [&] { std::reverse(pair_intersection_basis.begin(), pair_intersection_basis.end()); });
@@ -2281,7 +2313,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Balance cycles
   //
   
-  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_b1;
+  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_cm138a;
 
   // Read cycle output
   // Decode to original values in graph
@@ -2307,26 +2339,42 @@ int main([[maybe_unused]] int argc, char const* argv[])
   };
 
   basis = fn(basis).as([&](auto&& e){ return f_align_cycle(e); }).vec();
+  basis = detect_ears(ops, basis);
 
   fn(basis).ply([&](auto&& e){ logger.info()("Basis: {}\n", e); });
 
 
-  // Calculate graph depth-view and prox-view
-  auto depth_view = f_timer({}, [&] { return ns_views::depth::run(0,ops.preds,ops.succs); });
-  logger.info()("-- Built depth view");
-
-  auto prox_view = f_timer({}, [&] { return get_prox_view(ops,depth_view.nl,depth_view.ln); });
+  // Calculate graph prox-view
+  auto view_prox = f_timer({}, [&] { return get_prox_view(ops); });
   logger.info()("-- Built prox view");
 
-  auto cycle_supports = f_timer({}, [&] { return get_cycle_supports(ops, basis, prox_view); });
+  logger.info()("-- Cycle supports:");
+  for (auto&& base : basis)
+  {
+    
+    logger.info()("-- -- cycle: {}", base);
+    auto cycle_supports = f_timer({}, [&] { return get_cycle_supports(ops, base, view_prox); });
+    logger.info()("-- -- supports: {}", cycle_supports);
+    // // Get edge weights for supports
+    std::map<Edge, i64> m_edge_weight_supports;
+    for (auto const& edge : get_cycle_supports(ops, base, view_prox))
+    {
+      auto [u,v] = edge;
+      err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
+      i64 weight = view_prox.at(v) - view_prox.at(u);
+      m_edge_weight_supports[edge]      = weight;
+      m_edge_weight_supports[rev(edge)] = weight;
+      logger.info()("-- -- weight {} : {}", edge, weight);
+    } // for
+  } // for
   logger.info()("-- Built cycle supports");
 
-  view_draw(prox_view);
+  view_draw(view_prox);
 
   // Perform placement
   // std::cerr << "Started computation\n";
   auto start {std::chrono::system_clock::now()};
-  auto [placement, routing] {global_backtracking(ops,basis,m_crossing_nodes,cycle_supports,logger.sink())};
+  auto [placement, routing] {global_backtracking(ops,basis,m_crossing_nodes,logger.sink())};
   auto end {std::chrono::system_clock::now()};
   // std::cerr << "Finished computation\n";
   std::chrono::duration<f64> dur {end-start};
