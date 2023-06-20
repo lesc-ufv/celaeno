@@ -337,7 +337,7 @@ decltype(auto) get_prox_view(Ops const& ops)
   } // while
 
 
-  std::map<u64, Nodes> m_layer_nodes;
+  std::map<i64, Nodes> m_layer_nodes;
   fn(m_node_layer).ply([&](auto&& e)
   {
     if ( ! m_layer_nodes.contains(e.second) )
@@ -977,33 +977,62 @@ template<typename F = std::function<bool(Edge)>>
 } // function: e_bfs }}}
 
 // fn: minimal_basis_bfs_ordering {{{
-void minimal_basis_bfs_ordering(Ops const& ops, Basis& basis)
+Basis minimal_basis_bfs_ordering(Ops const& ops, Basis basis, MEdgeWeight const& m_edge_weight)
 {
+  Basis out;
+
   // std::random_device rd;
   // std::mt19937 g(rd());
   // std::shuffle(basis.begin(), basis.end(), g);
 
-  // Fetch inputs
-  Nodes inputs;
-  ns_search::bfs::run(0, ops, [&](auto e)
-  {
-    if ( ops.preds(e).size() == 0 ) { inputs.push_back(e); };
-    return false;
-  });
+  // // Try to start from smaller basis
+  // std::ranges::sort(out, {}, [](auto&& _1){ return _1.size(); });
 
-  // Make the first elements contain the inputs
-  std::ranges::partition(basis, [&](auto const& e){ return fn(e).in(inputs).vec().size() != 0; });
+  // Find a base that has an intersection of two nodes, with an edge weight of 1
+  for (auto it_curr{basis.begin()}; it_curr != basis.end(); ++it_curr)
+  {
+    bool stop{false};
+    for (auto it_comp{basis.begin()}; it_comp != basis.end(); ++it_comp)
+    {
+      if ( *it_curr == *it_comp ) { continue; }
+      Nodes intersection = fn(*it_curr).in(*it_comp).vec();
+      if ( intersection.size() == 2 && m_edge_weight.at(Edge{intersection.at(0), intersection.at(1)}) == 1)
+      {
+        out.push_back(*it_curr);
+        out.push_back(*it_comp);
+        basis = fn(basis).keep([&](auto&& _1){ return _1 != *it_curr && _1 != *it_comp; }).vec();
+        stop = true;
+        break;
+      }
+    } // for
+    if ( stop ) { break; }
+  } // for
+
+  std::ranges::copy(basis, std::back_inserter(out));
+
+  // // Fetch inputs
+  // Nodes inputs;
+  // ns_search::bfs::run(0, ops, [&](auto e)
+  // {
+  //   if ( ops.preds(e).size() == 0 ) { inputs.push_back(e); };
+  //   return false;
+  // });
+  //
+  // // Make the first elements contain the inputs
+  // std::ranges::partition(basis, [&](auto const& e){ return fn(e).in(inputs).vec().size() != 0; });
 
   // Take first base, use it as a starting point
-  Basis::iterator cut{basis.begin()};
+  Basis::iterator cut{out.begin()};
 
   // Partition the vector into adjacencies of cur
-  for(auto it{basis.begin()}; it != basis.end(); ++it)
+  for(auto it{out.begin()}; it != out.end(); ++it)
   {
     cut = std::partition(cut
-      , basis.end()
+      , out.end()
       , [&](Base const& b) { return fn(b).in(*it).vec().size() >= 2; });
   }
+
+  return out;
 } // function: minimal_basis_bfs_ordering }}}
 
 // fn: align_intersections {{{
@@ -1315,44 +1344,27 @@ auto place_intersection(Ops const& ops
   // Check if intersection is empty
   err::err({! intersection.empty()})("Intersection must not be empty");
 
-  // Intersection must have size less or eq to 2
+  // Intersection must have size size of two
   err::err({intersection.size() >= 2})("Intersection size must at least 2");
 
-  // Intersection must have size less or eq to 2
-  // err::err({intersection.size() <= 2})("Intersection size must be two or less");
-  
-  // // Place single-node intersection
-  // if( intersection.size() == 1 )
-  // {
-  //   auto u{intersection.at(0)};
-  //   placement[u] = std::make_pair(0,0);
-  //   return placement;
-  // } // if
-
-  // Update placement
-  // for (i64 i{}; auto u : intersection)
-  // {
-  //   placement[u] = std::make_pair(i,--i);
-  // } // for
-
-  // For cm138a is ( 0,-1)
-  // For b1     is ( 0,-1)
   auto [u,v] = std::tie(intersection.at(0), intersection.at(1));
 
   // Edge weight for the first edge must equal 1
   i64 weight = m_edge_weight.at({u,v});
-  // err::err({weight == 1})("Initial intersection of {} and {} is {}, should be 1", u, v, weight);
+  err::err({weight == 1})("Initial intersection of {} and {} is {}, should be 1", u, v, weight);
 
+  // For b1     is ( 1,-1)
+  // For cm138a is ( 0,-1)
   if ( fn(ops.succs(u)).has(v) != 0 )
   {
 
-    placement[v] = std::make_pair(  0,-1);
+    placement[v] = std::make_pair(-1,-1);
     placement[u] = std::make_pair( 0, 0);
   } // if
   else
   {
     placement[v] = std::make_pair( 0, 0);
-    placement[u] = std::make_pair(  0,-1);
+    placement[u] = std::make_pair(-1,-1);
   } // else
 
   return placement;
@@ -1387,6 +1399,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   , Range auto cycle
   , Range auto inter
   , MEdgeWeight m_edge_weight
+  , Map auto&& prox_view
   , Sink sink)
 {
   // Init logger
@@ -1731,6 +1744,33 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // Sort tile_candidates by distance x (or/and) y, to reduce area overhead
       tile_candidates = f_tiles_sort_by_overhead(tile_candidates);
       logger.info()("Candidates sorted by area overhead: {}", tile_candidates);
+
+      auto f_tiles_by_layer = [&](Tiles const& _1)
+      {
+        Tiles _1_out{_1};
+
+        // Current layer of u
+        i64 _1_idx_layer_u = prox_view.at(u);
+
+        auto _1_it = std::ranges::find_if(prox_view, [&](auto&& __1)
+        {
+          // Is on same layer and is placed
+          return  __1.second == _1_idx_layer_u && p.contains(__1.first);
+        });
+
+        if ( _1_it != std::ranges::end(prox_view) )
+        {
+          // Fetch current 'y' for layer
+          Node _1_idx_layer_v{p.at(_1_it->first).second};
+          
+          return fn(_1_out).keep([&](auto&& __1){ return __1.second == _1_idx_layer_v; }).vec();
+
+        } // if
+
+        return _1_out;
+      };
+
+      tile_candidates = f_tiles_by_layer(tile_candidates);
     } // if
     else
     {
@@ -2043,7 +2083,7 @@ decltype(auto) global_backtracking(Ops const& ops
     logger.info()("-- Base (ear): {}\n", base);
   } // for
 
-  f_timer({}, [&] { minimal_basis_bfs_ordering(ops, basis); });
+  basis = f_timer({}, [&] { return minimal_basis_bfs_ordering(ops, basis, m_edge_weight); });
 
   // Process into adjacent intersection
   for (i32 i{}; auto const& base : basis)
@@ -2060,23 +2100,13 @@ decltype(auto) global_backtracking(Ops const& ops
     logger.info()("-- Base (align): {}", base);
   } // for
 
-  // // Check if it has intersection.size() == 2
-  // err::err({ fn(pair_intersection_basis).any([&](auto&& _1)
-  // {
-  //   auto const& __1_intersection = _1.first;
-  //   return m_edge_weight.at({__1_intersection.front(),__1_intersection.back()}) == 1; })
-  // })
-  // ("The algorithm requires an intersection with weight 1");
-  //
-  // // Rotate while intersection has weight != 1
-  // pair_intersection_basis = fn(pair_intersection_basis)
-  //   .rot([&](auto&& _1)
-  //   {
-  //     auto const& __1_intersection = _1.front().first;
-  //     return m_edge_weight.at({__1_intersection.front(),__1_intersection.back()}) == 1;
-  //   })
-  //   .vec();
-  // logger.info()("-- Rotated pair_intersection_basis");
+  // Check if it has intersection.size() == 2
+  err::err({ fn(pair_intersection_basis).any([&](auto&& _1)
+  {
+    auto const& __1_intersection = _1.first;
+    return m_edge_weight.at({__1_intersection.front(),__1_intersection.back()}) == 1; })
+  })
+  ("The algorithm requires an intersection with weight 1");
 
   // Reverse the pairs before processing, I don't remember why
   f_timer({}, [&] { std::reverse(pair_intersection_basis.begin(), pair_intersection_basis.end()); });
@@ -2092,11 +2122,15 @@ decltype(auto) global_backtracking(Ops const& ops
   // Nodes on this map are always point to their successors
   NodeMMap mmap_node;
 
-  // Stack generators
-  std::stack<cppcoro::generator<PlaceCycleRet>> st_generator;
+  // Stack generators and pair cycle/intersection
+  struct StackBacktrack
+  {
+    cppcoro::generator<PlaceCycleRet> generator;
+    Nodes cycle;
+    Nodes intersection;
+  };
 
-  // Stack of processed solutions
-  std::stack<std::pair<Nodes,Nodes>> st_solutions;
+  std::stack<StackBacktrack> st_generator;
 
   // Push intersection
   if(auto [u,v] = std::make_pair(intersection_initial.at(0),intersection_initial.at(1)); fn(ops.succs(u)).has(v) )
@@ -2144,6 +2178,7 @@ decltype(auto) global_backtracking(Ops const& ops
             , cycle
             , intersection
             , m_edge_weight
+            , prox_view
             , logger.sink()
           );
       });
@@ -2154,24 +2189,19 @@ decltype(auto) global_backtracking(Ops const& ops
       // Progressively remove nodes from nodes_unreachable set
       // This allows to backtrack until the earliest cycle that
       // contains one or more unreachable nodes(s)
-      err::err({ ! st_solutions.empty() })("Solution not found");
-
-      err::err({ st_solutions.size() == st_generator.size() })
-        ("Number of solutions differ from number of generators");
+      err::err({ ! st_generator.empty() })("Solution not found");
 
       logger.info()("----------------");
       logger.info()("unreachable: {}", nodes_unreachable);
       if ( ! nodes_unreachable.empty() )
       {
-        while ( ! nodes_unreachable.empty() and ! st_solutions.empty() )
+        while ( ! nodes_unreachable.empty() and ! st_generator.empty() )
         {
-          auto e{st_solutions.top()}; st_solutions.pop();
-
-          intersection = e.first;
-          cycle = e.second;
-
           // Get previous generator
-          generator = std::move(st_generator.top()); st_generator.pop();
+          generator = std::move(st_generator.top().generator);
+          cycle = st_generator.top().cycle;
+          intersection = st_generator.top().intersection;
+          st_generator.pop();
 
           // Check if this cycle contains unreachable nodes
           if ( auto nodes_unreachable_in_cycle = fn(cycle).in(nodes_unreachable).vec(); ! nodes_unreachable_in_cycle.empty() )
@@ -2202,13 +2232,11 @@ decltype(auto) global_backtracking(Ops const& ops
       } // if
       else
       {
-        auto e{st_solutions.top()}; st_solutions.pop();
-
-        intersection = e.first;
-        cycle = e.second;
-
-        // Get previous generator
-        generator = std::move(st_generator.top()); st_generator.pop();
+        // Update generator/cycle
+        generator = std::move(st_generator.top().generator);
+        cycle = st_generator.top().cycle;
+        intersection = st_generator.top().intersection;
+        st_generator.pop();
 
         // Set iterator to begin
         it_gen = generator.begin();
@@ -2361,8 +2389,7 @@ decltype(auto) global_backtracking(Ops const& ops
     {
       // placement = it_gen.value()->placement;
       // paths = it_gen.value()->paths;
-      st_generator.push(std::move(generator));
-      st_solutions.push(std::make_pair(intersection,cycle));
+      st_generator.push({std::move(generator),cycle,intersection});
       logger.info()("-- Success for cycle: {}", cycle);
       logger.info()("-- Placement:");
       for (auto e : placement) { logger.info()("e: {}", e); } // for
