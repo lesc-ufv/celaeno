@@ -235,31 +235,107 @@ decltype(auto) view_draw(Map auto&& map_vertex_layer)
 // fn: get_prox_view {{{
 decltype(auto) get_prox_view(Ops const& ops)
 {
-  std::map<Node,u64> m_node_layer;
+  std::map<Node,i64> m_node_layer;
 
-  // Get inputs
-  Nodes vec_node_curr;
+  struct Entry
+  {
+    Node u; // Current node
+    bool is_input; // If is input or output
+  };
+
+  // Visited nodes
+  std::set<Node> set_visited;
+
+  // Nodes to visit
+  std::queue<Entry> queue_visit;
+
+  // Search from io to the rest of the graph
+  auto f_search_by_root = [&](Entry entry)
+  {
+    i64 idx_current_layer{m_node_layer.at(entry.u)};
+
+    // Mark as visited
+    set_visited.insert(entry.u);
+
+    // Set u as initial node
+    Nodes vec_node_curr{entry.u};
+
+    fmt::print("u: {}\n", entry.u);
+
+    while( ! vec_node_curr.empty() )
+    {
+      fmt::print("l: {} - vec_node_curr: {}\n", idx_current_layer, vec_node_curr);
+
+      // Update m_node_layer
+      rg::for_each(vec_node_curr, [&](auto&& _1)
+      {
+        // Prefer lowest layer (closer to inputs)
+        if ( ! m_node_layer.contains(_1) )
+        {
+          m_node_layer[_1] = idx_current_layer;
+        }
+        else if ( entry.is_input && idx_current_layer > m_node_layer.at(_1) )
+        {
+          m_node_layer[_1] = idx_current_layer;
+        }
+        else if ( ! entry.is_input && idx_current_layer < m_node_layer.at(_1) )
+        {
+          m_node_layer[_1] = idx_current_layer;
+        }
+      });
+
+      // If has input or output, and is not in visited set, push into queue
+      auto f_is_input = [&](Node _1){ return ops.preds(_1).size() == 0; };
+      auto f_is_output = [&](Node _1){ return ops.succs(_1).size() == 0; };
+      rg::for_each(vec_node_curr, [&](auto&& _1)
+      {
+        if ( ! set_visited.contains(_1) )
+        {
+          if ( f_is_input(_1) )
+          {
+            queue_visit.push({_1, true});
+          } // if
+          else if ( f_is_output(_1) )
+          {
+            queue_visit.push({_1, false});
+          } // else if
+        }
+      });
+
+      // Update layer counter
+      if ( entry.is_input ) { idx_current_layer++; } else { idx_current_layer--; }
+
+      // Transform into next layer
+      auto f_next = (entry.is_input)? ops.succs : ops.preds;
+      vec_node_curr = fn(vec_node_curr)
+        .as([&](auto&& _1){ return f_next(_1); })
+        .squash()
+        .sort()
+        .unique()
+        .vec();
+    }
+  };
+
+  // Get an input and push into the queue, assume the initial layer to be 0
   ns_search::bfs::run(0
     , ops
-    , [&](auto&& e){ if ( ops.preds(e).size() == 0 ) { vec_node_curr.push_back(e); } ; return false; });
+    , [&](auto&& _1){ return (ops.preds(_1).size() == 0)? (queue_visit.push({_1, true}), true) : false;  });
 
-  // Keep track of current layer
-  i64 idx_current_layer = 0;
+  // Start with the assumption that initial input is at level 0
+  m_node_layer[queue_visit.front().u] = 0;
 
-  while( ! vec_node_curr.empty() )
+  while ( ! queue_visit.empty() )
   {
-    // Push initial layer
-    rg::for_each(vec_node_curr, [&](auto&& _1){ m_node_layer[_1] = idx_current_layer; });
+    // Skip visited
+    if ( set_visited.contains(queue_visit.front().u) ) { queue_visit.pop(); continue; }
+    fmt::print("-- Next on queue: {}\n", queue_visit.front().u);
+    // Use node as search tree root
+    f_search_by_root(queue_visit.front());
+    // Go to next
+    queue_visit.pop();
+    fmt::print("-- visited: {}\n", set_visited);
+  } // while
 
-    // Increment layer counter
-    idx_current_layer++;
-
-    // Transform into next layer
-    vec_node_curr = fn(vec_node_curr)
-      .as([&](auto&& e){ return ops.succs(e); })
-      .squash()
-      .vec();
-  }
 
   std::map<u64, Nodes> m_layer_nodes;
   fn(m_node_layer).ply([&](auto&& e)
@@ -278,6 +354,8 @@ decltype(auto) get_prox_view(Ops const& ops)
   {
     fmt::print("l: {} - n: {}\n", l, nds);
   } // for
+
+  // exit(0);
 
   return m_node_layer;
 } // fn: get_prox_view }}}
@@ -1257,7 +1335,8 @@ auto place_intersection(Ops const& ops
   //   placement[u] = std::make_pair(i,--i);
   // } // for
 
-  // For b1 is (-1,-1)
+  // For cm138a is ( 0,-1)
+  // For b1     is ( 0,-1)
   auto [u,v] = std::tie(intersection.at(0), intersection.at(1));
 
   // Edge weight for the first edge must equal 1
@@ -1267,13 +1346,13 @@ auto place_intersection(Ops const& ops
   if ( fn(ops.succs(u)).has(v) != 0 )
   {
 
-    placement[v] = std::make_pair( -1,-1);
+    placement[v] = std::make_pair(  0,-1);
     placement[u] = std::make_pair( 0, 0);
   } // if
   else
   {
     placement[v] = std::make_pair( 0, 0);
-    placement[u] = std::make_pair( -1,-1);
+    placement[u] = std::make_pair(  0,-1);
   } // else
 
   return placement;
@@ -1313,16 +1392,16 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   // Init logger
   err::Logger logger{sink};
 
-  // // Get edge weights for supports
-  auto view_prox = get_prox_view(ops);
-  std::map<Edge, i64> m_edge_weight_supports;
-  for (auto const& edge : get_cycle_supports(ops, cycle, view_prox))
-  {
-    auto [u,v] = edge;
-    err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
-    m_edge_weight_supports[edge]      = view_prox.at(v) - view_prox.at(u);
-    m_edge_weight_supports[rev(edge)] = view_prox.at(v) - view_prox.at(u);
-  } // for
+  // // // Get edge weights for supports
+  // auto view_prox = get_prox_view(ops);
+  // std::map<Edge, i64> m_edge_weight_supports;
+  // for (auto const& edge : get_cycle_supports(ops, cycle, view_prox))
+  // {
+  //   auto [u,v] = edge;
+  //   err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
+  //   m_edge_weight_supports[edge]      = view_prox.at(v) - view_prox.at(u);
+  //   m_edge_weight_supports[rev(edge)] = view_prox.at(v) - view_prox.at(u);
+  // } // for
 
 
   // Edge operations {{{
@@ -1451,7 +1530,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     return tile_candidates;
   };
 
-  // // Only keep tiles that are reacheable. A pair of tiles (t1,t2) are reacheable when it is
+  // // Only keep tiles that are reachable. A pair of tiles (t1,t2) are reachable when it is
   // // possible to create a path from t1 to t2, and this path has the same size as the chebyshev
   // // distance from (t1,t2)
   auto f_tiles_keep_by_astar = [&](Nodes const& neighbors_positioned, Tiles const& tile_candidates)
@@ -1681,7 +1760,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // Failed
       if( placed.empty() )
       {
-        logger.info()("Unreacheable neighbors of {}: {}", u, unreachable);
+        logger.info()("unreachable neighbors of {}: {}", u, unreachable);
         co_yield PlaceCycleRet({},{},mmap_node,unreachable,true);
         break;
       } // if
@@ -1871,6 +1950,30 @@ decltype(auto) detect_ears(Ops const& ops, R const& basis)
 
 } // function: detect_ears }}}
 
+// fn: backtrack_until_unreachable_position_changes {{{
+std::optional<cppcoro::generator<PlaceCycleRet>::iterator> backtrack_until_unreachable_position_changes(cppcoro::generator<PlaceCycleRet>& generator
+  , Nodes const& vec_node_unreachable
+  , Placement const& map_node_tile)
+{
+  for( auto it{generator.begin()}; it != generator.end(); ++it )
+  {
+    // Fetch current result
+    auto const& gen_map_node_tile = it->m_placement ;
+
+    // Check if the target positions have changed
+    auto f_has_changed_position = [&](Node _1)
+    {
+      return map_node_tile.contains(_1) && gen_map_node_tile.contains(_1) && map_node_tile.at(_1) != gen_map_node_tile.at(_1);
+    };
+    if ( std::ranges::any_of(vec_node_unreachable, f_has_changed_position) )
+    {
+      return it;
+    } // if
+  } // for
+
+  return std::nullopt;
+} // function: backtrack_until_unreachable_position_changes }}}
+
 // fn: global_backtracking {{{
 template<typename C>
 decltype(auto) global_backtracking(Ops const& ops
@@ -2009,6 +2112,8 @@ decltype(auto) global_backtracking(Ops const& ops
     Nodes intersection;
     Nodes cycle;
     cppcoro::generator<PlaceCycleRet> generator;
+    std::optional<cppcoro::generator<PlaceCycleRet>::iterator> it_gen = std::nullopt;
+
 
     if( ! b_backtrack )
     {
@@ -2028,6 +2133,7 @@ decltype(auto) global_backtracking(Ops const& ops
             , logger.sink()
           );
       });
+      it_gen = generator.begin();
     } // if
     else
     {
@@ -2040,7 +2146,7 @@ decltype(auto) global_backtracking(Ops const& ops
         ("Number of solutions differ from number of generators");
 
       logger.info()("----------------");
-      logger.info()("Unreacheable: {}", nodes_unreachable);
+      logger.info()("unreachable: {}", nodes_unreachable);
       if ( ! nodes_unreachable.empty() )
       {
         while ( ! nodes_unreachable.empty() and ! st_solutions.empty() )
@@ -2050,16 +2156,24 @@ decltype(auto) global_backtracking(Ops const& ops
           intersection = e.first;
           cycle = e.second;
 
-          // Check if this cycle contains unreachable nodes
-          if ( auto intersect = fn(cycle).in(nodes_unreachable).vec(); ! intersect.empty() )
-          {
-            logger.info()("Cycle: {}", cycle);
-            logger.info()("Intersect: {}", intersect);
-            std::ranges::for_each(intersect, [&](auto _1){ nodes_unreachable.erase(_1); });
-          } // if
-
           // Get previous generator
           generator = std::move(st_generator.top()); st_generator.pop();
+
+          // Check if this cycle contains unreachable nodes
+          if ( auto nodes_unreachable_in_cycle = fn(cycle).in(nodes_unreachable).vec(); ! nodes_unreachable_in_cycle.empty() )
+          {
+            logger.info()("Cycle: {}", cycle);
+            logger.info()("nodes_unreachable_in_cycle: {}", nodes_unreachable_in_cycle);
+            // Erase intersection of the current cycle with unreachable nodes
+            std::ranges::for_each(nodes_unreachable_in_cycle, [&](auto _1){ nodes_unreachable.erase(_1); });
+            // Try to generate a solution with a different position for at least 1 node in the
+            // intersection
+            if ( auto opt_it = backtrack_until_unreachable_position_changes(generator, nodes_unreachable_in_cycle, placement) )
+            {
+              it_gen = *opt_it;
+              break;
+            } // if
+          } // if
 
           // Re-insert intersection and base into the to-place vector
           if ( ! nodes_unreachable.empty() )
@@ -2067,6 +2181,7 @@ decltype(auto) global_backtracking(Ops const& ops
             pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
           } // if
         } // while
+
       } // if
       else
       {
@@ -2077,6 +2192,9 @@ decltype(auto) global_backtracking(Ops const& ops
 
         // Get previous generator
         generator = std::move(st_generator.top()); st_generator.pop();
+
+        // Set iterator to begin
+        it_gen = generator.begin();
       } // else
 
       // Disable backtracking
@@ -2090,15 +2208,13 @@ decltype(auto) global_backtracking(Ops const& ops
     // - Push generator to backtracking stack
     // - Push incident cycle to backtracking stack
 
-    auto it_gen{generator.begin()}; 
-
     auto check_half_separations = [&]
     {
-      while ( it_gen != generator.end() && it_gen->m_failed == false )
+      while ( it_gen && it_gen.value() != generator.end() && it_gen.value()->m_failed == false )
       {
-        placement = it_gen->m_placement;
-        paths = it_gen->m_paths;
-        mmap_node = it_gen->m_mmap_node;
+        placement = it_gen.value()->m_placement;
+        paths     = it_gen.value()->m_paths;
+        mmap_node = it_gen.value()->m_mmap_node;
 
         // Check for half separation
         // Test resulting cycle, to see if it hasn't twisted within itself
@@ -2212,7 +2328,7 @@ decltype(auto) global_backtracking(Ops const& ops
         if ( has_inner_crossings )
         {
           logger.info()("Cycle {} has inner crossings\n", i);
-          it_gen = std::next(it_gen);
+          it_gen = std::next(it_gen.value());
         }
         else
         {
@@ -2224,10 +2340,10 @@ decltype(auto) global_backtracking(Ops const& ops
 
     check_half_separations();
 
-    if( it_gen != generator.end() && it_gen->m_failed == false )
+    if( it_gen && it_gen.value() != generator.end() && it_gen.value()->m_failed == false )
     {
-      // placement = it_gen->placement;
-      // paths = it_gen->paths;
+      // placement = it_gen.value()->placement;
+      // paths = it_gen.value()->paths;
       st_generator.push(std::move(generator));
       st_solutions.push(std::make_pair(intersection,cycle));
       logger.info()("-- Success for cycle: {}", cycle);
@@ -2242,7 +2358,7 @@ decltype(auto) global_backtracking(Ops const& ops
     {
       pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
       b_backtrack = true;
-      nodes_unreachable = (it_gen != generator.end())? it_gen->m_unreachable : std::set<Node>{};
+      nodes_unreachable = (it_gen && it_gen.value() != generator.end())? it_gen.value()->m_unreachable : std::set<Node>{};
       logger.info()("-- Failed for cycle: {}", cycle);
     } // else
 
@@ -2313,7 +2429,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Balance cycles
   //
   
-  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_cm138a;
+  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_b1;
 
   // Read cycle output
   // Decode to original values in graph
