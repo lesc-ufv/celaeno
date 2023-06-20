@@ -1498,9 +1498,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       {
         Tile const& tn{p[n]};
         // A position before the placed incoming edges is not good
-        if( fn(ops.preds(u)).has(n) && tn.second < t.second ) { return false; }  // if
+        if( fn(ops.preds(u)).has(n) && tn.second <= t.second ) { return false; }  // if
         // A position after the placed outgoing edges is not good
-        else if( fn(ops.succs(u)).has(n) && tn.second > t.second ) { return false; } // else if
+        else if( fn(ops.succs(u)).has(n) && tn.second >= t.second ) { return false; } // else if
       }
       return true;
     }).vec();
@@ -1800,7 +1800,14 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // Failed
       if( placed.empty() )
       {
+        // unreachable = fn(cycle)
+        //   .as([&](auto&& _1){ return fn(ops.preds(_1)).chain(ops.succs(_1)).vec(); })
+        //   .squash()
+        //   .keep([&](auto&& _1){ return p.contains(_1); })
+        //   .chain(unreachable)
+        //   .set();
         logger.info()("unreachable neighbors of {}: {}", u, unreachable);
+
         co_yield PlaceCycleRet({},{},mmap_node,unreachable,true);
         break;
       } // if
@@ -2191,46 +2198,51 @@ decltype(auto) global_backtracking(Ops const& ops
       // contains one or more unreachable nodes(s)
       err::err({ ! st_generator.empty() })("Solution not found");
 
-      logger.info()("----------------");
-      logger.info()("unreachable: {}", nodes_unreachable);
-      if ( ! nodes_unreachable.empty() )
-      {
-        while ( ! nodes_unreachable.empty() and ! st_generator.empty() )
-        {
-          // Get previous generator
-          generator = std::move(st_generator.top().generator);
-          cycle = st_generator.top().cycle;
-          intersection = st_generator.top().intersection;
-          st_generator.pop();
-
-          // Check if this cycle contains unreachable nodes
-          if ( auto nodes_unreachable_in_cycle = fn(cycle).in(nodes_unreachable).vec(); ! nodes_unreachable_in_cycle.empty() )
-          {
-            logger.info()("Cycle: {}", cycle);
-            logger.info()("nodes_unreachable_in_cycle: {}", fn(nodes_unreachable_in_cycle)
-              .keep([&](auto&& _1){ return placement.contains(_1); })
-              .as([&](auto&& _1){ return std::make_pair(_1, placement.at(_1)); })
-              .vec());
-            // Erase intersection of the current cycle with unreachable nodes
-            std::ranges::for_each(nodes_unreachable_in_cycle, [&](auto _1){ nodes_unreachable.erase(_1); });
-            // Try to generate a solution with a different position for at least 1 node in the
-            // intersection
-            if ( auto opt_it = backtrack_until_unreachable_position_changes(generator, nodes_unreachable_in_cycle, placement, logger.sink()) )
-            {
-              it_gen = *opt_it;
-              break;
-            } // if
-          } // if
-
-          // Re-insert intersection and base into the to-place vector
-          if ( ! nodes_unreachable.empty() )
-          {
-            pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
-          } // if
-        } // while
-
-      } // if
-      else
+      // logger.info()("----------------");
+      // logger.info()("unreachable: {}", nodes_unreachable);
+      // if ( ! nodes_unreachable.empty() and ! st_generator.empty() )
+      // {
+      //   while ( ! nodes_unreachable.empty() and ! st_generator.empty() )
+      //   {
+      //     // Get previous generator
+      //     generator = std::move(st_generator.top().generator);
+      //     cycle = st_generator.top().cycle;
+      //     intersection = st_generator.top().intersection;
+      //     st_generator.pop();
+      //
+      //     // Check if this cycle contains unreachable nodes
+      //     if ( auto nodes_unreachable_in_cycle = fn(cycle).in(nodes_unreachable).vec(); ! nodes_unreachable_in_cycle.empty() )
+      //     {
+      //       it_gen = generator.begin();
+      //       break;
+      //       // logger.info()("Cycle: {}", cycle);
+      //       // logger.info()("nodes_unreachable_in_cycle: {}", fn(nodes_unreachable_in_cycle)
+      //       //   .keep([&](auto&& _1){ return placement.contains(_1); })
+      //       //   .as([&](auto&& _1){ return std::make_pair(_1, placement.at(_1)); })
+      //       //   .vec());
+      //       // // Erase intersection of the current cycle with unreachable nodes
+      //       // std::ranges::for_each(nodes_unreachable_in_cycle, [&](auto _1){ nodes_unreachable.erase(_1); });
+      //       // // Try to generate a solution with a different position for at least 1 node in the
+      //       // // intersection
+      //       // if ( auto opt_it = backtrack_until_unreachable_position_changes(generator, cycle, placement, logger.sink()); opt_it )
+      //       // {
+      //       //   placement = opt_it.value()->m_placement;
+      //       //   paths     = opt_it.value()->m_paths;
+      //       //   mmap_node = opt_it.value()->m_mmap_node;
+      //       //   it_gen = *opt_it;
+      //       //   break;
+      //       // } // if
+      //     } // if
+      //
+      //     // Re-insert intersection and base into the to-place vector
+      //     if ( ! nodes_unreachable.empty() and ! st_generator.empty() )
+      //     {
+      //       pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
+      //     } // if
+      //   } // while
+      //
+      // } // if
+      // else
       {
         // Update generator/cycle
         generator = std::move(st_generator.top().generator);
@@ -2247,6 +2259,8 @@ decltype(auto) global_backtracking(Ops const& ops
 
       logger.info()("----------------");
     } // else
+
+    if ( ! it_gen ) { it_gen = generator.begin(); }
 
     // If a solution is found from current placement
     // - Update final solution
