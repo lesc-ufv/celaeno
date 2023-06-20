@@ -1953,20 +1953,34 @@ decltype(auto) detect_ears(Ops const& ops, R const& basis)
 // fn: backtrack_until_unreachable_position_changes {{{
 std::optional<cppcoro::generator<PlaceCycleRet>::iterator> backtrack_until_unreachable_position_changes(cppcoro::generator<PlaceCycleRet>& generator
   , Nodes const& vec_node_unreachable
-  , Placement const& map_node_tile)
+  , Placement const& map_node_tile
+  , Sink sink)
 {
+  err::Logger logger{sink};
+
+  logger.info()("vec_node_unreachable: {}", vec_node_unreachable);
+
   for( auto it{generator.begin()}; it != generator.end(); ++it )
   {
     // Fetch current result
-    auto const& gen_map_node_tile = it->m_placement ;
+    auto const& gen_map_node_tile = it->m_placement;
+
+    // Stop on failure
+    if ( it->m_failed ) { break; }
 
     // Check if the target positions have changed
     auto f_has_changed_position = [&](Node _1)
     {
-      return map_node_tile.contains(_1) && gen_map_node_tile.contains(_1) && map_node_tile.at(_1) != gen_map_node_tile.at(_1);
+      err::err({ map_node_tile.contains(_1) })("map_node_tile does not contain: {}", _1);
+      err::err({ gen_map_node_tile.contains(_1) })("gen_map_node_tile does not contain: {}", _1);
+      return map_node_tile.at(_1) != gen_map_node_tile.at(_1);
     };
     if ( std::ranges::any_of(vec_node_unreachable, f_has_changed_position) )
     {
+      logger.info()("nodes_unreachable_in_cycle (new positions): {}", fn(vec_node_unreachable)
+        .keep([&](auto&& _1){ return gen_map_node_tile.contains(_1); })
+        .as([&](auto&& _1){ return std::make_pair(_1, gen_map_node_tile.at(_1)); })
+        .vec());
       return it;
     } // if
   } // for
@@ -2163,12 +2177,15 @@ decltype(auto) global_backtracking(Ops const& ops
           if ( auto nodes_unreachable_in_cycle = fn(cycle).in(nodes_unreachable).vec(); ! nodes_unreachable_in_cycle.empty() )
           {
             logger.info()("Cycle: {}", cycle);
-            logger.info()("nodes_unreachable_in_cycle: {}", nodes_unreachable_in_cycle);
+            logger.info()("nodes_unreachable_in_cycle: {}", fn(nodes_unreachable_in_cycle)
+              .keep([&](auto&& _1){ return placement.contains(_1); })
+              .as([&](auto&& _1){ return std::make_pair(_1, placement.at(_1)); })
+              .vec());
             // Erase intersection of the current cycle with unreachable nodes
             std::ranges::for_each(nodes_unreachable_in_cycle, [&](auto _1){ nodes_unreachable.erase(_1); });
             // Try to generate a solution with a different position for at least 1 node in the
             // intersection
-            if ( auto opt_it = backtrack_until_unreachable_position_changes(generator, nodes_unreachable_in_cycle, placement) )
+            if ( auto opt_it = backtrack_until_unreachable_position_changes(generator, nodes_unreachable_in_cycle, placement, logger.sink()) )
             {
               it_gen = *opt_it;
               break;
