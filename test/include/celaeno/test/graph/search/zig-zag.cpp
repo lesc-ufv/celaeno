@@ -1035,9 +1035,58 @@ Basis minimal_basis_bfs_ordering(Ops const& ops, Basis basis, MEdgeWeight const&
   return out;
 } // function: minimal_basis_bfs_ordering }}}
 
-// fn: align_intersections {{{
+// fn: cycle_align_intersection {{{
+//
+// Align an intersection between two cycles
+//
+template<Range R1, Range R2, Range R3>
+decltype(auto) cycle_align_intersection(R1 r1, R2 r2, R3 r3, Sink sink)
+{
+  err::Logger logger{sink};
+
+  logger.info()("r1 (pre): {}", r1);
+  logger.info()("r2 (pre): {}", r2);
+  logger.info()("r3 (pre): {}", r3);
+
+  // Rotate a cycle until intersection is at the start
+  auto f_rotate_intersection_to_start = [](auto&& _1, auto&& _2)
+  {
+    return fn(_1).rot([&](auto __1)
+    {
+      return fn(__1).cut(u64{}, _2.size()).in(_2).vec().size() == _2.size();
+    }).vec();
+  };
+
+  // Order intersection according to r1
+  r3 = fn(r1).in(r3).vec();
+  logger.info()("r3 (ord): {}", r3);
+
+  // Align r1 with intersection
+  r1 = f_rotate_intersection_to_start(r1, r3);
+
+  // // Set r3 to the order of in r1
+  // r3 = fn(r1).cut(u64{}, r3.size()).vec();
+
+  // Align r2 with intersection
+  r2 = f_rotate_intersection_to_start(r2, r3);
+
+  // Check if r2 needs reverse to be in the same order as the intersection
+  if ( fn(r2).cut(u64{}, r3.size()).vec() != r3 )
+  {
+    std::ranges::reverse(r2);
+    r2 = f_rotate_intersection_to_start(r2, r3);
+  }
+
+  logger.info()("r1 (pos): {}", r1);
+  logger.info()("r2 (pos): {}", r2);
+  logger.info()("r3 (pos): {}", r3);
+
+  return std::make_tuple(r1,r2,r3);
+} // function: cycle_align_intersection }}}
+
+// fn: cycle_align_intersections {{{
 template<Range R>
-decltype(auto) align_intersections(R minimal_basis, Sink sink)
+decltype(auto) cycle_align_intersections(R minimal_basis, Sink sink)
 {
   // Init logger
   err::Logger logger{sink};
@@ -1045,16 +1094,6 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
   err::err({ ! minimal_basis.empty() })("Minimal basis must not be empty");
 
   err::err({ minimal_basis.size() > 1 })("Minimal basis must contain at least two cycles");
-
-  // // Rotate until first two basis have intersection of size 2
-  // minimal_basis = fn(minimal_basis)
-  //   .rot([](auto const& basis)
-  //   {
-  //     auto const& fst = basis.at(0);
-  //     auto const& snd = basis.at(1);
-  //     return fn(fst).in(snd).vec().size() == 2;
-  //   })
-  //   .vec();
 
   PairsInterCycles out;
 
@@ -1072,43 +1111,7 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
 
     auto intersection{fn(c1).in(c2).vec()};
 
-    auto f_align_intersection = [&]()
-    {
-      intersection = fn(c1).in(c2).vec();
-      logger.info()("c1 (pre): {}", c1);
-      logger.info()("c2 (pre): {}", c2);
-      logger.info()("in (pre): {}", intersection);
-      if ( intersection.size() > 1 )
-      {
-        c1 = fn(c1).rot([&](auto v)
-        {
-          return fn(v).cut(u64{}, intersection.size()).in(intersection).vec().size() == intersection.size();
-        }).vec();
-        logger.info()("Rotated c1");
-
-        c2 = fn(c2).rot([&](auto v)
-        {
-          return fn(v).cut(u64{}, intersection.size()).in(intersection).vec().size() == intersection.size();
-        }).vec();
-        logger.info()("Rotated c2");
-
-        // Check if needs reverse
-        u64 size_intersection = intersection.size();
-        if ( fn(c1).cut(u64{}, size_intersection).vec() != fn(c2).cut(u64{}, size_intersection).vec() )
-        {
-          std::ranges::reverse(c2);
-          std::ranges::rotate(c2, c2.end() - 1);
-        }
-        logger.info()("Checked if requires reverse");
-
-        intersection = fn(c1).in(c2).vec();
-      }
-      logger.info()("c1: {}", c1);
-      logger.info()("c2: {}", c2);
-      logger.info()("in: {}", intersection);
-    };
-
-    f_align_intersection();
+    std::tie(c1,c2,intersection) = cycle_align_intersection(c1,c2,fn(c1).in(c2).vec(),sink);
 
     // Log data
     // Handle first element
@@ -1122,7 +1125,7 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
       if( c1.front() == c1.back() ){ c1.pop_back(); }
 
       // Rotate elements until first two are the intersection
-      f_align_intersection();
+      std::tie(c1,c2,intersection) = cycle_align_intersection(c1,c2,fn(c1).in(c2).vec(),sink);
 
       logger.info()("Rotated c1: {}", c1);
 
@@ -1145,7 +1148,7 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
       logger.info()("Trying new c1: {}", c1);
 
       // Try to form intersection
-      f_align_intersection();
+      std::tie(c1,c2,intersection) = cycle_align_intersection(c1,c2,fn(c1).in(c2).vec(),sink);
 
       logger.info()("new_c1 ∩ c2: {}", intersection);
 
@@ -1164,7 +1167,7 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
     // Remove last element of cycle, if it equals the first
     if( c2.front() == c2.back() ){ c2.pop_back(); }
 
-    f_align_intersection();
+    std::tie(c1,c2,intersection) = cycle_align_intersection(c1,c2,fn(c1).in(c2).vec(),sink);
 
     logger.info()("Final c2: {}", c2);
 
@@ -1175,10 +1178,91 @@ decltype(auto) align_intersections(R minimal_basis, Sink sink)
     ++i;
   } // for
 
-  logger.info()("Finished align_intersections");
+  logger.info()("Finished cycle_align_intersections");
 
   return out;
-} // fn: align_intersections }}}
+} // fn: cycle_align_intersections }}}
+
+// fn: cycle_merge_on_intersection {{{
+//
+// Merge two cycles with a common intersection, into one large cycle
+//
+template<Range R1, Range R2, Range R3>
+Nodes cycle_merge_on_intersection(Ops const& ops, R1 r1, R2 r2, R3 r3, Sink sink)
+{
+  // Both cannot be empty
+  err::err({ ! r1.empty() or ! r2.empty() })("Empty intersection for merge cycle");
+
+  // Intersection must not be empty
+  err::err({ ! r3.empty() })("Empty intersection for merge cycle");
+
+  // If r2 == r3, then r2 is already in r1
+  if ( r2 == r3 ) { return r1; }
+
+  // If either are empty, return the other
+  if ( r1.empty() && ! r2.empty() ) { return r2; }
+  if ( r2.empty() && ! r1.empty() ) { return r1; }
+
+  // Align intersection to be at the start, and on the same order, in both cycles
+  std::tie(r1,r2,r3) = cycle_align_intersection(r1, r2, r3, sink);
+
+  // Remove intersection from r1
+  r1.erase(r1.begin(), std::next(r1.begin(), r3.size()));
+
+  // Check for undetected edges
+  auto f_neigh = [&](auto&& _1){ return fn(ops.preds(_1)).chain(ops.succs(_1)).vec(); };
+
+  // r3 = fn(r1)
+  //   // Remove intersection
+  //   .dif(r3)
+  //   // Transform into neighbors of nodes
+  //   .as([&](auto&& _1){ return f_neigh(_1); })
+  //   // Squash vectors in vector
+  //   .squash().sort().unique()
+  //   // Intersection with outer cycle uniquely
+  //   .in(r2).sort().unique()
+  //   // Include original intersection nodes uniquely
+  //   .chain(r3).sort().unique()
+  //   // Rotate outer cycle until it matches the whole intersection
+  //   .mut([&](auto&& _1)
+  //   {
+  //     // Rotate until nodes in r2 slice are all in _1
+  //     return fn(r2).rot([&](auto&& __1)
+  //     {
+  //       return fn(__1).cut(u64{},_1.size()).in(_1).vec().size() == _1.size();
+  //     })
+  //     // Cut for the size of the intersection
+  //     .mut([&](auto&& __1){ return Nodes{__1.begin(), std::next(__1.begin(), _1.size())}; })
+  //     .vec();
+  //   })
+  //   .vec();
+
+  // Erase intersection from r2
+  r2.erase(r2.begin(), std::next(r2.begin(), r3.size()));
+
+  // Reduce intersection to first and last elements
+  r3 = fn(r3).mut([](auto&& _1){ return Nodes{_1.front(), _1.back()}; }).vec();
+
+  // Introduce first an last elements
+  Nodes merge = fn(r1).push_front(r3.back()).push_back(r3.front()).rev().chain(r2).vec();
+
+  // Check for sequentiality
+  auto f_seq = [&](auto&& _1, auto&& _2){ return fn(ops.succs(_1)).has(_2) or fn(ops.preds(_1)).has(_2); };
+  // err::err({ fn(merge)
+  //   .push_back(merge.at(0))
+  //   .slide(2)
+  //   .all([&](auto&& _1){ return f_seq(_1.at(0),_1.at(1)); })
+  // })( "Non sequential result in merge cycles" );
+  if ( ! fn(merge)
+    .push_back(merge.at(0))
+    .slide(2)
+    .all([&](auto&& _1){ return f_seq(_1.at(0),_1.at(1)); }))
+  {
+    err::err()( "Non sequential result in merge cycles" );
+  }
+
+  return merge;
+} // function: cycle_merge_on_intersection }}}
 
 // fn: get_cycle_supports {{{
 decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&& prox_view)
@@ -1827,7 +1911,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
     // Block paths between u and candidate
     bool has_routes{true};
-    for (auto v : neighbors_positioned)
+    for (auto v : fn(neighbors_positioned).in(cycle).vec())
     {
       // Calculate chebyshev distance
       auto d_chebyshev{f_dist_chebyshev(chosen,p.at(v))};
@@ -2099,7 +2183,7 @@ decltype(auto) global_backtracking(Ops const& ops
   } // for
 
   auto pair_intersection_basis =
-    f_timer({}, [&] { return align_intersections(basis,logger.sink()); });
+    f_timer({}, [&] { return cycle_align_intersections(basis,logger.sink()); });
 
   // Process into adjacent intersection
   for (auto const& base : pair_intersection_basis)
@@ -2135,6 +2219,7 @@ decltype(auto) global_backtracking(Ops const& ops
     cppcoro::generator<PlaceCycleRet> generator;
     Nodes cycle;
     Nodes intersection;
+    Nodes cycle_outer;
   };
 
   std::stack<StackBacktrack> st_generator;
@@ -2166,6 +2251,7 @@ decltype(auto) global_backtracking(Ops const& ops
     // Get next pair intersection/placement
     Nodes intersection;
     Nodes cycle;
+    Nodes cycle_outer;
     cppcoro::generator<PlaceCycleRet> generator;
     std::optional<cppcoro::generator<PlaceCycleRet>::iterator> it_gen = std::nullopt;
 
@@ -2174,6 +2260,12 @@ decltype(auto) global_backtracking(Ops const& ops
     {
       intersection = pair_intersection_basis.back().first;
       cycle = pair_intersection_basis.back().second;
+      cycle_outer = (st_generator.empty())? cycle
+        : cycle_merge_on_intersection(ops
+          , st_generator.top().cycle_outer
+          , cycle
+          , fn(cycle).in(st_generator.top().cycle_outer).vec()
+          , sink);
       pair_intersection_basis.pop_back();
       // Create generator
       generator = f_timer({}, [&]
@@ -2198,7 +2290,6 @@ decltype(auto) global_backtracking(Ops const& ops
       // contains one or more unreachable nodes(s)
       err::err({ ! st_generator.empty() })("Solution not found");
 
-      // logger.info()("----------------");
       // logger.info()("unreachable: {}", nodes_unreachable);
       // if ( ! nodes_unreachable.empty() and ! st_generator.empty() )
       // {
@@ -2207,6 +2298,7 @@ decltype(auto) global_backtracking(Ops const& ops
       //     // Get previous generator
       //     generator = std::move(st_generator.top().generator);
       //     cycle = st_generator.top().cycle;
+      //     cycle_outer = st_generator.top().cycle_outer;
       //     intersection = st_generator.top().intersection;
       //     st_generator.pop();
       //
@@ -2248,6 +2340,7 @@ decltype(auto) global_backtracking(Ops const& ops
         generator = std::move(st_generator.top().generator);
         cycle = st_generator.top().cycle;
         intersection = st_generator.top().intersection;
+        cycle_outer = st_generator.top().cycle_outer;
         st_generator.pop();
 
         // Set iterator to begin
@@ -2257,8 +2350,11 @@ decltype(auto) global_backtracking(Ops const& ops
       // Disable backtracking
       b_backtrack = false;
 
-      logger.info()("----------------");
     } // else
+
+    logger.info()("Cycle        : {}", cycle);
+    logger.info()("Cycle Outer  : {}", cycle_outer);
+    logger.info()("Intersection : {}", intersection);
 
     if ( ! it_gen ) { it_gen = generator.begin(); }
 
@@ -2401,9 +2497,7 @@ decltype(auto) global_backtracking(Ops const& ops
 
     if( it_gen && it_gen.value() != generator.end() && it_gen.value()->m_failed == false )
     {
-      // placement = it_gen.value()->placement;
-      // paths = it_gen.value()->paths;
-      st_generator.push({std::move(generator),cycle,intersection});
+      st_generator.push({std::move(generator),cycle,intersection,cycle_outer});
       logger.info()("-- Success for cycle: {}", cycle);
       logger.info()("-- Placement:");
       for (auto e : placement) { logger.info()("e: {}", e); } // for
