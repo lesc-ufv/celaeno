@@ -1294,8 +1294,8 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&&
     fmt::print("c2: {}\n", c2);
 
     // Insert additional edges
-    auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
-    auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
+    // auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
+    // auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
 
     // Check which yields most cuts (c1 → c2 or c2 → c1)
     Edges cuts_c1 = f_make_cuts(c1,c2);
@@ -1478,15 +1478,17 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   // Init logger
   err::Logger logger{sink};
 
-  // // // Get edge weights for supports
-  // std::map<Edge, i64> m_edge_weight_supports;
-  // for (auto const& edge : get_cycle_supports(ops, cycle, prox_view))
-  // {
-  //   auto [u,v] = edge;
-  //   err::err({ prox_view.at(v) > prox_view.at(u) })("v is not sucessor of u");
-  //   m_edge_weight_supports[edge]      = prox_view.at(v) - prox_view.at(u);
-  //   m_edge_weight_supports[rev(edge)] = prox_view.at(v) - prox_view.at(u);
-  // } // for
+  // // Get edge weights for supports
+  std::map<Edge, i64> m_edge_weight_supports;
+  for (auto const& edge : get_cycle_supports(ops, cycle, prox_view))
+  {
+    auto [u,v] = edge;
+    err::err({ prox_view.at(v) > prox_view.at(u) })("v is not after u");
+    i64 weight = prox_view.at(v) - prox_view.at(u);
+    // i64 weight = 1;
+    m_edge_weight_supports[edge]      = weight;
+    m_edge_weight_supports[rev(edge)] = weight;
+  } // for
 
 
   // Edge operations {{{
@@ -1570,9 +1572,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       {
         Tile const& tn{p[n]};
         // A position before the placed incoming edges is not good
-        if( fn(ops.preds(u)).has(n) && tn.second <= t.second ) { return false; }  // if
+        if( fn(ops.preds(u)).has(n) && tn.second < t.second ) { return false; }  // if
         // A position after the placed outgoing edges is not good
-        else if( fn(ops.succs(u)).has(n) && tn.second >= t.second ) { return false; } // else if
+        else if( fn(ops.succs(u)).has(n) && tn.second > t.second ) { return false; } // else if
       }
       return true;
     }).vec();
@@ -1586,7 +1588,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
     // For each tile, check if it adheres the distance constraint to every placed neighbor of u
     tile_candidates = fn(tile_candidates)
-      .in_all(neighbors_positioned , [&](Tile t, Node v) { return f_target(u,v) == f_dist_chebyshev(t,p.at(v)); })
+      .in_all(fn(neighbors_positioned).in(cycle).vec() , [&](Tile t, Node v) { return f_target(u,v) == f_dist_chebyshev(t,p.at(v)); })
       .vec();
 
     // auto f_has_support = [&](Node __1) -> std::optional<Node>
@@ -1607,7 +1609,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     //     logger.info()("Support tile: {}", tile_support);
     //     tile_candidates = fn(tile_candidates).keep([&](auto&& __1)
     //     {
-    //       return f_dist_chebyshev(__1, tile_support) >= m_edge_weight_supports.at({u,*opt_support});
+    //       return f_dist_chebyshev(__1, tile_support) == m_edge_weight_supports.at({u,*opt_support});
     //     }).vec();
     //   } // if
     // } // if
@@ -1861,9 +1863,11 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       tile_candidates = fn(tile_candidates).sort().unique().vec();
       logger.info()("Candidates without duplicates: {}", tile_candidates);
 
+      // Make all nodes on the same graph layer be on the same y coordinate
       tile_candidates = f_tiles_by_layer(u, tile_candidates);
       logger.info()("Candidates on the same layer: {}", tile_candidates);
 
+      // Avoid nodes of a cycle inside another cycle (should be only adjacently)
       tile_candidates = f_keep_outside_cycle(tile_candidates);
       logger.info()("Candidates outside cycle: {}", tile_candidates);
 
@@ -1876,13 +1880,6 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     {
       tile_candidates = m_backtrack.at(u);
     } // else
-
-    // Save unreachable nodes
-    if ( tile_candidates.empty() )
-    {
-      // Save neighbors in case they are unreachable
-      std::ranges::for_each(neighbors_positioned, [&](auto e){ unreachable.insert(e); });
-    }
 
     // Log
     logger.info()("Chosen candidates by order: {}", tile_candidates);
@@ -1900,12 +1897,12 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // Failed
       if( placed.empty() )
       {
-        // unreachable = fn(cycle)
-        //   .as([&](auto&& _1){ return fn(ops.preds(_1)).chain(ops.succs(_1)).vec(); })
-        //   .squash()
-        //   .keep([&](auto&& _1){ return p.contains(_1); })
-        //   .chain(unreachable)
-        //   .set();
+        unreachable = fn(cycle)
+          .as([&](auto&& _1){ return fn(ops.preds(_1)).chain(ops.succs(_1)).vec(); })
+          .squash()
+          .keep([&](auto&& _1){ return p.contains(_1); })
+          .chain(unreachable)
+          .set();
         logger.info()("unreachable neighbors of {}: {}", u, unreachable);
 
         co_yield PlaceCycleRet({},{},mmap_node,unreachable,true);
@@ -2307,51 +2304,49 @@ decltype(auto) global_backtracking(Ops const& ops
       // contains one or more unreachable nodes(s)
       err::err({ ! st_generator.empty() })("Solution not found");
 
-      // logger.info()("unreachable: {}", nodes_unreachable);
-      // if ( ! nodes_unreachable.empty() and ! st_generator.empty() )
-      // {
-      //   while ( ! nodes_unreachable.empty() and ! st_generator.empty() )
-      //   {
-      //     // Get previous generator
-      //     generator = std::move(st_generator.top().generator);
-      //     cycle = st_generator.top().cycle;
-      //     cycle_outer = st_generator.top().cycle_outer;
-      //     intersection = st_generator.top().intersection;
-      //     st_generator.pop();
-      //
-      //     // Check if this cycle contains unreachable nodes
-      //     if ( auto nodes_unreachable_in_cycle = fn(cycle).in(nodes_unreachable).vec(); ! nodes_unreachable_in_cycle.empty() )
-      //     {
-      //       it_gen = generator.begin();
-      //       break;
-      //       // logger.info()("Cycle: {}", cycle);
-      //       // logger.info()("nodes_unreachable_in_cycle: {}", fn(nodes_unreachable_in_cycle)
-      //       //   .keep([&](auto&& _1){ return placement.contains(_1); })
-      //       //   .as([&](auto&& _1){ return std::make_pair(_1, placement.at(_1)); })
-      //       //   .vec());
-      //       // // Erase intersection of the current cycle with unreachable nodes
-      //       // std::ranges::for_each(nodes_unreachable_in_cycle, [&](auto _1){ nodes_unreachable.erase(_1); });
-      //       // // Try to generate a solution with a different position for at least 1 node in the
-      //       // // intersection
-      //       // if ( auto opt_it = backtrack_until_unreachable_position_changes(generator, cycle, placement, logger.sink()); opt_it )
-      //       // {
-      //       //   placement = opt_it.value()->m_placement;
-      //       //   paths     = opt_it.value()->m_paths;
-      //       //   mmap_node = opt_it.value()->m_mmap_node;
-      //       //   it_gen = *opt_it;
-      //       //   break;
-      //       // } // if
-      //     } // if
-      //
-      //     // Re-insert intersection and base into the to-place vector
-      //     if ( ! nodes_unreachable.empty() and ! st_generator.empty() )
-      //     {
-      //       pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
-      //     } // if
-      //   } // while
-      //
-      // } // if
-      // else
+      logger.info()("unreachable: {}", nodes_unreachable);
+      if ( ! nodes_unreachable.empty() and ! st_generator.empty() )
+      {
+        while ( ! nodes_unreachable.empty() and ! st_generator.empty() )
+        {
+          // Get previous generator
+          generator = std::move(st_generator.top().generator);
+          cycle = st_generator.top().cycle;
+          cycle_outer = st_generator.top().cycle_outer;
+          intersection = st_generator.top().intersection;
+          st_generator.pop();
+
+          // Check if this cycle contains unreachable nodes
+          if ( auto nodes_unreachable_in_cycle = fn(cycle).in(nodes_unreachable).vec(); ! nodes_unreachable_in_cycle.empty() )
+          {
+            logger.info()("Cycle: {}", cycle);
+            logger.info()("nodes_unreachable_in_cycle: {}", fn(nodes_unreachable_in_cycle)
+              .keep([&](auto&& _1){ return placement.contains(_1); })
+              .as([&](auto&& _1){ return std::make_pair(_1, placement.at(_1)); })
+              .vec());
+            // Erase intersection of the current cycle with unreachable nodes
+            std::ranges::for_each(nodes_unreachable_in_cycle, [&](auto _1){ nodes_unreachable.erase(_1); });
+            // Try to generate a solution with a different position for at least 1 node in the
+            // intersection
+            if ( auto opt_it = backtrack_until_unreachable_position_changes(generator, cycle, placement, logger.sink()); opt_it )
+            {
+              placement = opt_it.value()->m_placement;
+              paths     = opt_it.value()->m_paths;
+              mmap_node = opt_it.value()->m_mmap_node;
+              it_gen = *opt_it;
+              break;
+            } // if
+          } // if
+
+          // Re-insert intersection and base into the to-place vector
+          if ( ! nodes_unreachable.empty() and ! st_generator.empty() )
+          {
+            pair_intersection_basis.push_back(std::make_pair(intersection,cycle));
+          } // if
+        } // while
+
+      } // if
+      else
       {
         // Update generator/cycle
         generator = std::move(st_generator.top().generator);
@@ -2588,7 +2583,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(0,ops); });
 
-  // unbalance(0,ops);
+  unbalance(0,ops);
 
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/3-out.v");
 
@@ -2598,7 +2593,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Balance cycles
   //
   
-  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_b1;
+  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_cm150a_unbalanced;
 
   // Read cycle output
   // Decode to original values in graph
@@ -2647,6 +2642,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
       auto [u,v] = edge;
       err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
       i64 weight = view_prox.at(v) - view_prox.at(u);
+      // i64 weight = 1;
       m_edge_weight_supports[edge]      = weight;
       m_edge_weight_supports[rev(edge)] = weight;
       logger.info()("-- -- weight {} : {}", edge, weight);
