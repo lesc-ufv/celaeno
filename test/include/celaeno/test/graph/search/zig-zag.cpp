@@ -1044,6 +1044,11 @@ decltype(auto) cycle_align_intersection(R1 r1, R2 r2, R3 r3, Sink sink)
 {
   err::Logger logger{sink};
 
+  // err::err({ ! r3.empty() })("Intersection must not be empty");
+  err::err({ ! r1.empty() && ! r2.empty() })("r1 or r2 are empty");
+
+  if ( r3.empty() ) { return std::make_tuple(r1,r2,r3); }
+
   logger.info()("r1 (pre): {}", r1);
   logger.info()("r2 (pre): {}", r2);
   logger.info()("r3 (pre): {}", r3);
@@ -1057,21 +1062,63 @@ decltype(auto) cycle_align_intersection(R1 r1, R2 r2, R3 r3, Sink sink)
     }).vec();
   };
 
+  // Remove elements that are not part of the intersection
+  auto f_rotate_and_remove_in_between = [](auto&& _1, auto&& _2)
+  {
+    // Move fst element to beginning
+    Nodes _1_out_norm = fn(_1).rot([&](auto __1)
+    {
+      return __1.front() == _2.front();
+    }).vec();
+
+    // Do the same but reverse
+    Nodes _1_out_rev = fn(_1).rev().rot([&](auto __1)
+    {
+      return __1.front() == _2.front();
+    }).vec();
+
+    // Search the one with a smaller distance to _2.back()
+    auto _1_out_norm_it = std::ranges::find(_1_out_norm, _2.back());
+    auto _1_out_rev_it  = std::ranges::find(_1_out_rev , _2.back());
+
+    err::err({ _1_out_norm_it != std::ranges::end(_1_out_norm) })("Intersection element not found");
+    err::err({ _1_out_rev_it  != std::ranges::end(_1_out_rev) })("Intersection element not found");
+
+    // Calculate distances
+    u64 _1_dist_to_last_norm = std::distance(_1_out_norm.begin(), _1_out_norm_it);
+    u64 _1_dist_to_last_rev  = std::distance(_1_out_rev.begin(), _1_out_rev_it);
+
+    // Select smallest
+    if ( _1_dist_to_last_norm < _1_dist_to_last_rev )
+    {
+      // Remove intersection with elements in-between
+      _1_out_norm.erase(_1_out_norm.begin(), std::next(_1_out_norm_it));
+      // Return intersection without elements in-between
+      return fn(_2).chain(_1_out_norm).vec();
+    } // if
+    else
+    {
+      // Remove intersection with elements in-between
+      _1_out_rev.erase(_1_out_rev.begin(), std::next(_1_out_rev_it));
+      // Return intersection without elements in-between
+      return fn(_2).chain(_1_out_rev).vec();
+    } // else
+
+  };
+
   // Align r1 with intersection
+  // r1 defines the order of the intersection
+  // r1 expects the intersection to have no other element in-between
+  // If there is, infinite loop
   r1 = f_rotate_intersection_to_start(r1, r3);
 
-  // Set r3 to the order of in r1
+  // Set r3 to the order in which it appears on r1
   r3 = fn(r1).cut(u64{}, r3.size()).vec();
 
   // Align r2 with intersection
-  r2 = f_rotate_intersection_to_start(r2, r3);
-
-  // Check if r2 needs reverse to be in the same order as the intersection
-  if ( fn(r2).cut(u64{}, r3.size()).vec() != r3 )
-  {
-    std::ranges::reverse(r2);
-    r2 = f_rotate_intersection_to_start(r2, r3);
-  }
+  // Rotates intersection to the beginning
+  // Removes elements in-between the intersection that are not a part it
+  r2 = f_rotate_and_remove_in_between(r2, r3);
 
   logger.info()("r1 (pos): {}", r1);
   logger.info()("r2 (pos): {}", r2);
@@ -1200,7 +1247,7 @@ Nodes cycle_merge_on_intersection(Ops const& ops, R1 r1, R2 r2, R3 r3, Sink sink
   if ( r2.empty() && ! r1.empty() ) { return r1; }
 
   // Align intersection to be at the start, and on the same order, in both cycles
-  std::tie(r1,r2,r3) = cycle_align_intersection(r1, r2, r3, sink);
+  std::tie(r2,r1,r3) = cycle_align_intersection(r2, r1, r3, sink);
 
   // Remove intersection from r1
   r1.erase(r1.begin(), std::next(r1.begin(), r3.size()));
@@ -1438,13 +1485,13 @@ auto place_intersection(Ops const& ops
   if ( fn(ops.succs(u)).has(v) != 0 )
   {
 
-    placement[v] = std::make_pair(-1,-1);
+    placement[v] = std::make_pair( 1,-1);
     placement[u] = std::make_pair( 0, 0);
   } // if
   else
   {
     placement[v] = std::make_pair( 0, 0);
-    placement[u] = std::make_pair(-1,-1);
+    placement[u] = std::make_pair( 1,-1);
   } // else
 
   return placement;
@@ -1478,6 +1525,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   , std::multimap<Node,Node> mmap_node
   , Range auto cycle
   , Range auto inter
+  , Range auto cycle_outer
   , MEdgeWeight m_edge_weight
   , Map auto&& prox_view
   , Sink sink)
@@ -1623,32 +1671,6 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     return tile_candidates;
   };
 
-  // // Only keep tiles that are reachable. A pair of tiles (t1,t2) are reachable when it is
-  // // possible to create a path from t1 to t2, and this path has the same size as the chebyshev
-  // // distance from (t1,t2)
-  auto f_tiles_keep_by_astar = [&](Nodes const& neighbors_positioned, Tiles const& tile_candidates)
-  {
-    return fn(tile_candidates).keep([&](Tile t)
-    {
-      for (auto v : neighbors_positioned)
-      {
-        // Calculate chebyshev distance
-        auto d_chebyshev{f_dist_chebyshev(t,p.at(v))};
-        // Calculate chebyshev-based A* path
-        auto d_astar{ns_search::a_star::run(t
-          , p.at(v)
-          , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
-          , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
-          , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
-        )};
-        // Check if path exists, and it is eq to chebyshev
-        if( ! d_astar || static_cast<size_t>(d_chebyshev+1) != d_astar->size() ) { return false; } // if
-      } // for
-      return true;
-    })
-    .vec();
-  };
-
   // // Get the maxmin values for x and for y
   auto f_tiles_maxmin_xy = [&]
   {
@@ -1725,6 +1747,82 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       return i64{};
     }).vec();
   };
+
+  // All nodes of the same layer should be placed on the same 'y'
+  auto f_tiles_by_layer = [&](Node u, Tiles const& _1)
+  {
+    Tiles _1_out{_1};
+
+    // Current layer of u
+    i64 _1_idx_layer_u = prox_view.at(u);
+
+    auto _1_it = std::ranges::find_if(prox_view, [&](auto&& __1)
+    {
+      // Is on same layer and is placed
+      return  __1.second == _1_idx_layer_u && p.contains(__1.first);
+    });
+
+    if ( _1_it != std::ranges::end(prox_view) )
+    {
+      // Fetch current 'y' for layer
+      Node _1_idx_layer_v{p.at(_1_it->first).second};
+      
+      return fn(_1_out).keep([&](auto&& __1){ return __1.second == _1_idx_layer_v; }).vec();
+
+    } // if
+
+    return _1_out;
+  };
+
+  // Do not allow intersection between cycles
+  auto f_keep_outside_cycle = [&](auto&& _1)
+  {
+    // Fetch cycle tiles
+    auto _1_tiles_cycle = fn(cycle_outer)
+      .keep([&](Node __1){ return p.contains(__1); })
+      .as([&](Node __1){ return p.at(__1); })
+      .vec();
+    return fn(_1).keep([&](auto&& __1)
+    {
+      // Keep tiles with same y as current tile __1
+      auto _1_tiles_cycle_with_same_y = fn(_1_tiles_cycle).keep([&](auto&& ___1){ return ___1.second == __1.second; }).vec();
+      // If has a y outside cycle range, is not in cycle
+      if ( _1_tiles_cycle_with_same_y.empty() )     { return true; }
+      // If current y has only 1 element, is not in cycle
+      if ( _1_tiles_cycle_with_same_y.size() == 1 ) { return true; }
+      // Fetch max/min on the same y
+      auto [_1_tile_x_min,_1_tile_x_max] = std::ranges::minmax_element(_1_tiles_cycle_with_same_y,{},[&](auto&& ___1){ return ___1.first; });
+      err::err({_1_tile_x_min != _1_tile_x_max})("Different nodes on the same position");
+      // Keep if is not inside outer cycle
+      return ! (__1.first > _1_tile_x_min->first && __1.first < _1_tile_x_max->first);
+    }).vec();
+  };
+
+  // // Only keep tiles that are reachable. A pair of tiles (t1,t2) are reachable when it is
+  // // possible to create a path from t1 to t2, and this path has the same size as the chebyshev
+  // // distance from (t1,t2)
+  auto f_tiles_keep_by_astar = [&](Nodes const& neighbors_positioned, Tiles const& tile_candidates)
+  {
+    return fn(tile_candidates).keep([&](Tile t)
+    {
+      for (auto v : neighbors_positioned)
+      {
+        // Calculate chebyshev distance
+        auto d_chebyshev{f_dist_chebyshev(t,p.at(v))};
+        // Calculate chebyshev-based A* path
+        auto d_astar{ns_search::a_star::run(t
+          , p.at(v)
+          , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
+          , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
+          , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
+        )};
+        // Check if path exists, and it is eq to chebyshev
+        if( ! d_astar || static_cast<size_t>(d_chebyshev+1) != d_astar->size() ) { return false; } // if
+      } // for
+      return true;
+    })
+    .vec();
+  };
   // }}}
 
   // Get lowest node id
@@ -1741,7 +1839,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     } // for
   }
 
-  // Get unique element without changing the order
+  // Get unique elements without changing the order
   auto path{fp::nub(cycle)};
 
   // It is desirable to start from the intersection nodes in the cycle,
@@ -1821,36 +1919,16 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       tile_candidates = fn(tile_candidates).sort().unique().vec();
       logger.info()("Candidates without duplicates: {}", tile_candidates);
 
+      tile_candidates = f_tiles_by_layer(u, tile_candidates);
+      logger.info()("Candidates on the same layer: {}", tile_candidates);
+
+      tile_candidates = f_keep_outside_cycle(tile_candidates);
+      logger.info()("Candidates outside cycle: {}", tile_candidates);
+
       // Sort tile_candidates by distance x (or/and) y, to reduce area overhead
       tile_candidates = f_tiles_sort_by_overhead(tile_candidates);
       logger.info()("Candidates sorted by area overhead: {}", tile_candidates);
 
-      auto f_tiles_by_layer = [&](Tiles const& _1)
-      {
-        Tiles _1_out{_1};
-
-        // Current layer of u
-        i64 _1_idx_layer_u = prox_view.at(u);
-
-        auto _1_it = std::ranges::find_if(prox_view, [&](auto&& __1)
-        {
-          // Is on same layer and is placed
-          return  __1.second == _1_idx_layer_u && p.contains(__1.first);
-        });
-
-        if ( _1_it != std::ranges::end(prox_view) )
-        {
-          // Fetch current 'y' for layer
-          Node _1_idx_layer_v{p.at(_1_it->first).second};
-          
-          return fn(_1_out).keep([&](auto&& __1){ return __1.second == _1_idx_layer_v; }).vec();
-
-        } // if
-
-        return _1_out;
-      };
-
-      tile_candidates = f_tiles_by_layer(tile_candidates);
     } // if
     else
     {
@@ -2272,6 +2350,7 @@ decltype(auto) global_backtracking(Ops const& ops
             , mmap_node
             , cycle
             , intersection
+            , cycle_outer
             , m_edge_weight
             , prox_view
             , logger.sink()
