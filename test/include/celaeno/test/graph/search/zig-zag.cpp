@@ -1057,15 +1057,11 @@ decltype(auto) cycle_align_intersection(R1 r1, R2 r2, R3 r3, Sink sink)
     }).vec();
   };
 
-  // Order intersection according to r1
-  r3 = fn(r1).in(r3).vec();
-  logger.info()("r3 (ord): {}", r3);
-
   // Align r1 with intersection
   r1 = f_rotate_intersection_to_start(r1, r3);
 
-  // // Set r3 to the order of in r1
-  // r3 = fn(r1).cut(u64{}, r3.size()).vec();
+  // Set r3 to the order of in r1
+  r3 = fn(r1).cut(u64{}, r3.size()).vec();
 
   // Align r2 with intersection
   r2 = f_rotate_intersection_to_start(r2, r3);
