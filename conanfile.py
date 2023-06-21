@@ -53,6 +53,7 @@ class CelaenoConan(ConanFile):
     self.requires('argparse/2.1')
     self.requires('andreasbuhr-cppcoro/cci.20210113')
     self.requires('pybind11/2.9.1')
+    self.requires('boost/1.82.0')
 
   def source(self):
     # Remove examples

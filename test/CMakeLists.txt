@@ -74,6 +74,7 @@ function(add_test target)
   target_link_libraries(${target}
     PRIVATE
       celaeno
+      Boost::Boost
       argparse::argparse
       fmt::fmt
       spdlog::spdlog

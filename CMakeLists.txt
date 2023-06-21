@@ -42,6 +42,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
 
 # External libraries
+if(NOT Boost_FOUND)
+  find_package(Boost REQUIRED)
+endif()
+
 if(NOT pybind11_FOUND)
   find_package(pybind11 REQUIRED)
 endif()

@@ -81,6 +81,10 @@
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
+#include <boost/geometry/geometries/polygon.hpp>
+
 // Using namespace {{{
 using namespace celaeno::fun::fn;
 using namespace celaeno::concepts;
@@ -377,6 +381,21 @@ i64 lowest_node_id(Ops const& ops)
 
   return --idx;
 } // function: lowest_node_id }}}
+
+// fn: is_tile_inside_cycle {{{
+decltype(auto) is_tile_inside_cycle(Tile t, Tiles const& tiles)
+{
+  // Alias boost types
+  using point_type = boost::geometry::model::d2::point_xy<i64>;
+  using polygon_type = boost::geometry::model::polygon<point_type>;
+  /// Create and correct polygon
+  polygon_type poly;
+  std::ranges::for_each(tiles,[&](auto&& _1){ boost::geometry::append(poly, point_type(_1.first, _1.second)); });
+  boost::geometry::correct(poly);
+  // Calculate if t is inside tiles
+  point_type p(t.first, t.second);
+  return boost::geometry::within(p, poly);
+} // function: is_tile_inside_cycle }}}
 
 // fn: path_from_multimap {{{
 //
@@ -901,80 +920,6 @@ decltype(auto) cycle_has_inner_crossings(Nodes cycle
 
   return false;
 } // function: cycle_has_inner_crossings }}}
-
-// fn: e_bfs {{{
-template<typename F = std::function<bool(Edge)>>
-[[nodiscard]] Annotations e_bfs(Ops const& ops
-  , Node r
-  , F&& f = [](Edge) -> bool { return false; }
-)
-  requires Returns<bool,F,Edge>
-{
-  // Empty node queue
-  std::queue<Node> q;
-
-  // Push initial element
-  q.push(r);
-
-  // Visited Nodes
-  std::set<Node> vn;
-
-  // Visited edges
-  std::set<Edge> ve;
-
-  // Annotations
-  Annotations h;
-
-  // Push initial distance
-  h[r] = {0};
-
-  while (! q.empty())
-  {
-    // Get next node from queue front
-    Node u{q.front()}; q.pop();
-
-    // If node has been visited, skip iteration
-    if( vn.contains(u) ){ continue; }
-
-    // Else visit node
-    vn.insert(u);
-
-    // Helper to retrieve neighboring vertices of a vertex 'v'
-    auto neighbors = [&](Node v){ return fn(ops.preds(v)).chain(ops.succs(v)).vec(); };
-
-    // Helper to check if a set of edges has been visited
-    auto contains = []<Range R, typename... E>(R&& _1, E&&... _2)
-      requires IsPairsOf<Node,E...> // Edges must be node pairs
-    {
-      return (_1.contains(_2) or ...);
-    };
-
-    // Retrieve neighbors of 'u', remove ones that form visited edges
-    auto targets{fn(neighbors(u))
-      .keep([&](Node v){ return ! contains(ve, Edge{u,v}, Edge{v,u}); })
-      .vec()
-    };
-
-    // Iterate throught target edge nodes
-    bool stop{false};
-    for (auto v : targets)
-    {
-      // Apply callback
-      stop = f(Edge{u,v})? true : stop;
-      // Inherit distances from u to v
-      rg::for_each(h[u],[&,v=v](auto d){ h[v].insert(d+1); });
-      // Visit edge
-      ve.emplace(u,v);
-      // Enqueue v if not visited
-      if( ! vn.contains(v) ){ q.push(v); }
-    } // for
-
-    if( stop ){ break; }
-
-  } // while: ! q.empty()
-
-  return h;
-} // function: e_bfs }}}
 
 // fn: minimal_basis_bfs_ordering {{{
 Basis minimal_basis_bfs_ordering(Ops const& ops, Basis basis, MEdgeWeight const& m_edge_weight)
@@ -1781,6 +1726,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       .keep([&](Node __1){ return p.contains(__1); })
       .as([&](Node __1){ return p.at(__1); })
       .vec();
+
     return fn(_1).keep([&](auto&& __1)
     {
       // Keep tiles with same y as current tile __1
@@ -1789,11 +1735,8 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       if ( _1_tiles_cycle_with_same_y.empty() )     { return true; }
       // If current y has only 1 element, is not in cycle
       if ( _1_tiles_cycle_with_same_y.size() == 1 ) { return true; }
-      // Fetch max/min on the same y
-      auto [_1_tile_x_min,_1_tile_x_max] = std::ranges::minmax_element(_1_tiles_cycle_with_same_y,{},[&](auto&& ___1){ return ___1.first; });
-      err::err({_1_tile_x_min != _1_tile_x_max})("Different nodes on the same position");
-      // Keep if is not inside outer cycle
-      return ! (__1.first > _1_tile_x_min->first && __1.first < _1_tile_x_max->first);
+      // Check winding number
+      return ! is_tile_inside_cycle(__1, _1_tiles_cycle);
     }).vec();
   };
 
@@ -1811,7 +1754,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         // Calculate chebyshev-based A* path
         auto d_astar{ns_search::a_star::run(t
           , p.at(v)
-          , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
+          , [&](Tile dest) -> Tiles { return f_keep_outside_cycle(f_get_candidates(dest,1)); }
           , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
           , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
         )};
@@ -1991,7 +1934,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // Calculate chebyshev-based A* path
       auto d_astar{ns_search::a_star::run(chosen
           , p.at(v)
-          , [&](Tile dest) -> Tiles { return f_get_candidates(dest,1); }
+          , [&](Tile dest) -> Tiles { return f_keep_outside_cycle(f_get_candidates(dest,1)); }
           , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
           , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
           )};
