@@ -1441,7 +1441,7 @@ Tiles Adjacencies::tiles()
       {
         auto dist_cur{ns_heuristics::chebyshev::run(m_src,t)};
 
-        if( dist_cur > m_dist_exact+1 )
+        if( dist_cur > m_dist_exact )
         {
           return true; // stop
         } // if
@@ -1485,13 +1485,13 @@ auto place_intersection(Ops const& ops
   if ( fn(ops.succs(u)).has(v) != 0 )
   {
 
-    placement[v] = std::make_pair( 1,-1);
+    placement[v] = std::make_pair(-1,-1);
     placement[u] = std::make_pair( 0, 0);
   } // if
   else
   {
     placement[v] = std::make_pair( 0, 0);
-    placement[u] = std::make_pair( 1,-1);
+    placement[u] = std::make_pair(-1,-1);
   } // else
 
   return placement;
@@ -1534,14 +1534,13 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   err::Logger logger{sink};
 
   // // // Get edge weights for supports
-  // auto view_prox = get_prox_view(ops);
   // std::map<Edge, i64> m_edge_weight_supports;
-  // for (auto const& edge : get_cycle_supports(ops, cycle, view_prox))
+  // for (auto const& edge : get_cycle_supports(ops, cycle, prox_view))
   // {
   //   auto [u,v] = edge;
-  //   err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
-  //   m_edge_weight_supports[edge]      = view_prox.at(v) - view_prox.at(u);
-  //   m_edge_weight_supports[rev(edge)] = view_prox.at(v) - view_prox.at(u);
+  //   err::err({ prox_view.at(v) > prox_view.at(u) })("v is not sucessor of u");
+  //   m_edge_weight_supports[edge]      = prox_view.at(v) - prox_view.at(u);
+  //   m_edge_weight_supports[rev(edge)] = prox_view.at(v) - prox_view.at(u);
   // } // for
 
 
@@ -1800,7 +1799,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
   // // Only keep tiles that are reachable. A pair of tiles (t1,t2) are reachable when it is
   // // possible to create a path from t1 to t2, and this path has the same size as the chebyshev
-  // // distance from (t1,t2)
+  // // distance from t1 to t2
   auto f_tiles_keep_by_astar = [&](Nodes const& neighbors_positioned, Tiles const& tile_candidates)
   {
     return fn(tile_candidates).keep([&](Tile t)
@@ -2350,7 +2349,7 @@ decltype(auto) global_backtracking(Ops const& ops
             , mmap_node
             , cycle
             , intersection
-            , cycle_outer
+            , (st_generator.empty())? cycle : st_generator.top().cycle_outer
             , m_edge_weight
             , prox_view
             , logger.sink()
