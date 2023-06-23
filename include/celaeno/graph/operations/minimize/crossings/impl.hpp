@@ -324,16 +324,16 @@ template<SignedIntegral S
           std::tie(map_layer_nodes.at(il1), map_layer_nodes.at(il2), map_layer_nodes.at(il3)) 
             = std::tie(opt_3->second.at(0), opt_3->second.at(1), opt_3->second.at(2));
         } // if
-        // else if ( auto opt_2_12 = f_try_by_two(l1,l2); opt_2_12 )
-        // {
-        //   map_layer_nodes.at(il1) = opt_2_12->second.at(0);
-        //   map_layer_nodes.at(il2) = opt_2_12->second.at(1);
-        // } // else if
-        // else if ( auto opt_2_23 = f_try_by_two(l2,l3); opt_2_23 )
-        // {
-        //   map_layer_nodes.at(il2) = opt_2_23->second.at(0);
-        //   map_layer_nodes.at(il3) = opt_2_23->second.at(1);
-        // } // else if
+        else if ( auto opt_2_12 = f_try_by_two(l1,l2); opt_2_12 )
+        {
+          map_layer_nodes.at(il1) = opt_2_12->second.at(0);
+          map_layer_nodes.at(il2) = opt_2_12->second.at(1);
+        } // else if
+        else if ( auto opt_2_23 = f_try_by_two(l2,l3); opt_2_23 )
+        {
+          map_layer_nodes.at(il2) = opt_2_23->second.at(0);
+          map_layer_nodes.at(il3) = opt_2_23->second.at(1);
+        } // else if
       } // for
 
       i64 count_crossings_curr_phase_1 = f_count_crossings_all(map_layer_nodes);

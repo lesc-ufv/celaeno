@@ -85,6 +85,19 @@
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
 
+#define L01(cap,ret,expr) [cap]                                        ret { expr; }
+#define L02(cap,ret,expr) [cap]                                        ret { expr; }
+#define L03(cap,ret,expr) [cap]                                        ret { expr; }
+#define L11(cap,ret,expr) [cap](auto&& _1)                             ret { expr; }
+#define L12(cap,ret,expr) [cap](auto&& __1)                            ret { expr; }
+#define L13(cap,ret,expr) [cap](auto&& ___1)                           ret { expr; }
+#define L21(cap,ret,expr) [cap](auto&& _1, auto&& _2)                  ret { expr; }
+#define L22(cap,ret,expr) [cap](auto&& __1, auto&& __2)                ret { expr; }
+#define L23(cap,ret,expr) [cap](auto&& ___1, auto&& ___2)              ret { expr; }
+#define L31(cap,ret,expr) [cap](auto&& _1, auto&& _2, auto&& _3)       ret { expr; }
+#define L32(cap,ret,expr) [cap](auto&& __1, auto&& __2, auto&& __3)    ret { expr; }
+#define L33(cap,ret,expr) [cap](auto&& ___1, auto&& ___2, auto&& ___3) ret { expr; }
+
 // Using namespace {{{
 using namespace celaeno::fun::fn;
 using namespace celaeno::concepts;
@@ -175,330 +188,321 @@ decltype(auto) rev(std::pair<T1,T2> const& pair)
   return std::make_pair(pair.second,pair.first);
 } // function: rev }}}
 
-// // fn: view_draw {{{
-// decltype(auto) view_draw(Map auto&& map_vertex_layer)
+// fn: view_draw {{{
+decltype(auto) view_draw(Map auto&& map_layer_vertices, Map auto&& map_edge, std::string str_file_name)
+{
+  // , Map auto&& map_vertex_tile, Range auto&& range_edge_path)
+  // Get max layer id
+  constexpr u64 const size_spacing = 4;
+
+  // Find out the size of the largest layer
+  u64 const size_max_layer = fn(map_layer_vertices).as(L11(,,return _1.second.size())).max();
+  fmt::print("Max layer size: {}\n", size_max_layer);
+
+  // Shift layers left by (size_max_layer-size_cur_layer)/2
+  std::map<i64, i64> map_layer_shift = fn(map_layer_vertices)
+    .as([&](auto&& e){ return std::make_pair(e.first, static_cast<i64>(size_max_layer / e.second.size())); })
+    // .as([&](auto&& e){ if (e.second == 0) { e.second = 1; } return e; })
+    .map();
+
+  // Convert layers into collections of xy positions
+  std::map<Node, Tile> map_vertex_tile = fn(map_layer_vertices)
+  .as([&](auto&& _1)
+  {
+    i64 y_pos = _1.first;
+    i64 x_pos = -1;
+    return fn(_1.second)
+      .as([&](auto __1)
+      {
+        i64 __1_tile_y = y_pos;
+        i64 __1_tile_x = (++x_pos*map_layer_shift.at(y_pos)+std::floor(map_layer_shift.at(y_pos)/2.0));
+        __1_tile_y *= 4;
+        return std::make_pair(__1, Tile(__1_tile_x, __1_tile_y));
+      })
+      .vec();
+  })
+  .squash()
+  .map();
+
+  std::vector<std::pair<Edge,Tiles>> path;
+  fn(map_edge).ply([&](auto&& _1)
+  {
+    path.push_back(
+      std::make_pair(Edge{_1}
+        , Tiles{map_vertex_tile.at(_1.first)
+        , map_vertex_tile.at(_1.second)
+        }
+      )
+    );
+  });
+
+  ns_draw::svg::svg(str_file_name, map_vertex_tile, path, [](auto e){ return e; });
+
+} // function: view_draw }}}
+
+// // fn: get_prox_view_2 {{{
+// template<typename T>
+// decltype(auto) get_prox_view_2(Ops const& ops, T&& map_node_layer)
 // {
-//   // , Map auto&& map_vertex_tile, Range auto&& range_edge_path)
-//   // Get max layer id
-//   constexpr u64 const size_spacing = 4;
+//   std::queue<Node> q;
 //
-//   i64 max_layer_id = fn(map_vertex_layer).as([](auto&& e){ return e.second; }).max();
-//
-//   // Create layers
-//   ns_views::proximity::LayerNodes<i64> map_layer_vertices;
-//   std::ranges::for_each(map_vertex_layer, [&](auto&& e)
+//   for (auto [u,depth] : map_node_layer)
 //   {
-//     i64 layer_curr = max_layer_id - e.second;
-//     if ( ! map_layer_vertices.contains(layer_curr) )
+//     // Get succs
+//     Nodes succs{ops.succs(u)};
+//
+//     if( succs.empty() ){ continue; }
+//
+//     // Check if smallest successor has a dist > 1
+//     auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
+//
+//     // If dist of v to u is gt than 1, make it 1
+//     if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
 //     {
-//       map_layer_vertices.emplace(layer_curr, Nodes{e.first});
+//       map_node_layer.at(u) = depth_v - 1;
+//
+//       // Enqueue predecessors of u
+//       for( auto w : ops.preds(u) ){ q.push(w); }
+//     } // if
+//   } // for
+//
+//   while( ! q.empty() )
+//   {
+//     Node u{q.front()}; q.pop();
+//
+//     // Get succs
+//     Nodes succs{ops.succs(u)};
+//
+//     if( succs.empty() ){ continue; }
+//
+//     // Check if smallest successor has a dist > 1
+//     auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
+//
+//     // If dist of v to u is gt than 1, make it 1
+//     if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
+//     {
+//       map_node_layer.at(u) = depth_v - 1;
+//
+//       // Enqueue predecessors of u
+//       for( auto w : ops.preds(u) ){ q.push(w); }
+//     } // if
+//
+//   } // While
+//
+//   std::map<i64, Nodes> map_layer_nodes;
+//   fn(map_node_layer).ply([&](auto&& e) { map_layer_nodes[e.second].push_back(e.first); });
+//
+//   // struct: Result {{{
+//   struct Result
+//   {
+//     std::map<i64,Nodes> ln;
+//     std::map<i64,i64> nl;
+//     Result(std::map<i64,Nodes> _ln, std::map<i64,i64> _nl)
+//       : ln(std::move(_ln))
+//       , nl(std::move(_nl))
+//     {}
+//   }; // struct }}}
+//
+//   return Result(map_layer_nodes, map_node_layer);
+// } // fn: get_prox_view_2 }}}
+
+// // fn: get_prox_view {{{
+// decltype(auto) get_prox_view(Ops const& ops)
+// {
+//   std::map<Node,i64> m_node_layer;
+//
+//   struct Entry
+//   {
+//     Node u; // Current node
+//     bool is_input; // If is input or output
+//   };
+//
+//   // Visited nodes
+//   std::set<Node> set_visited;
+//
+//   // Nodes to visit
+//   std::queue<Entry> queue_visit;
+//
+//   // Search from io to the rest of the graph
+//   auto f_search_by_root = [&](Entry entry)
+//   {
+//     i64 idx_current_layer{m_node_layer.at(entry.u)};
+//
+//     // Mark as visited
+//     set_visited.insert(entry.u);
+//
+//     // Set u as initial node
+//     Nodes vec_node_curr{entry.u};
+//
+//     fmt::print("u: {}\n", entry.u);
+//
+//     while( ! vec_node_curr.empty() )
+//     {
+//       fmt::print("l: {} - vec_node_curr: {}\n", idx_current_layer, vec_node_curr);
+//
+//       // Update m_node_layer
+//       rg::for_each(vec_node_curr, [&](auto&& _1)
+//       {
+//         // Prefer lowest layer (closer to inputs)
+//         if ( ! m_node_layer.contains(_1) ) { m_node_layer[_1] = idx_current_layer; }
+//         // Fetch all predecessors/successors, and find out their max_layer + 1
+//         else
+//         {
+//           if ( (entry.is_input && idx_current_layer > m_node_layer.at(_1))
+//               or (! entry.is_input && idx_current_layer < m_node_layer.at(_1)) )
+//           {
+//             m_node_layer[_1] = idx_current_layer;
+//           }
+//         } // else
+//       });
+//
+//       // If has input or output, and is not in visited set, push into queue
+//       auto f_is_input = [&](Node _1){ return ops.preds(_1).size() == 0; };
+//       auto f_is_output = [&](Node _1){ return ops.succs(_1).size() == 0; };
+//       rg::for_each(vec_node_curr, [&](auto&& _1)
+//       {
+//         if ( ! set_visited.contains(_1) )
+//         {
+//           if ( f_is_input(_1) )
+//           {
+//             queue_visit.push({_1, true});
+//           } // if
+//           else if ( f_is_output(_1) )
+//           {
+//             queue_visit.push({_1, false});
+//           } // else if
+//         }
+//       });
+//
+//       // Update layer counter
+//       if ( entry.is_input ) { idx_current_layer++; } else { idx_current_layer--; }
+//
+//       // Transform into next layer
+//       auto f_next = (entry.is_input)? ops.succs : ops.preds;
+//       vec_node_curr = fn(vec_node_curr)
+//         .as([&](auto&& _1){ return f_next(_1); })
+//         .squash()
+//         .sort()
+//         .unique()
+//         .vec();
+//     }
+//   };
+//
+//   // Get an input and push into the queue, assume the initial layer to be 0
+//   ns_search::bfs::run(0
+//     , ops
+//     , [&](auto&& _1){ return (ops.preds(_1).size() == 0)? (queue_visit.push({_1, true}), true) : false;  });
+//
+//   // Start with the assumption that initial input is at level 0
+//   m_node_layer[queue_visit.front().u] = 0;
+//
+//   while ( ! queue_visit.empty() )
+//   {
+//     // Skip visited
+//     if ( set_visited.contains(queue_visit.front().u) ) { queue_visit.pop(); continue; }
+//     // fmt::print("-- Next on queue: {}\n", queue_visit.front().u);
+//     // Use node as search tree root
+//     f_search_by_root(queue_visit.front());
+//     // Go to next
+//     queue_visit.pop();
+//     // fmt::print("-- visited: {}\n", set_visited);
+//   } // while
+//
+//   // Correct neighbors on the same layer
+//   // // Queue node and is_successor
+//   std::queue<std::pair<Node,bool>> queue_same_layer;
+//
+//   // Error check for node with neighbors on the same layer
+//   // // Push to queue
+//   for (auto&& e : m_node_layer)
+//   {
+//     Node node = e.first;
+//     i64 node_layer = e.second;
+//     auto succs = ops.succs(node);
+//     auto preds = ops.succs(node);
+//     fn(succs).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,true}); } });
+//     fn(preds).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,false}); } });
+//   } // for
+//
+//   while ( ! queue_same_layer.empty() )
+//   {
+//     auto [node,is_successor] = queue_same_layer.front();
+//     queue_same_layer.pop();
+//     if ( is_successor )
+//     {
+//       ++m_node_layer.at(node);
+//       fn(ops.succs(node)).ply([&](auto&& _1)
+//       {
+//         queue_same_layer.push({_1,true});
+//       });
 //     }
 //     else
 //     {
-//       map_layer_vertices.at(layer_curr).push_back(e.first);
+//       --m_node_layer.at(node);
+//       fn(ops.preds(node)).ply([&](auto&& _1)
+//       {
+//         queue_same_layer.push({_1,false});
+//       });
 //     }
-//   });
+//   } // while
 //
-//   for (auto&& [l,v] : map_layer_vertices)
-//   {
-//     fmt::print("l: {} - v: {}\n", l, v);
-//   } // for
-//
-//   // Find out the size of the largest layer
-//   u64 const size_max_layer = fn(map_layer_vertices).as([](auto&& e){ return e.second.size(); }).max();
-//   fmt::print("Max layer size: {}\n", size_max_layer);
-//
-//   // Shift layers left by (size_max_layer-size_cur_layer)/2
-//   std::map<i64, i64> map_layer_shift = fn(map_layer_vertices)
-//     .as([&](auto&& e){ return std::make_pair(e.first, static_cast<i64>((size_max_layer - e.second.size()) / 2)); })
-//     .as([&](auto&& e){ if (e.second == 0) { e.second = 1; } return e; })
+//   // Start layer indices from 0
+//   auto map_translate_layer = fn(m_node_layer)
+//     .as(fun::snd)
+//     .sort()
+//     .unique()
+//     .zip_with_ints(i64{})
 //     .map();
 //
-//   // Convert layers into collections of xy positions
-//   std::map<Node, Tile> map_vertex_tile = fn(map_layer_vertices)
-//   .as([&](auto&& _1)
+//   m_node_layer = fn(m_node_layer)
+//     .as([&](auto&& _1){ return std::make_pair(_1.first, map_translate_layer.at(_1.second)); })
+//     .map();
+//
+//
+//   std::map<i64, Nodes> m_layer_nodes;
+//   fn(m_node_layer).ply([&](auto&& e)
 //   {
-//     i64 y_pos = _1.first;
-//     i64 x_pos = 0;
-//     return fn(_1.second)
-//       .as([&](auto __1)
-//       {
-//         return std::make_pair(__1, Tile((++x_pos)*(map_layer_shift.at(y_pos)), y_pos));
-//       })
-//       .vec();
-//   })
-//   .squash()
-//   .map();
+//     if ( ! m_layer_nodes.contains(e.second) )
+//     {
+//       m_layer_nodes.emplace(e.second, Nodes{e.first});
+//     } // if
+//     else
+//     {
+//       m_layer_nodes.at(e.second).push_back(e.first);
+//     } // else
+//   });
 //
-//   std::vector<std::pair<Edge,Tiles>> path;
+//   fmt::print("-- Final layer nodes:\n");
+//   for (auto [l,nds] : m_layer_nodes)
+//   {
+//     fmt::print("l: {} - n: {}\n", l, nds);
+//   } // for
 //
-//   ns_draw::svg::svg("out/celaeno.svg", map_vertex_tile, path, [](auto e){ return e; });
 //
-// } // function: view_draw }}}
-
-// fn: get_prox_view_2 {{{
-template<typename T>
-decltype(auto) get_prox_view_2(Ops const& ops, T&& map_node_layer)
-{
-  std::queue<Node> q;
-
-  for (auto [u,depth] : map_node_layer)
-  {
-    // Get succs
-    Nodes succs{ops.succs(u)};
-
-    if( succs.empty() ){ continue; }
-
-    // Check if smallest successor has a dist > 1
-    auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
-
-    // If dist of v to u is gt than 1, make it 1
-    if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
-    {
-      map_node_layer.at(u) = depth_v - 1;
-
-      // Enqueue predecessors of u
-      for( auto w : ops.preds(u) ){ q.push(w); }
-    } // if
-  } // for
-
-  while( ! q.empty() )
-  {
-    Node u{q.front()}; q.pop();
-
-    // Get succs
-    Nodes succs{ops.succs(u)};
-
-    if( succs.empty() ){ continue; }
-
-    // Check if smallest successor has a dist > 1
-    auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
-
-    // If dist of v to u is gt than 1, make it 1
-    if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
-    {
-      map_node_layer.at(u) = depth_v - 1;
-
-      // Enqueue predecessors of u
-      for( auto w : ops.preds(u) ){ q.push(w); }
-    } // if
-
-  } // While
-
-  std::map<i64, Nodes> map_layer_nodes;
-  fn(map_node_layer).ply([&](auto&& e) { map_layer_nodes[e.second].push_back(e.first); });
-
-  // struct: Result {{{
-  struct Result
-  {
-    std::map<i64,Nodes> ln;
-    std::map<i64,i64> nl;
-    Result(std::map<i64,Nodes> _ln, std::map<i64,i64> _nl)
-      : ln(std::move(_ln))
-      , nl(std::move(_nl))
-    {}
-  }; // struct }}}
-
-  return Result(map_layer_nodes, map_node_layer);
-} // fn: get_prox_view_2 }}}
-
-// fn: get_prox_view {{{
-decltype(auto) get_prox_view(Ops const& ops)
-{
-  std::map<Node,i64> m_node_layer;
-
-  struct Entry
-  {
-    Node u; // Current node
-    bool is_input; // If is input or output
-  };
-
-  // Visited nodes
-  std::set<Node> set_visited;
-
-  // Nodes to visit
-  std::queue<Entry> queue_visit;
-
-  // Search from io to the rest of the graph
-  auto f_search_by_root = [&](Entry entry)
-  {
-    i64 idx_current_layer{m_node_layer.at(entry.u)};
-
-    // Mark as visited
-    set_visited.insert(entry.u);
-
-    // Set u as initial node
-    Nodes vec_node_curr{entry.u};
-
-    fmt::print("u: {}\n", entry.u);
-
-    while( ! vec_node_curr.empty() )
-    {
-      fmt::print("l: {} - vec_node_curr: {}\n", idx_current_layer, vec_node_curr);
-
-      // Update m_node_layer
-      rg::for_each(vec_node_curr, [&](auto&& _1)
-      {
-        // Prefer lowest layer (closer to inputs)
-        if ( ! m_node_layer.contains(_1) ) { m_node_layer[_1] = idx_current_layer; }
-        // Fetch all predecessors/successors, and find out their max_layer + 1
-        else
-        {
-          if ( (entry.is_input && idx_current_layer > m_node_layer.at(_1))
-              or (! entry.is_input && idx_current_layer < m_node_layer.at(_1)) )
-          {
-            m_node_layer[_1] = idx_current_layer;
-          }
-        } // else
-      });
-
-      // If has input or output, and is not in visited set, push into queue
-      auto f_is_input = [&](Node _1){ return ops.preds(_1).size() == 0; };
-      auto f_is_output = [&](Node _1){ return ops.succs(_1).size() == 0; };
-      rg::for_each(vec_node_curr, [&](auto&& _1)
-      {
-        if ( ! set_visited.contains(_1) )
-        {
-          if ( f_is_input(_1) )
-          {
-            queue_visit.push({_1, true});
-          } // if
-          else if ( f_is_output(_1) )
-          {
-            queue_visit.push({_1, false});
-          } // else if
-        }
-      });
-
-      // Update layer counter
-      if ( entry.is_input ) { idx_current_layer++; } else { idx_current_layer--; }
-
-      // Transform into next layer
-      auto f_next = (entry.is_input)? ops.succs : ops.preds;
-      vec_node_curr = fn(vec_node_curr)
-        .as([&](auto&& _1){ return f_next(_1); })
-        .squash()
-        .sort()
-        .unique()
-        .vec();
-    }
-  };
-
-  // Get an input and push into the queue, assume the initial layer to be 0
-  ns_search::bfs::run(0
-    , ops
-    , [&](auto&& _1){ return (ops.preds(_1).size() == 0)? (queue_visit.push({_1, true}), true) : false;  });
-
-  // Start with the assumption that initial input is at level 0
-  m_node_layer[queue_visit.front().u] = 0;
-
-  while ( ! queue_visit.empty() )
-  {
-    // Skip visited
-    if ( set_visited.contains(queue_visit.front().u) ) { queue_visit.pop(); continue; }
-    // fmt::print("-- Next on queue: {}\n", queue_visit.front().u);
-    // Use node as search tree root
-    f_search_by_root(queue_visit.front());
-    // Go to next
-    queue_visit.pop();
-    // fmt::print("-- visited: {}\n", set_visited);
-  } // while
-
-  // Correct neighbors on the same layer
-  // // Queue node and is_successor
-  std::queue<std::pair<Node,bool>> queue_same_layer;
-
-  // Error check for node with neighbors on the same layer
-  // // Push to queue
-  for (auto&& e : m_node_layer)
-  {
-    Node node = e.first;
-    i64 node_layer = e.second;
-    auto succs = ops.succs(node);
-    auto preds = ops.succs(node);
-    fn(succs).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,true}); } });
-    fn(preds).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,false}); } });
-  } // for
-
-  while ( ! queue_same_layer.empty() )
-  {
-    auto [node,is_successor] = queue_same_layer.front();
-    queue_same_layer.pop();
-    if ( is_successor )
-    {
-      ++m_node_layer.at(node);
-      fn(ops.succs(node)).ply([&](auto&& _1)
-      {
-        queue_same_layer.push({_1,true});
-      });
-    }
-    else
-    {
-      --m_node_layer.at(node);
-      fn(ops.preds(node)).ply([&](auto&& _1)
-      {
-        queue_same_layer.push({_1,false});
-      });
-    }
-  } // while
-
-  // Start layer indices from 0
-  auto map_translate_layer = fn(m_node_layer)
-    .as(fun::snd)
-    .sort()
-    .unique()
-    .zip_with_ints(i64{})
-    .map();
-
-  m_node_layer = fn(m_node_layer)
-    .as([&](auto&& _1){ return std::make_pair(_1.first, map_translate_layer.at(_1.second)); })
-    .map();
-
-
-  std::map<i64, Nodes> m_layer_nodes;
-  fn(m_node_layer).ply([&](auto&& e)
-  {
-    if ( ! m_layer_nodes.contains(e.second) )
-    {
-      m_layer_nodes.emplace(e.second, Nodes{e.first});
-    } // if
-    else
-    {
-      m_layer_nodes.at(e.second).push_back(e.first);
-    } // else
-  });
-
-  fmt::print("-- Final layer nodes:\n");
-  for (auto [l,nds] : m_layer_nodes)
-  {
-    fmt::print("l: {} - n: {}\n", l, nds);
-  } // for
-
-
-  // Error check for node with neighbors on the same layer
-  for (auto&& e : m_node_layer)
-  {
-    Node node = e.first;
-    i64 node_layer = e.second;
-    auto succs = ops.succs(node);
-    auto preds = ops.preds(node);
-    err::err({ fn(succs).all([&](auto _1){ return m_node_layer.at(_1) > node_layer; }) })("Nodes on same layer");
-    err::err({ fn(preds).all([&](auto _1){ return m_node_layer.at(_1) < node_layer; }) })("Nodes on same layer");
-  } // for
-
-  // struct: Result {{{
-  struct Result
-  {
-    std::map<i64,std::vector<i64>> ln;
-    std::map<i64,i64> nl;
-    Result(std::map<i64,std::vector<i64>>& _ln, std::map<i64,i64>& _nl)
-      : ln(std::move(_ln))
-      , nl(std::move(_nl))
-    {}
-  }; // struct }}}
-
-  return Result(m_layer_nodes, m_node_layer);
-} // fn: get_prox_view }}}
+//   // Error check for node with neighbors on the same layer
+//   for (auto&& e : m_node_layer)
+//   {
+//     Node node = e.first;
+//     i64 node_layer = e.second;
+//     auto succs = ops.succs(node);
+//     auto preds = ops.preds(node);
+//     err::err({ fn(succs).all([&](auto _1){ return m_node_layer.at(_1) > node_layer; }) })("Nodes on same layer");
+//     err::err({ fn(preds).all([&](auto _1){ return m_node_layer.at(_1) < node_layer; }) })("Nodes on same layer");
+//   } // for
+//
+//   // struct: Result {{{
+//   struct Result
+//   {
+//     std::map<i64,std::vector<i64>> ln;
+//     std::map<i64,i64> nl;
+//     Result(std::map<i64,std::vector<i64>>& _ln, std::map<i64,i64>& _nl)
+//       : ln(std::move(_ln))
+//       , nl(std::move(_nl))
+//     {}
+//   }; // struct }}}
+//
+//   return Result(m_layer_nodes, m_node_layer);
+// } // fn: get_prox_view }}}
 
 // fn: lowest_node_id {{{
 //
@@ -2290,9 +2294,17 @@ decltype(auto) global_backtracking(Ops const& ops
     logger.info()("-- Base: {}\n", base);
   } // for
 
-  // Calculate graph prox-view
-  auto prox_view = f_timer({}, [&] { return get_prox_view(ops).nl; });
-  logger.info()("-- Built prox view");
+  // // Calculate graph prox-view
+  // auto prox_view = f_timer({}, [&] { return get_prox_view(ops).nl; });
+  // logger.info()("-- Built prox view");
+  // for (auto e : prox_view)
+  // {
+  //   fmt::print("prox e: {}\n", e);
+  // } // for
+
+  // Calculate graph depth-view
+  auto prox_view = f_timer({}, [&] { return ns_views::depth::run(i64{}, ops.preds, ops.succs).nl; });
+  logger.info()("-- Built prox depth");
   for (auto e : prox_view)
   {
     fmt::print("prox e: {}\n", e);
@@ -2316,12 +2328,12 @@ decltype(auto) global_backtracking(Ops const& ops
     logger.info()("Weight: {}", e);
   } // for
 
-  basis = f_timer({}, [&] { return detect_ears(ops, basis); });
-
-  for (auto&& base : basis)
-  {
-    logger.info()("-- Base (ear): {}\n", base);
-  } // for
+  // basis = f_timer({}, [&] { return detect_ears(ops, basis); });
+  //
+  // for (auto&& base : basis)
+  // {
+  //   logger.info()("-- Base (ear): {}\n", base);
+  // } // for
 
   basis = f_timer({}, [&] { return minimal_basis_bfs_ordering(ops, basis, m_edge_weight); });
 
@@ -2702,20 +2714,26 @@ int main([[maybe_unused]] int argc, char const* argv[])
   auto f_write_d = [&]<typename... Args>(Args&&... args) { ns_io_dimacs::Writer(std::forward<Args>(args)...); };
 
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/0-out.v");
+  auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+  // view_draw(view.ln, g.data(), "out/0-out-graph.svg");
+
 
   f_timer({}, [&]{ celaeno::graph::operations::balance::outgoing::run(0,ops); });
+  view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/1-out.v");
+  // view_draw(view.ln, g.data(), "out/1-out-graph.svg");
 
   // auto view = get_prox_view_2(ops, ns_views::depth::run(i64{}, ops.preds, ops.succs).nl);
-  auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-
   f_timer({}, [&]{ celaeno::graph::operations::balance::paths::run(i64{},ops,view); });
-  f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/2-out.v");
-
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  view = ns_ops::minimize::crossings::run(i64{}, ops.preds, ops.succs, ops.adj, view);
-  
+  f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/2-out.v");
+  // view_draw(view.ln, g.data(), "out/2-out-graph.svg");
+
+  // view = ns_ops::minimize::crossings::run(i64{}, ops.preds, ops.succs, ops.adj, view);
+
   auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(ops,view); });
+  // view_draw(view.ln, g.data(), "out/3-out-graph.svg");
+
 
   // unbalance(0,ops);
 
@@ -2730,7 +2748,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Balance cycles
   //
   
-  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_b1;
+  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_cm138a;
 
   // Read cycle output
   // Decode to original values in graph
@@ -2756,7 +2774,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   };
 
   basis = fn(basis).as([&](auto&& e){ return f_align_cycle(e); }).vec();
-  basis = detect_ears(ops, basis);
+  // basis = detect_ears(ops, basis);
 
   fn(basis).ply([&](auto&& e){ logger.info()("Basis: {}\n", e); });
 
@@ -2786,8 +2804,6 @@ int main([[maybe_unused]] int argc, char const* argv[])
   //   } // for
   // } // for
   // logger.info()("-- Built cycle supports");
-
-  // view_draw(view_prox);
 
   // Perform placement
   // std::cerr << "Started computation\n";
