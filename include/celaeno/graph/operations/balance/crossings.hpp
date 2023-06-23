@@ -44,6 +44,8 @@
 #include <celaeno/err/err.hpp>
 
 #include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/operations/balance/paths.hpp>
 
 // namespace celaeno::graph::operations::balance::crossings {{{
 namespace celaeno::graph::operations::balance::crossings
@@ -61,7 +63,9 @@ namespace fp = fplus;
 namespace fw = fplus::fwd;
 
 namespace err = celaeno::err;
+namespace ns_views = celaeno::graph::views;
 namespace ns_search = celaeno::graph::search;
+namespace ns_operations = celaeno::graph::operations;
 // }}}
 
 // Aliases {{{
@@ -272,18 +276,17 @@ std::map<T,Cross<T>> run(R&& l1, R&& l2, Ops const& ops)
 } // function: run }}}
 
 // fn: run {{{
-template<SignedIntegral T = i64, typename V>
-std::map<i64,Cross<i64>> run(Ops const& ops, V& view_proximity)
+template<SignedIntegral T = i64>
+std::map<i64,Cross<i64>> run(T root, Ops const& ops)
 {
   // Crossings
   std::map<i64, Cross<i64>> out;
 
-  // Create a proximity view
-  auto const& [ln,nl] = view_proximity;
+  // Create a depth view
+  auto [ln,nl]{ns_views::depth::run(root,ops.preds,ops.succs)};
 
   // Create overlapping layer indices
-  auto [it_min, it_max] {std::ranges::minmax_element(ln, {}, [](auto _1){ return _1.first; })};
-  auto layers{fp::overlapping_pairs(fp::numbers(it_min->first,it_max->first))};
+  auto layers{fp::overlapping_pairs(fp::numbers({},ln.size()))};
 
   for (auto const& [i,j] : layers)
   {
@@ -298,6 +301,79 @@ std::map<i64,Cross<i64>> run(Ops const& ops, V& view_proximity)
     } // for
   } // for
 
+  // // Dummy vertex with lowest value
+  // i64 idx{};
+  //
+  // // Define function to compare values lt 0
+  // auto f_lowest = [&idx](auto&& e) { if(e < idx){ idx=e; } return false; };
+  //
+  // // Get the dummy vertex with the lowest value
+  // ns_search::bfs::run(0,ops.preds,ops.succs,f_lowest);
+  //
+  // // Rebuild depth view
+  // nl = ns_views::depth::run(root,ops.preds,ops.succs).nl;
+  //
+  // auto f_layer_dist = [&nl=nl](i64 u, i64 v){ return fp::abs_diff(nl.at(u),nl.at(v)); };
+  //
+  // // Inserts w between u and v
+  // auto f_insert = [&](i64 u, i64 v, i64 w)
+  // {
+  //   ops.link(u,w);
+  //   ops.link(w,v);
+  //   ops.unlink(u,v);
+  // };
+  //
+  // // Rebalance
+  // for (auto& [cross_id,m_parent_child] : out)
+  // {
+  //   // fmt::print("Cross_id: {}\n", cross_id);
+  //   // std::cerr << "\n";
+  //
+  //   Cross<i64> m_new_parent_child;
+  //
+  //   // Check which parent has layer dist > 1 from cross_id
+  //   for (auto& [parent,child] : m_parent_child)
+  //   {
+  //     // fmt::print("Dist between {} and {}: {}\n", parent, cross_id, f_layer_dist(parent,cross_id));
+  //     // std::cerr << "\n";
+  //     // Insert n nodes between parent and cross_id
+  //     // where n is the layer distance between them
+  //     i64 u{parent};
+  //
+  //     for (i64 i{}; i < f_layer_dist(parent,cross_id)-1; ++i)
+  //     {
+  //       --idx;
+  //       // fmt::print("Insert {} between {} -- {}\n", idx, u, cross_id);
+  //       // std::cerr << "\n";
+  //       f_insert(u,cross_id,idx);
+  //       u = idx;
+  //     } // for
+  //
+  //     m_new_parent_child[u] = child;
+  //   } // for
+  //
+  //   m_parent_child = m_new_parent_child;
+  //
+  // } // for
+
+  // // Check if a node is a balancing dummy
+  // auto f_is_balancing_dummy =
+  // [&](T u)
+  // {
+  //   return ops.preds(u).size() == 1 && ops.succs(u).size() == 1;
+  // };
+  //
+  // // Get nodes until they are not a balancing dummy
+  // auto f_get_not_balancing_dummy =
+  // [&]<typename F>(T u, F f)
+  // {
+  //   while( f_is_balancing_dummy(u) )
+  //   {
+  //     u = f(u).at(0);
+  //   }
+  //   return u;
+  // };
+  //
 
   //
   // Passtrough balancing dummies

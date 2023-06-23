@@ -71,7 +71,6 @@
 
 #include "unbalance.hpp"
 #include "bfs.hpp"
-#include "cycles.hpp"
 
 // TODO Remove
 #include <celaeno/graph/operations/balance/outgoing.hpp>
@@ -239,6 +238,40 @@ decltype(auto) view_draw(Map auto&& map_layer_vertices, Map auto&& map_edge, std
   ns_draw::svg::svg(str_file_name, map_vertex_tile, path, [](auto e){ return e; });
 
 } // function: view_draw }}}
+
+// fn: get_cycle_basis {{{
+decltype(auto) get_cycle_basis(std::string str_file_dimacs)
+{
+  std::string str_home = std::getenv("HOME");
+  auto str_bin_dimacs = str_home + "/Repositories/celaeno/parmcb/build/mcb-dimacs-mpi";
+  auto str_file_out = str_home + "/Repositories/celaeno/out/cycles.txt";
+  auto cmd = fmt::format("{} -i {} --printcycles &> {}", str_bin_dimacs, str_file_dimacs, str_file_out);
+  system(cmd.c_str());
+
+  std::ifstream file_cycles{str_file_out};
+
+  err::err({ file_cycles.good() })("Could not open cycles file");
+
+  Basis out;
+  std::regex re("\\((\\d+),(\\d+)\\)");
+  std::smatch match;
+
+  for( std::string str_cycles; std::getline(file_cycles, str_cycles); )
+  {
+    Base base;
+    for(auto searchStart(str_cycles.cbegin()); std::regex_search(searchStart, str_cycles.cend(), match, re); )
+    {
+        base.emplace_back(std::stoi(match[1]));
+        base.emplace_back(std::stoi(match[2]));
+        searchStart = match.suffix().first;
+    }
+    if ( ! base.empty() )
+    {
+      out.push_back(fn(base).sort().unique().vec());
+    }
+  }
+  return out;
+} // function: get_cycle_basis }}}
 
 // // fn: get_prox_view_2 {{{
 // template<typename T>
@@ -1266,7 +1299,7 @@ decltype(auto) cycle_align_intersections(R minimal_basis, Sink sink)
     while( intersection.empty() or intersection.size() < 2 )
     {
       // Check if there are more cycles to intersect with
-      if( q.empty() ){ err::err()("No intersection for incident cycle"); }
+      if( q.empty() ){ err::err()("No intersection for incident cycle {}", c1); }
 
       // Update c1
       c1 = q.front(); q.pop();
@@ -2701,8 +2734,6 @@ int main([[maybe_unused]] int argc, char const* argv[])
   auto f_h = [&g](auto u){ return g.has(u); };
 
   err::Logger logger;
-
-
   fmt::print("Gates: {}\n", g.vertices_count());
   fmt::print("Wires: {}\n", g.edges_count());
 
@@ -2731,24 +2762,24 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   // view = ns_ops::minimize::crossings::run(i64{}, ops.preds, ops.succs, ops.adj, view);
 
-  auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(ops,view); });
+  auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(i64{}, ops); });
   // view_draw(view.ln, g.data(), "out/3-out-graph.svg");
 
 
-  // unbalance(0,ops);
+  unbalance(0,ops);
 
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/3-out.v");
 
   f_timer({}, f_write_d, g.data(), f_p, f_s, "out/3-out.dimacs");
 
-  exit(0);
+  // exit(0);
 
 
   //
   // Balance cycles
   //
   
-  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_cm138a;
+  Basis e_basis = get_cycle_basis("$HOME/Repositories/celaeno/out/3-out.dimacs");
 
   // Read cycle output
   // Decode to original values in graph
@@ -2762,7 +2793,6 @@ int main([[maybe_unused]] int argc, char const* argv[])
     .ply([&](auto&& e){ m_nodes_norm[e.second] = e.first; });
 
   Basis basis = fn(e_basis)
-    .as([](auto&& e){  return fn(e).squash().sort().unique().vec(); })
     .as([&](auto&& e){ return fn(e).as([&](auto _1) { return m_nodes_norm.at(_1); }).vec(); })
     .vec();
 
