@@ -1764,28 +1764,28 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       .in_all(fn(neighbors_positioned).in(cycle).vec() , [&](Tile t, Node v) { return f_target(u,v) == f_dist_chebyshev(t,p.at(v)); })
       .vec();
 
-    auto f_has_support = [&](Node __1) -> std::optional<Node>
-    {
-      auto __1_it = rg::find_if(m_edge_weight_supports, [&](auto&& ___1){ return ___1.first.first == __1; });
-      if ( __1_it !=  rg::end(m_edge_weight_supports) ) { return __1_it->first.second; }
-      return std::nullopt;
-    };
-    // Check if 'u' has support
-    if ( auto opt_support = f_has_support(u); opt_support )
-    {
-      logger.info()("Node {} has support {}", u, *opt_support);
-      // If it does check if it is placed
-      if ( p.contains(*opt_support) )
-      {
-        // If it is, check if the distance equals to chebyshev
-        auto tile_support = p.at(*opt_support);
-        logger.info()("Support tile: {}", tile_support);
-        tile_candidates = fn(tile_candidates).keep([&](auto&& __1)
-        {
-          return f_dist_chebyshev(__1, tile_support) == m_edge_weight_supports.at({u,*opt_support});
-        }).vec();
-      } // if
-    } // if
+    // auto f_has_support = [&](Node __1) -> std::optional<Node>
+    // {
+    //   auto __1_it = rg::find_if(m_edge_weight_supports, [&](auto&& ___1){ return ___1.first.first == __1; });
+    //   if ( __1_it !=  rg::end(m_edge_weight_supports) ) { return __1_it->first.second; }
+    //   return std::nullopt;
+    // };
+    // // Check if 'u' has support
+    // if ( auto opt_support = f_has_support(u); opt_support )
+    // {
+    //   logger.info()("Node {} has support {}", u, *opt_support);
+    //   // If it does check if it is placed
+    //   if ( p.contains(*opt_support) )
+    //   {
+    //     // If it is, check if the distance equals to chebyshev
+    //     auto tile_support = p.at(*opt_support);
+    //     logger.info()("Support tile: {}", tile_support);
+    //     tile_candidates = fn(tile_candidates).keep([&](auto&& __1)
+    //     {
+    //       return f_dist_chebyshev(__1, tile_support) == m_edge_weight_supports.at({u,*opt_support});
+    //     }).vec();
+    //   } // if
+    // } // if
 
     return tile_candidates;
   };
@@ -2766,7 +2766,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // view_draw(view.ln, g.data(), "out/3-out-graph.svg");
 
 
-  // unbalance(0,ops);
+  unbalance(0,ops);
 
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/3-out.v");
 
