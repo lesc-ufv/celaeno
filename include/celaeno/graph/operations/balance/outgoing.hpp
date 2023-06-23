@@ -41,7 +41,7 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
-#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/fun/fun.hpp>
 
 // namespace celaeno::graph::operations::balance::outgoing {{{
 namespace celaeno::graph::operations::balance::outgoing
@@ -54,14 +54,14 @@ using Ops = celaeno::graph::Ops;
 // namespaces {{{
 namespace fp = fplus;
 namespace rg = ranges;
-
-namespace ns_views = celaeno::graph::views;
 namespace ns_search = celaeno::graph::search;
+namespace fun = celaeno::fun;
 // }}}
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
+using namespace celaeno::fun::fn;
 // }}}
 
 // fn: run {{{
@@ -77,12 +77,6 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   spdlog::set_level(spdlog::level::debug);
   spdlog::debug("Algorithm: celaeno::graph::operations::balance::outgoing");
 #endif
-
-  auto depth_view {ns_views::depth::run(root,
-    std::forward<P>(f_pred),
-    std::forward<S>(f_succ)
-    ).ln
-  };
 
   // Dummy vertex with lowest value
   T idx{};
@@ -145,6 +139,32 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
     // Update current successors of n
     rg::for_each(successors, [&](auto s) { f_link(n,s); });
   } // for
+
+  // Some dummies only have one incoming edge and one outgoing edge,
+  // in this case it can be removed, and the predecessor and successor
+  // nodes are linked directly
+  // // Check if can remove, return predecessor and successor
+  auto f_can_remove = [&](auto&& _1) -> std::optional<std::pair<T,T>>
+  {
+    auto preds = f_pred(_1);
+    auto succs = f_succ(_1);
+    if ( _1 < 0 && preds.size() == 1 && succs.size() == 1 )
+    {
+      return std::make_pair(preds.front(), succs.front());
+    }
+    return std::nullopt;
+  };
+  // // Remove dummy nodes from graph
+  std::ranges::for_each(ns_search::bfs::run(root,f_pred,f_succ), [&](auto&& _1)
+  {
+    if ( auto opt_pred_succ = f_can_remove(_1); opt_pred_succ )
+    {
+      auto [pred,succ] = *opt_pred_succ;
+      f_unlink(pred,_1);
+      f_unlink(_1,succ);
+      f_link(pred,succ);
+    }
+  });
 
 } // }}}
 

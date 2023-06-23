@@ -51,18 +51,20 @@ using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
-// namespaces {{{
-namespace balance = celaeno::graph::operations::balance::paths;
-// }}}
-
 // run {{{
-template<SignedIntegral S, typename N1, typename N2, typename N3, typename E1, typename E2>
-decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
+template<SignedIntegral S
+  , typename N1
+  , typename N2
+  , typename N3
+  , typename V>
+decltype(auto) run(S root
+    , N1&& f_p
+    , N2&& f_s
+    , N3&& f_a
+    , V& view)
   requires CallableWith<N1,i64>
   && CallableWith<N2,i64>
   && CallableWith<N3,i64,i64>
-  && CallableWith<E1,i64,i64>
-  && CallableWith<E2,i64,i64>
 {
 
 #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
@@ -72,12 +74,7 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
   //
   // @ Sugiyama algorithm requires a k-layered bipartite graph
   //
-  balance::run(root,
-    std::forward<N1>(f_p),
-    std::forward<N2>(f_s),
-    std::forward<E1>(f_l),
-    std::forward<E2>(f_u)
-  );
+  // TODO Algorithm to check if is k-layered bipartite
 
   //
   // @ Perform crossing minimization
@@ -85,7 +82,8 @@ decltype(auto) run(S root, N1&& f_p, N2&& f_s, N3&& f_a, E1&& f_l, E2&& f_u)
   return impl::run(root,
     std::forward<N1>(f_p),
     std::forward<N2>(f_s),
-    std::forward<N3>(f_a)
+    std::forward<N3>(f_a),
+    view
   );
 
 } // function: run }}}

@@ -42,8 +42,8 @@
 #endif
 
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/search/kahn.hpp>
-#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/graph/search/bfs.hpp>
+#include <celaeno/fun/fun.hpp>
 
 // namespace celaeno::graph::views::proximity {{{
 
@@ -52,25 +52,37 @@ namespace celaeno::graph::views::proximity
 
 // Namespaces {{{
 namespace rg = ranges;
-namespace depth = celaeno::graph::views::depth;
-namespace kahn = celaeno::graph::search::kahn;
+namespace fun = celaeno::fun;
+namespace ns_search = celaeno::graph::search;
 // }}}
 
 // Using namespaces {{{
+using namespace celaeno::fun::fn;
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 // }}}
 
-// using declarations {{{
-using rg::for_each;
-using rg::sort;
+// Aliases {{{
+using Layer = i64;
+template<typename N> using LayerNodes = std::map<Layer,std::vector<N>>;
+template<typename N> using NodeLayer = std::map<N,Layer>;
 // }}}
 
-// fn: run {{{
+// struct: Result {{{
+template<typename N>
+struct Result
+{
+  LayerNodes<N> ln;
+  NodeLayer<N> nl;
+  Result(LayerNodes<N>& _ln, NodeLayer<N>& _nl)
+    : ln(std::move(_ln))
+    , nl(std::move(_nl))
+  {}
+}; // struct }}}
 
+// fn: run {{{
 template<SignedIntegral T, typename P, typename S>
-auto run(T root, P&& f_pred, S&& f_succ)
-  -> std::pair<std::map<T,std::vector<T>>,std::map<T,T>>
+Result<T> run([[maybe_unused]] T root, P&& f_pred, S&& f_succ)
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
 {
@@ -81,59 +93,126 @@ auto run(T root, P&& f_pred, S&& f_succ)
 #endif
 
   // Create a depth-view
-  auto [lvs,vl] {depth::run(root, std::forward<P>(f_pred), std::forward<S>(f_succ))};
+  NodeLayer<T> m_node_layer;
 
-  // Perform Topological sorting
-  auto topo {kahn::run(root,std::forward<P>(f_pred),std::forward<S>(f_succ))};
-
-  // Reverse topo view
-  std::reverse(topo.begin(),topo.end());
-
-  for (auto&& t : topo)
+  struct Entry
   {
-    auto preds{f_pred(t)};
-    // is not lev(0)
-    if( ! preds.empty() )
+    T u; // Current node
+    bool is_input; // If is input or output
+  };
+
+  // Visited nodes
+  std::set<T> set_visited;
+
+  // Nodes to visit
+  std::queue<Entry> queue_visit;
+
+  // Search from io to the rest of the graph
+  auto f_search_by_root = [&](Entry entry)
+  {
+    i64 idx_current_layer{m_node_layer.at(entry.u)};
+
+    // Mark as visited
+    set_visited.insert(entry.u);
+
+    // Set u as initial node
+    std::vector<T> vec_node_curr{entry.u};
+
+    while( ! vec_node_curr.empty() )
     {
-      for (auto&& p : preds)
+      // Update m_node_layer
+      rg::for_each(vec_node_curr, [&](auto&& _1)
       {
-        // Predecessor has an inter edge
-        if( (vl.at(t) - vl.at(p)) > 1 )
+        // Prefer lowest layer (closer to inputs)
+        if ( ! m_node_layer.contains(_1) )
         {
-          // Get successors
-          auto succs{f_succ(p)};
-          // If successors are empty, continue
-          if( succs.empty() ) continue;
-          // Levels ordered by successors
-          std::vector<T> levels;
-          // Order successors in ascending order of lev(s)
-          sort(succs,
-            [vl=std::ref(vl)](auto&& lhs, auto&& rhs)
-            {
-              return vl.get().at(lhs) < vl.get().at(rhs);
-            }
-          );
-          // Populate levels by sorted successors
-          for_each(succs,
-            [&,vl=std::ref(vl)](auto&& s)
-            {
-              levels.emplace_back(vl.get().at(s));
-            }
-          );
-          // Get the difference of lev(min(s)) and lev(p)
-          auto diff { levels.at(0) - vl.at(p) };
-          // If the diff is gt than one, update lev(p)
-          if( diff > 1) vl.at(p) = levels.at(0)-1;
+          m_node_layer[_1] = idx_current_layer;
         }
-      } // for
+        else if ( entry.is_input && idx_current_layer > m_node_layer.at(_1) )
+        {
+          m_node_layer[_1] = idx_current_layer;
+        }
+        else if ( ! entry.is_input && idx_current_layer < m_node_layer.at(_1) )
+        {
+          m_node_layer[_1] = idx_current_layer;
+        }
+      });
+
+      // If has input or output, and is not in visited set, push into queue
+      auto f_is_input = [&](T _1){ return f_pred(_1).size() == 0; };
+      auto f_is_output = [&](T _1){ return f_succ(_1).size() == 0; };
+      rg::for_each(vec_node_curr, [&](auto&& _1)
+      {
+        if ( ! set_visited.contains(_1) )
+        {
+          if ( f_is_input(_1) )
+          {
+            queue_visit.push({_1, true});
+          } // if
+          else if ( f_is_output(_1) )
+          {
+            queue_visit.push({_1, false});
+          } // else if
+        }
+      });
+
+      // Update layer counter
+      if ( entry.is_input ) { idx_current_layer++; } else { idx_current_layer--; }
+
+      // Transform into next layer
+      auto f_next = (entry.is_input)? f_succ : f_pred;
+      vec_node_curr = fn(vec_node_curr)
+        .as([&](auto&& _1){ return f_next(_1); })
+        .squash()
+        .sort()
+        .unique()
+        .vec();
+    }
+  };
+
+  // Get an input and push into the queue, assume the initial layer to be 0
+  ns_search::bfs::run(0
+    , f_pred
+    , f_succ
+    , [&](auto&& _1){ return (f_pred(_1).size() == 0)? (queue_visit.push({_1, true}), true) : false;  });
+
+  // Start with the assumption that initial input is at level 0
+  m_node_layer[queue_visit.front().u] = 0;
+
+  while ( ! queue_visit.empty() )
+  {
+    // Skip visited
+    if ( set_visited.contains(queue_visit.front().u) ) { queue_visit.pop(); continue; }
+    // Use node as search tree root
+    f_search_by_root(queue_visit.front());
+    // Go to next
+    queue_visit.pop();
+  } // while
+
+
+  LayerNodes<T> m_layer_nodes;
+  fn(m_node_layer).ply([&](auto&& e)
+  {
+    if ( ! m_layer_nodes.contains(e.second) )
+    {
+      m_layer_nodes.emplace(e.second, std::vector<T>{e.first});
     } // if
-  } // for
+    else
+    {
+      m_layer_nodes.at(e.second).push_back(e.first);
+    } // else
+  });
 
-  // Update level -> vertices
-  for_each(vl, [lvs=std::ref(lvs)](auto&& e){ lvs.get().at(e.second).emplace_back(e.first); });
-
-  return { lvs, vl };
+  return Result<T>{ m_layer_nodes, m_node_layer };
 
 } // function: run }}}
+
+// fn: run {{{
+template<SignedIntegral T>
+void run(T root, Ops ops)
+{
+  run(root, ops.preds, ops.succs);
+}
+// }}}
 
 } // namespace celaeno::graph::views::proximity }}}

@@ -64,7 +64,7 @@ using namespace celaeno::aliases;
 // }}}
 
 // Aliases {{{
-using Layer = u64;
+using Layer = i64;
 template<typename N> using LayerNodes = std::map<Layer,std::vector<N>>;
 template<typename N> using NodeLayer = std::map<N,Layer>;
 // }}}

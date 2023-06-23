@@ -221,6 +221,46 @@ struct Fun
     return *this;
   } // function: ply
 
+  // fn: zip_with_ints {{{
+  //
+  // Zips the value with a sequence of ints
+  //
+  // @param lb: lower bound
+  // @param ub: upper bound
+  //
+  template<typename Out = void, Integral I = u64>
+  [[nodiscard]] auto zip_with_ints(I&& lb = 0)
+  {
+    auto v = this->vec();
+    auto vec_ints = rv::ints(lb, static_cast<I>(v.size())) | rg::to<std::vector>;
+    auto zipped = rv::zip(v, vec_ints) | rg::to<std::vector>;
+    return Fun<decltype(zipped)>(zipped);
+  } // fn: zip_with_ints }}}
+
+  // fn: front {{{
+  //
+  // Get element at the front
+  //
+  // Synonyms:
+  //
+  template<typename Out = void, typename T>
+  [[nodiscard]] auto front()
+  {
+    return this->vec().front();
+  } // fn: front }}}
+
+  // fn: back {{{
+  //
+  // Get element at the back
+  //
+  // Synonyms:
+  //
+  template<typename Out = void, typename T>
+  [[nodiscard]] auto back()
+  {
+    return this->vec().back();
+  } // fn: back }}}
+
   // fn: mut {{{
   //
   // Transforms the whole container in a single pass of the unary predicate f
@@ -327,7 +367,6 @@ struct Fun
   {
     return make_view<Out>(view | rv::transform(f));
   } // fn: as }}}
-
 
   // fn: group_by {{{
   //
@@ -649,5 +688,12 @@ template<Range R>
 } // function: fn
 
 } // namespace: fn }}}
+
+
+// Helper function objects {{{
+[[maybe_unused]] auto fst = [](auto&& _1){ return _1.first; };
+[[maybe_unused]] auto snd = [](auto&& _1){ return _1.second; };
+// }}}
+
 
 } // namespace celaeno::fun }}}

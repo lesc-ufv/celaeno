@@ -46,6 +46,7 @@
 #include <celaeno/heuristics/barycenter.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 #include <celaeno/graph/representations/incidence.hpp>
+#include <celaeno/fun/fun.hpp>
 
 // namespace celaeno::graph::operations::minimize::crossings::impl {{{
 namespace celaeno::graph::operations::minimize::crossings::impl
@@ -58,11 +59,14 @@ namespace celaeno::graph::operations::minimize::crossings::impl
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
+using namespace celaeno::fun::fn;
 // }}}
 
 // namespaces {{{
 namespace rg = ranges;
+namespace rv = ranges::views;
 namespace ra = ranges::actions;
+namespace fun = celaeno::fun;
 namespace fp = fplus;
 namespace ns_views = celaeno::graph::views;
 namespace barycenter = celaeno::heuristics::barycenter;
@@ -169,27 +173,47 @@ std::optional<std::pair<std::decay_t<M>,std::decay_t<L>>> roc(M m, L row_layer)
 } // function: roc }}}
 
 // fn: run {{{
-template<SignedIntegral S, typename N1, typename N2, typename N3>
-[[nodiscard]] decltype(auto) run(S root, N1&& f_pred, N2&& f_succ, N3&& f_adj)
+template<SignedIntegral S
+  , typename N1
+  , typename N2
+  , typename N3
+  , typename V>
+[[nodiscard]] decltype(auto) run(S root
+    , N1&& f_pred
+    , N2&& f_succ
+    , N3&& f_adj
+    , V& view)
   requires CallableWith<N1,i64>
   && CallableWith<N2,i64>
   && CallableWith<N3,i64,i64>
 {
 
-  //
-  // @ Create a depth view
-  //
-  auto depth_view{ns_views::depth::run(root,f_pred,f_succ).ln};
+  auto map_layer_nodes = view.ln;
+  auto map_layer_nodes_best = map_layer_nodes;
 
   //
   // @ Generate layer pairs
   //
-  std::size_t layer_count{depth_view.size()};
+  std::size_t layer_count{map_layer_nodes.size()};
   assertm(layer_count != 0, "Layer count equals zero");
   auto layers = fp::overlapping_pairs(fp::numbers({},layer_count));
 
+  auto f_count_crossings_all = [&](auto&& _1)
+  {
+    i64 out{};
+    rg::for_each(layers,[&](auto e)
+    {
+      out += ccrossings::run(_1.at(e.first),_1.at(e.second),f_succ);
+    });
+    return out;
+  };
+
+  i64 crossings_best = f_count_crossings_all(map_layer_nodes);
+
+
+  // lamb: impl_phase_1 {{{
   auto impl_phase_1 =
-  [&]<typename M>(M m0, auto& l1, auto &l2)
+  [&]<typename M>(M m0, auto l1, auto l2)
   {
     while(true)
     {
@@ -222,79 +246,140 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
       //
       // Step 6: Stop if M0 and M2 are equal
       //
-      if( auto rev_m2{reverse(m2)}; rev_m2 == m0 ){ return rev_m2; } // if
+      if( auto rev_m2{reverse(m2)}; rev_m2 == m0 ){ return std::make_pair(l1,l2); } // if
       else { m0 = rev_m2; } // else
     } // while
-  }; // lamb: impl_phase_1
+  }; // lamb: impl_phase_1 }}}
 
+  // lamb: phase_1 {{{
   auto phase_1 =
   [&]
   {
-    // Compute best number of crossings
-    i64 best_crossings{};
+    std::vector<u64> count_layer = fp::numbers({},layer_count);
+    std::vector<std::vector<u64>> layers_of_3 = fp::divvy(3, 1, count_layer);
 
-    rg::for_each(layers,[&](auto e)
-    {
-      best_crossings += ccrossings::run(depth_view.at(e.first),depth_view.at(e.second),f_succ);
-    });
+    // Compute best number of crossings
+    i64 count_crossings_best_phase_1{f_count_crossings_all(map_layer_nodes)};
 
     // Save best node arrangements
-    auto best_arrangement{depth_view};
+    auto map_layer_nodes_best_phase_1{map_layer_nodes};
 
     // Iterate while solutions keeps improving
+    i64 attempts{};
     while( true )
     {
-      i64 curr_crossings{};
-
-      for( auto [il1,il2] : layers )
+      // lamb: try_by_three {{{
+      auto f_try_by_three = [&]<typename T>(T l1, T l2, T l3)
+        -> std::optional<std::pair<i64, std::vector<T>>>
       {
-        auto& l1{depth_view.at(il1)};
-        auto& l2{depth_view.at(il2)};
-        auto m2{impl_phase_1(incidence::run(l1,l2,f_adj),l1,l2)};
+        // Before
+        i64 count_crossings_curr = ccrossings::run(l1,l2,f_succ) + ccrossings::run(l2,l3,f_succ);
+
+        std::tie(l1,l2) = impl_phase_1(incidence::run(l1,l2,f_adj),l1,l2);
+        std::tie(l2,l3) = impl_phase_1(incidence::run(l2,l3,f_adj),l2,l3);
+
+        // After
+        i64 count_crossings_new = ccrossings::run(l1,l2,f_succ) + ccrossings::run(l2,l3,f_succ);
+
+        if ( count_crossings_new < count_crossings_curr )
+        {
+          return std::make_pair(count_crossings_new, std::vector<T>{l1,l2,l3});
+        }
+        else
+        {
+          return std::nullopt;
+        } // else
+        
+      }; // }}}
+
+      // lamb: try_by_two {{{
+      auto f_try_by_two = [&]<typename T>(T l1, T l2)
+        -> std::optional<std::pair<i64, std::vector<T>>>
+      {
+        // Before
+        i64 count_crossings_curr = ccrossings::run(l1,l2,f_succ);
+
+        std::tie(l1,l2) = impl_phase_1(incidence::run(l1,l2,f_adj),l1,l2);
+
+        // After
+        i64 count_crossings_new = ccrossings::run(l1,l2,f_succ);
+
+        if ( count_crossings_new < count_crossings_curr )
+        {
+          return std::make_pair(count_crossings_new, std::vector<T>{l1,l2});
+        }
+        else
+        {
+          return std::nullopt;
+        } // else
+        
+      }; // }}}
+
+      for( auto e : layers_of_3 )
+      {
+        auto [il1,il2,il3] = std::tie(e.at(0), e.at(1), e.at(2));
+        auto [l1,l2,l3] = std::tie(map_layer_nodes.at(il1), map_layer_nodes.at(il2), map_layer_nodes.at(il3));
+        if ( auto opt_3 = f_try_by_three(l1,l2,l3); opt_3 )
+        {
+          std::tie(map_layer_nodes.at(il1), map_layer_nodes.at(il2), map_layer_nodes.at(il3)) 
+            = std::tie(opt_3->second.at(0), opt_3->second.at(1), opt_3->second.at(2));
+        } // if
+        // else if ( auto opt_2_12 = f_try_by_two(l1,l2); opt_2_12 )
+        // {
+        //   map_layer_nodes.at(il1) = opt_2_12->second.at(0);
+        //   map_layer_nodes.at(il2) = opt_2_12->second.at(1);
+        // } // else if
+        // else if ( auto opt_2_23 = f_try_by_two(l2,l3); opt_2_23 )
+        // {
+        //   map_layer_nodes.at(il2) = opt_2_23->second.at(0);
+        //   map_layer_nodes.at(il3) = opt_2_23->second.at(1);
+        // } // else if
       } // for
 
-      rg::for_each(layers,[&](auto e)
-      {
-        curr_crossings += ccrossings::run(depth_view.at(e.first),depth_view.at(e.second),f_succ);
-      });
-
-      if( curr_crossings >= best_crossings )
+      i64 count_crossings_curr_phase_1 = f_count_crossings_all(map_layer_nodes);
+      if( count_crossings_curr_phase_1 >= count_crossings_best_phase_1 && ++attempts > 5 )
       {
         break;
       }
-      else if (curr_crossings < best_crossings)
+      else if (count_crossings_curr_phase_1 < count_crossings_best_phase_1)
       {
-        best_arrangement = depth_view;
-        best_crossings = curr_crossings;
+        map_layer_nodes_best_phase_1 = map_layer_nodes;
+        count_crossings_best_phase_1 = count_crossings_curr_phase_1;
       } // else
 
-      layers = ra::reverse(layers);
+      layers_of_3 = ra::reverse(layers_of_3);
     } // while
 
-    depth_view = best_arrangement;
-  }; // lamb: phase_1
+    map_layer_nodes = map_layer_nodes_best_phase_1;
+  }; // lamb: phase_1 }}}
 
   //
   // Execute ror and roc until both fail
   //
-  for ( bool stop{false}; stop != true; )
+  
+  for ( i64 iterations {}; iterations < 10; ++iterations )
   {
+    ++iterations;
     for( auto [il1,il2] : layers )
     {
-      auto& l1{depth_view.at(il1)};
-      auto& l2{depth_view.at(il2)};
+      auto l1{map_layer_nodes.at(il1)};
+      auto l2{map_layer_nodes.at(il2)};
 
       //
       // Step 7
       //
       auto opt_ror{ror(incidence::run(l1,l2,f_adj),l2)};
-
       if( opt_ror )
       {
-        // spdlog::info("opt_ror");
-        l2 = opt_ror->second;
+        map_layer_nodes.at(il2) = opt_ror->second;
         phase_1();
       }
+
+      if ( auto crossings_curr = f_count_crossings_all(map_layer_nodes); crossings_curr < crossings_best )
+      {
+        crossings_best = crossings_curr;
+        map_layer_nodes_best = map_layer_nodes;
+      } // if
 
       //
       // Step 8
@@ -302,19 +387,30 @@ template<SignedIntegral S, typename N1, typename N2, typename N3>
       auto opt_roc{roc(incidence::run(l1,l2,f_adj),l1)};
       if( opt_roc )
       {
-        // spdlog::info("opt_roc");
-        l1 = opt_roc->second;
+        map_layer_nodes.at(il1) = opt_roc->second;
         phase_1();
-      }
+      } // if
 
-      if( ! opt_ror && ! opt_roc ){ stop = true; }
+      if ( auto crossings_curr = f_count_crossings_all(map_layer_nodes); crossings_curr < crossings_best )
+      {
+        crossings_best = crossings_curr;
+        map_layer_nodes_best = map_layer_nodes;
+      } // if
 
     } // for
 
     layers = ra::reverse(layers);
   } // while
 
-  return fp::get_map_values(depth_view);
+  // Rebuild map_node_layer
+  view.nl.clear();
+  view.ln = map_layer_nodes_best;
+  for (auto& e : map_layer_nodes_best)
+  {
+    std::ranges::for_each(e.second, [&](auto&& _1){ return  view.nl[_1] = e.first; });
+  } // for
+
+  return view;
 } // }}}
 
 } // namespace celaeno::graph::operations::minimize::crossing::impl }}}

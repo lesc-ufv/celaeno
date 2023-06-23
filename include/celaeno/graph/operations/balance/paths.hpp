@@ -41,7 +41,7 @@
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/graph/views/depth.hpp>
+#include <celaeno/fun/fun.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 
 // namespace celaeno::graph::operations::balance::paths {{{
@@ -49,23 +49,28 @@ namespace celaeno::graph::operations::balance::paths
 {
 
 // Namespaces {{{
-namespace depth = celaeno::graph::views::depth;
 namespace bfs = celaeno::graph::search::bfs;
+namespace fun = celaeno::fun;
 // }}}
 
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
+using namespace celaeno::fun::fn;
 // }}}
 
 // Using declarations {{{
-using std::ranges::transform;
 using Ops = celaeno::graph::Ops;
 // }}}
 
 // fn: run {{{
-template<SignedIntegral T, typename P, typename S, typename L, typename U>
-void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
+template<SignedIntegral T
+  , typename P
+  , typename S
+  , typename L
+  , typename U
+  , typename V>
+void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, V& view)
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
   && CallableWith<L,T,T>
@@ -87,13 +92,19 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   bfs::run(root,f_pred,f_succ,f_lowest);
 
   // vl = Vertex → Level; lv = Level  → Vertex
-  auto [lv,vl] = depth::run(root,std::forward<P>(f_pred),std::forward<S>(f_succ));
+  auto& [lv,vl] = view;
 
-  // Create the vector with levels indexes
-  std::vector<T> levels {};
+  fmt::print("From balance paths:\n");
+  for (auto&& [l, nds] : lv)
+  {
+    fmt::print("l: {} - n: {}\n", l, nds);
+  } // for
 
-  // Populate level indexes
-  transform(lv, std::back_inserter(levels), [](auto&& e) { return e.first; });
+  // Create the vector with levels indices
+  std::vector<T> levels = fn(lv).as(fun::fst).sort().vec();
+
+  // Nodes to insert in level i
+  std::map<i64, std::vector<T>> map_level_new_nodes;
 
   // Algorithm
   for (auto&& current : levels)
@@ -120,6 +131,8 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
           //
           f_link(p,idx);
           f_link(idx,*it);
+          map_level_new_nodes[vl.at(*it)-distance+1].push_back(idx);
+
           //
           // ↓         ↓
           // A    C    B
@@ -157,13 +170,23 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
     } // for
   } // for: i
 
+  // Update view
+  for(auto&& [level,new_nodes] : map_level_new_nodes)
+  {
+    std::ranges::for_each(new_nodes, [&](auto&& _1)
+    {
+      lv.at(level).push_back(_1);
+      vl[_1] = level;
+    });
+  } // for
+
 } // }}}
 
 // fn: run {{{
-template<SignedIntegral T>
-void run(T root, Ops ops)
+template<SignedIntegral T, typename V>
+void run(T root, Ops ops, V& view)
 {
-  run(root, ops.preds, ops.succs, ops.link, ops.unlink);
+  run(root, ops.preds, ops.succs, ops.link, ops.unlink, view);
 }
 // }}}
 

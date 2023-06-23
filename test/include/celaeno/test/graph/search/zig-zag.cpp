@@ -175,66 +175,132 @@ decltype(auto) rev(std::pair<T1,T2> const& pair)
   return std::make_pair(pair.second,pair.first);
 } // function: rev }}}
 
-// fn: view_draw {{{
-decltype(auto) view_draw(Map auto&& map_vertex_layer)
+// // fn: view_draw {{{
+// decltype(auto) view_draw(Map auto&& map_vertex_layer)
+// {
+//   // , Map auto&& map_vertex_tile, Range auto&& range_edge_path)
+//   // Get max layer id
+//   constexpr u64 const size_spacing = 4;
+//
+//   i64 max_layer_id = fn(map_vertex_layer).as([](auto&& e){ return e.second; }).max();
+//
+//   // Create layers
+//   ns_views::proximity::LayerNodes<i64> map_layer_vertices;
+//   std::ranges::for_each(map_vertex_layer, [&](auto&& e)
+//   {
+//     i64 layer_curr = max_layer_id - e.second;
+//     if ( ! map_layer_vertices.contains(layer_curr) )
+//     {
+//       map_layer_vertices.emplace(layer_curr, Nodes{e.first});
+//     }
+//     else
+//     {
+//       map_layer_vertices.at(layer_curr).push_back(e.first);
+//     }
+//   });
+//
+//   for (auto&& [l,v] : map_layer_vertices)
+//   {
+//     fmt::print("l: {} - v: {}\n", l, v);
+//   } // for
+//
+//   // Find out the size of the largest layer
+//   u64 const size_max_layer = fn(map_layer_vertices).as([](auto&& e){ return e.second.size(); }).max();
+//   fmt::print("Max layer size: {}\n", size_max_layer);
+//
+//   // Shift layers left by (size_max_layer-size_cur_layer)/2
+//   std::map<i64, i64> map_layer_shift = fn(map_layer_vertices)
+//     .as([&](auto&& e){ return std::make_pair(e.first, static_cast<i64>((size_max_layer - e.second.size()) / 2)); })
+//     .as([&](auto&& e){ if (e.second == 0) { e.second = 1; } return e; })
+//     .map();
+//
+//   // Convert layers into collections of xy positions
+//   std::map<Node, Tile> map_vertex_tile = fn(map_layer_vertices)
+//   .as([&](auto&& _1)
+//   {
+//     i64 y_pos = _1.first;
+//     i64 x_pos = 0;
+//     return fn(_1.second)
+//       .as([&](auto __1)
+//       {
+//         return std::make_pair(__1, Tile((++x_pos)*(map_layer_shift.at(y_pos)), y_pos));
+//       })
+//       .vec();
+//   })
+//   .squash()
+//   .map();
+//
+//   std::vector<std::pair<Edge,Tiles>> path;
+//
+//   ns_draw::svg::svg("out/celaeno.svg", map_vertex_tile, path, [](auto e){ return e; });
+//
+// } // function: view_draw }}}
+
+// fn: get_prox_view_2 {{{
+template<typename T>
+decltype(auto) get_prox_view_2(Ops const& ops, T&& map_node_layer)
 {
-  // , Map auto&& map_vertex_tile, Range auto&& range_edge_path)
-  // Get max layer id
-  constexpr u64 const size_spacing = 4;
+  std::queue<Node> q;
 
-  u64 max_layer_id = fn(map_vertex_layer).as([](auto&& e){ return e.second; }).max();
-
-  // Create layers
-  ns_views::depth::LayerNodes<i64> map_layer_vertices;
-  std::ranges::for_each(map_vertex_layer, [&](auto&& e)
+  for (auto [u,depth] : map_node_layer)
   {
-    u64 layer_curr = max_layer_id - e.second;
-    if ( ! map_layer_vertices.contains(layer_curr) )
-    {
-      map_layer_vertices.emplace(layer_curr, Nodes{e.first});
-    }
-    else
-    {
-      map_layer_vertices.at(layer_curr).push_back(e.first);
-    }
-  });
+    // Get succs
+    Nodes succs{ops.succs(u)};
 
-  for (auto&& [l,v] : map_layer_vertices)
-  {
-    fmt::print("l: {} - v: {}\n", l, v);
+    if( succs.empty() ){ continue; }
+
+    // Check if smallest successor has a dist > 1
+    auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
+
+    // If dist of v to u is gt than 1, make it 1
+    if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
+    {
+      map_node_layer.at(u) = depth_v - 1;
+
+      // Enqueue predecessors of u
+      for( auto w : ops.preds(u) ){ q.push(w); }
+    } // if
   } // for
 
-  // Find out the size of the largest layer
-  u64 const size_max_layer = fn(map_layer_vertices).as([](auto&& e){ return e.second.size(); }).max();
-  fmt::print("Max layer size: {}\n", size_max_layer);
-
-  // Shift layers left by (size_max_layer-size_cur_layer)/2
-  std::map<u64, u64> map_layer_shift = fn(map_layer_vertices)
-    .as([&](auto&& e){ return std::make_pair(e.first, (size_max_layer - e.second.size()) / 2); })
-    .as([&](auto&& e){ if (e.second == 0) { e.second = 1; } return e; })
-    .map();
-
-  // Convert layers into collections of xy positions
-  std::map<Node, Tile> map_vertex_tile = fn(map_layer_vertices)
-  .as([&](auto&& _1)
+  while( ! q.empty() )
   {
-    i64 y_pos = _1.first;
-    i64 x_pos = 0;
-    return fn(_1.second)
-      .as([&](auto __1)
-      {
-        return std::make_pair(__1, Tile((++x_pos)*(map_layer_shift.at(y_pos)), y_pos));
-      })
-      .vec();
-  })
-  .squash()
-  .map();
+    Node u{q.front()}; q.pop();
 
-  std::vector<std::pair<Edge,Tiles>> path;
+    // Get succs
+    Nodes succs{ops.succs(u)};
 
-  ns_draw::svg::svg("out/celaeno.svg", map_vertex_tile, path, [](auto e){ return e; });
+    if( succs.empty() ){ continue; }
 
-} // function: view_draw }}}
+    // Check if smallest successor has a dist > 1
+    auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
+
+    // If dist of v to u is gt than 1, make it 1
+    if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
+    {
+      map_node_layer.at(u) = depth_v - 1;
+
+      // Enqueue predecessors of u
+      for( auto w : ops.preds(u) ){ q.push(w); }
+    } // if
+
+  } // While
+
+  std::map<i64, Nodes> map_layer_nodes;
+  fn(map_node_layer).ply([&](auto&& e) { map_layer_nodes[e.second].push_back(e.first); });
+
+  // struct: Result {{{
+  struct Result
+  {
+    std::map<i64,Nodes> ln;
+    std::map<i64,i64> nl;
+    Result(std::map<i64,Nodes> _ln, std::map<i64,i64> _nl)
+      : ln(std::move(_ln))
+      , nl(std::move(_nl))
+    {}
+  }; // struct }}}
+
+  return Result(map_layer_nodes, map_node_layer);
+} // fn: get_prox_view_2 }}}
 
 // fn: get_prox_view {{{
 decltype(auto) get_prox_view(Ops const& ops)
@@ -274,18 +340,16 @@ decltype(auto) get_prox_view(Ops const& ops)
       rg::for_each(vec_node_curr, [&](auto&& _1)
       {
         // Prefer lowest layer (closer to inputs)
-        if ( ! m_node_layer.contains(_1) )
+        if ( ! m_node_layer.contains(_1) ) { m_node_layer[_1] = idx_current_layer; }
+        // Fetch all predecessors/successors, and find out their max_layer + 1
+        else
         {
-          m_node_layer[_1] = idx_current_layer;
-        }
-        else if ( entry.is_input && idx_current_layer > m_node_layer.at(_1) )
-        {
-          m_node_layer[_1] = idx_current_layer;
-        }
-        else if ( ! entry.is_input && idx_current_layer < m_node_layer.at(_1) )
-        {
-          m_node_layer[_1] = idx_current_layer;
-        }
+          if ( (entry.is_input && idx_current_layer > m_node_layer.at(_1))
+              or (! entry.is_input && idx_current_layer < m_node_layer.at(_1)) )
+          {
+            m_node_layer[_1] = idx_current_layer;
+          }
+        } // else
       });
 
       // If has input or output, and is not in visited set, push into queue
@@ -332,13 +396,63 @@ decltype(auto) get_prox_view(Ops const& ops)
   {
     // Skip visited
     if ( set_visited.contains(queue_visit.front().u) ) { queue_visit.pop(); continue; }
-    fmt::print("-- Next on queue: {}\n", queue_visit.front().u);
+    // fmt::print("-- Next on queue: {}\n", queue_visit.front().u);
     // Use node as search tree root
     f_search_by_root(queue_visit.front());
     // Go to next
     queue_visit.pop();
-    fmt::print("-- visited: {}\n", set_visited);
+    // fmt::print("-- visited: {}\n", set_visited);
   } // while
+
+  // Correct neighbors on the same layer
+  // // Queue node and is_successor
+  std::queue<std::pair<Node,bool>> queue_same_layer;
+
+  // Error check for node with neighbors on the same layer
+  // // Push to queue
+  for (auto&& e : m_node_layer)
+  {
+    Node node = e.first;
+    i64 node_layer = e.second;
+    auto succs = ops.succs(node);
+    auto preds = ops.succs(node);
+    fn(succs).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,true}); } });
+    fn(preds).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,false}); } });
+  } // for
+
+  while ( ! queue_same_layer.empty() )
+  {
+    auto [node,is_successor] = queue_same_layer.front();
+    queue_same_layer.pop();
+    if ( is_successor )
+    {
+      ++m_node_layer.at(node);
+      fn(ops.succs(node)).ply([&](auto&& _1)
+      {
+        queue_same_layer.push({_1,true});
+      });
+    }
+    else
+    {
+      --m_node_layer.at(node);
+      fn(ops.preds(node)).ply([&](auto&& _1)
+      {
+        queue_same_layer.push({_1,false});
+      });
+    }
+  } // while
+
+  // Start layer indices from 0
+  auto map_translate_layer = fn(m_node_layer)
+    .as(fun::snd)
+    .sort()
+    .unique()
+    .zip_with_ints(i64{})
+    .map();
+
+  m_node_layer = fn(m_node_layer)
+    .as([&](auto&& _1){ return std::make_pair(_1.first, map_translate_layer.at(_1.second)); })
+    .map();
 
 
   std::map<i64, Nodes> m_layer_nodes;
@@ -354,14 +468,36 @@ decltype(auto) get_prox_view(Ops const& ops)
     } // else
   });
 
+  fmt::print("-- Final layer nodes:\n");
   for (auto [l,nds] : m_layer_nodes)
   {
     fmt::print("l: {} - n: {}\n", l, nds);
   } // for
 
-  // exit(0);
 
-  return m_node_layer;
+  // Error check for node with neighbors on the same layer
+  for (auto&& e : m_node_layer)
+  {
+    Node node = e.first;
+    i64 node_layer = e.second;
+    auto succs = ops.succs(node);
+    auto preds = ops.preds(node);
+    err::err({ fn(succs).all([&](auto _1){ return m_node_layer.at(_1) > node_layer; }) })("Nodes on same layer");
+    err::err({ fn(preds).all([&](auto _1){ return m_node_layer.at(_1) < node_layer; }) })("Nodes on same layer");
+  } // for
+
+  // struct: Result {{{
+  struct Result
+  {
+    std::map<i64,std::vector<i64>> ln;
+    std::map<i64,i64> nl;
+    Result(std::map<i64,std::vector<i64>>& _ln, std::map<i64,i64>& _nl)
+      : ln(std::move(_ln))
+      , nl(std::move(_nl))
+    {}
+  }; // struct }}}
+
+  return Result(m_layer_nodes, m_node_layer);
 } // fn: get_prox_view }}}
 
 // fn: lowest_node_id {{{
@@ -1572,9 +1708,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       {
         Tile const& tn{p[n]};
         // A position before the placed incoming edges is not good
-        if( fn(ops.preds(u)).has(n) && tn.second < t.second ) { return false; }  // if
+        if( fn(ops.preds(u)).has(n) && tn.second <= t.second ) { return false; }  // if
         // A position after the placed outgoing edges is not good
-        else if( fn(ops.succs(u)).has(n) && tn.second > t.second ) { return false; } // else if
+        else if( fn(ops.succs(u)).has(n) && tn.second >= t.second ) { return false; } // else if
       }
       return true;
     }).vec();
@@ -2154,8 +2290,8 @@ decltype(auto) global_backtracking(Ops const& ops
     logger.info()("-- Base: {}\n", base);
   } // for
 
-  // Calculate graph depth-view
-  auto prox_view = f_timer({}, [&] { return get_prox_view(ops); });
+  // Calculate graph prox-view
+  auto prox_view = f_timer({}, [&] { return get_prox_view(ops).nl; });
   logger.info()("-- Built prox view");
   for (auto e : prox_view)
   {
@@ -2561,39 +2697,40 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u, f_h);
 
-  auto f_write_v = [&]<typename... Args>(Args&&... args)
-  {
-    ns_io_verilog::Writer(std::forward<Args>(args)...);
-  };
+  auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
 
-  auto f_write_d = [&]<typename... Args>(Args&&... args)
-  {
-    ns_io_dimacs::Writer(std::forward<Args>(args)...);
-  };
+  auto f_write_d = [&]<typename... Args>(Args&&... args) { ns_io_dimacs::Writer(std::forward<Args>(args)...); };
 
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/0-out.v");
 
   f_timer({}, [&]{ celaeno::graph::operations::balance::outgoing::run(0,ops); });
-
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/1-out.v");
 
-  f_timer({}, [&]{ celaeno::graph::operations::balance::paths::run(0,ops); });
+  // auto view = get_prox_view_2(ops, ns_views::depth::run(i64{}, ops.preds, ops.succs).nl);
+  auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
 
+  f_timer({}, [&]{ celaeno::graph::operations::balance::paths::run(i64{},ops,view); });
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/2-out.v");
 
-  auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(0,ops); });
+  view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+  view = ns_ops::minimize::crossings::run(i64{}, ops.preds, ops.succs, ops.adj, view);
+  
+  auto m_crossing_nodes = f_timer({}, [&]{ return celaeno::graph::operations::balance::crossings::run(ops,view); });
 
-  unbalance(0,ops);
+  // unbalance(0,ops);
 
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/3-out.v");
 
   f_timer({}, f_write_d, g.data(), f_p, f_s, "out/3-out.dimacs");
 
+  exit(0);
+
+
   //
   // Balance cycles
   //
   
-  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_cm150a_unbalanced;
+  std::vector<std::vector<std::vector<Node>>> e_basis = e_basis_b1;
 
   // Read cycle output
   // Decode to original values in graph
@@ -2625,32 +2762,32 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
 
   // Calculate graph prox-view
-  auto view_prox = f_timer({}, [&] { return get_prox_view(ops); });
-  logger.info()("-- Built prox view");
+  // auto view_prox = f_timer({}, [&] { return get_prox_view(ops); });
+  // logger.info()("-- Built prox view");
 
-  logger.info()("-- Cycle supports:");
-  for (auto&& base : basis)
-  {
-    
-    logger.info()("-- -- cycle: {}", base);
-    auto cycle_supports = f_timer({}, [&] { return get_cycle_supports(ops, base, view_prox); });
-    logger.info()("-- -- supports: {}", cycle_supports);
-    // // Get edge weights for supports
-    std::map<Edge, i64> m_edge_weight_supports;
-    for (auto const& edge : get_cycle_supports(ops, base, view_prox))
-    {
-      auto [u,v] = edge;
-      err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
-      i64 weight = view_prox.at(v) - view_prox.at(u);
-      // i64 weight = 1;
-      m_edge_weight_supports[edge]      = weight;
-      m_edge_weight_supports[rev(edge)] = weight;
-      logger.info()("-- -- weight {} : {}", edge, weight);
-    } // for
-  } // for
-  logger.info()("-- Built cycle supports");
+  // logger.info()("-- Cycle supports:");
+  // for (auto&& base : basis)
+  // {
+  //   
+  //   logger.info()("-- -- cycle: {}", base);
+  //   auto cycle_supports = f_timer({}, [&] { return get_cycle_supports(ops, base, view_prox); });
+  //   logger.info()("-- -- supports: {}", cycle_supports);
+  //   // // Get edge weights for supports
+  //   std::map<Edge, i64> m_edge_weight_supports;
+  //   for (auto const& edge : get_cycle_supports(ops, base, view_prox))
+  //   {
+  //     auto [u,v] = edge;
+  //     err::err({ view_prox.at(v) > view_prox.at(u) })("v is not sucessor of u");
+  //     i64 weight = view_prox.at(v) - view_prox.at(u);
+  //     // i64 weight = 1;
+  //     m_edge_weight_supports[edge]      = weight;
+  //     m_edge_weight_supports[rev(edge)] = weight;
+  //     logger.info()("-- -- weight {} : {}", edge, weight);
+  //   } // for
+  // } // for
+  // logger.info()("-- Built cycle supports");
 
-  view_draw(view_prox);
+  // view_draw(view_prox);
 
   // Perform placement
   // std::cerr << "Started computation\n";
@@ -2676,14 +2813,14 @@ int main([[maybe_unused]] int argc, char const* argv[])
     y += std::abs(y_min);
   } // for
 
-  // Expand grid to solve crossings
-  for (auto& [n,p] : placement)
-  {
-    auto& [x,y] = p;
-
-    x *= 2;
-    y *= 2;
-  } // for
+  // // Expand grid to solve crossings
+  // for (auto& [n,p] : placement)
+  // {
+  //   auto& [x,y] = p;
+  //
+  //   x *= 2;
+  //   y *= 2;
+  // } // for
 
   for(auto& [pair,path] : routing)
   {
@@ -2691,8 +2828,8 @@ int main([[maybe_unused]] int argc, char const* argv[])
     {
       tile.first += std::abs(x_min);
       tile.second += std::abs(y_min);
-      tile.first *= 2;
-      tile.second *= 2;
+      // tile.first *= 2;
+      // tile.second *= 2;
     }
   }
 

@@ -58,7 +58,7 @@ template<Range R>
   auto f = [i=1](auto&& acc, auto&& curr) mutable { return acc + curr*i++; };
 
   auto a { std::accumulate(r.begin(), r.end(), 0, f) };
-  auto b { std::reduce(std::execution::par_unseq, r.begin(), r.end(), 0) };
+  auto b { std::reduce(r.begin(), r.end(), 0) };
 
   return (b != 0)? static_cast<double>(a)/b : 0;
 } // function: run }}}
