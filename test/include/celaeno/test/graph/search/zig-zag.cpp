@@ -1307,6 +1307,9 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&&
 {
   Edges out;
 
+  auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
+  auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
+
   auto f_make_cuts = [&](Range auto&& _1, Range auto&& _2) -> Edges
   {
     Edges _1_out;
@@ -1316,7 +1319,10 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&&
     {
       auto it_c2 = std::ranges::find_if(_2, [&](auto&& __1){ return view.at(__1) > view.at(*it_c1); });
       if ( it_c2 == std::ranges::end(_2) ) { break; } // if
-      _1_out.push_back(Edge{*it_c1, *it_c2});
+      if ( f_degree_out(*it_c1) < 2 && f_degree_in(*it_c2) < 2 )
+      {
+        _1_out.push_back(Edge{*it_c1, *it_c2});
+      }
     } // for
 
     return _1_out;
@@ -1342,10 +1348,6 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&&
     fmt::print("cycle: {}\n", cycle);
     fmt::print("c1: {}\n", c1);
     fmt::print("c2: {}\n", c2);
-
-    // Insert additional edges
-    // auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
-    // auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
 
     // Check which yields most cuts (c1 → c2 or c2 → c1)
     Edges cuts_c1 = f_make_cuts(c1,c2);
@@ -2581,7 +2583,8 @@ decltype(auto) pre_processing(Ops const& ops)
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, [&]{ ns_ops::balance::paths::run(i64{},ops,view); });
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  auto map_crossings_nodes = f_timer({}, [&]{ return ns_ops::balance::crossings::run(i64{}, ops); });
+  // view = f_timer({}, [&]{ return ns_ops::minimize::crossings::run(i64{},ops.preds, ops.succs, ops.adj, view); });
+  auto map_crossings_nodes = f_timer({}, [&]{ return ns_ops::balance::crossings::run(i64{}, ops, view); });
   unbalance(0, ops);
   return map_crossings_nodes;
 } // function: pre_processing }}}
@@ -2657,6 +2660,23 @@ int main([[maybe_unused]] int argc, char const* argv[])
   Basis basis = decode_node_ids(ops, e_basis, logger.sink());
   auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
 
+  // logger.info()("-- Cycle supports:");
+  // for (auto&& base : basis)
+  // {
+  //
+  //   logger.info()("-- -- cycle: {}", base);
+  //   auto cycle_supports = f_timer({}, [&] { return get_cycle_supports(ops, base, view.nl); });
+  //   logger.info()("-- -- supports: {}", cycle_supports);
+  //   for (auto const& edge : cycle_supports)
+  //   {
+  //     auto [u,v] = edge;
+  //     err::err({ view.nl.at(v) > view.nl.at(u) })("v is not sucessor of u");
+  //     ops.link(u,v);
+  //   } // for
+  // } // for
+  // // logger.info()("-- Built cycle supports");
+  // f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/2-out.v");
+
   //
   // Perform placement
   //
@@ -2666,6 +2686,21 @@ int main([[maybe_unused]] int argc, char const* argv[])
   std::chrono::duration<f64> dur {end-start};
   std::stringstream ss; ss << dur.count();
 
+  // Print area
+  std::pair<int,int> pair_min = placement.begin()->second;
+  std::pair<int,int> pair_max = placement.begin()->second;
+  fn(placement).ply([&](auto const& e)
+  {
+    auto const& tile = e.second;
+    if ( tile.first < pair_min.first ) { pair_min.first = tile.first; }
+    if ( tile.second < pair_min.second ) { pair_min.second = tile.second; }
+    if ( tile.first > pair_max.first ) { pair_max.first = tile.first; }
+    if ( tile.second > pair_max.second ) { pair_max.second = tile.second; }
+  });
+  fmt::print("Area: {}x{}\n"
+    , std::abs(pair_max.first - pair_min.first)
+    , std::abs(pair_max.second - pair_min.second)
+  );
   fmt::print("Circuit: {}\n", argv[1]);
   fmt::print("Time(s): {}\n", ss.str());
 

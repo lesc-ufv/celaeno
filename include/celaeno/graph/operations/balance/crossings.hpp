@@ -276,14 +276,14 @@ std::map<T,Cross<T>> run(R&& l1, R&& l2, Ops const& ops)
 } // function: run }}}
 
 // fn: run {{{
-template<SignedIntegral T = i64>
-std::map<i64,Cross<i64>> run(T root, Ops const& ops)
+template<SignedIntegral T = i64, typename V>
+std::map<i64,Cross<i64>> run(T root, Ops const& ops, V&& view)
 {
   // Crossings
   std::map<i64, Cross<i64>> out;
 
   // Create a depth view
-  auto [ln,nl]{ns_views::depth::run(root,ops.preds,ops.succs)};
+  auto [ln,nl] = view;
 
   // Create overlapping layer indices
   auto layers{fp::overlapping_pairs(fp::numbers({},ln.size()))};
