@@ -86,19 +86,25 @@
 #include <boost/geometry/geometries/geometries.hpp>
 #include <boost/geometry/geometries/segment.hpp>
 
+#include <boost/preprocessor/repetition.hpp>
+#include <boost/preprocessor/punctuation/comma_if.hpp>
+#include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/variadic/size.hpp>
 
-#define L01(cap,ret,expr) [cap]                                        ret { expr; }
-#define L02(cap,ret,expr) [cap]                                        ret { expr; }
-#define L03(cap,ret,expr) [cap]                                        ret { expr; }
-#define L11(cap,ret,expr) [cap](auto&& _1)                             ret { expr; }
-#define L12(cap,ret,expr) [cap](auto&& __1)                            ret { expr; }
-#define L13(cap,ret,expr) [cap](auto&& ___1)                           ret { expr; }
-#define L21(cap,ret,expr) [cap](auto&& _1, auto&& _2)                  ret { expr; }
-#define L22(cap,ret,expr) [cap](auto&& __1, auto&& __2)                ret { expr; }
-#define L23(cap,ret,expr) [cap](auto&& ___1, auto&& ___2)              ret { expr; }
-#define L31(cap,ret,expr) [cap](auto&& _1, auto&& _2, auto&& _3)       ret { expr; }
-#define L32(cap,ret,expr) [cap](auto&& __1, auto&& __2, auto&& __3)    ret { expr; }
-#define L33(cap,ret,expr) [cap](auto&& ___1, auto&& ___2, auto&& ___3) ret { expr; }
+#define AUTO_FORWARD_DECL(z, n, prefix) BOOST_PP_COMMA_IF(n) [[maybe_unused]] auto&& BOOST_PP_CAT(prefix, BOOST_PP_INC(n))
+
+#define LAMB_1(body) [&]([[maybe_unused]] auto&& _1) { body; }
+#define LAMB_2(body, n) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, _)) { body; }
+#define LAMB_3(body, n, prefix) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, prefix)) { body; }
+
+#define GET_MACRO(_1,_2,_3,NAME,...) NAME
+#define L(...) GET_MACRO(__VA_ARGS__, LAMB_3, LAMB_2, LAMB_1)(__VA_ARGS__)
+
+#define LAMBR_1(body) [&]([[maybe_unused]] auto&& _1) -> decltype(auto) { return body; }
+#define LAMBR_2(body, n) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, _)) -> decltype(auto) { return body; }
+#define LAMBR_3(body, n, prefix) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, prefix)) -> decltype(auto) { return body; }
+
+#define LR(...) GET_MACRO(__VA_ARGS__, LAMBR_3, LAMBR_2, LAMBR_1)(__VA_ARGS__)
 
 // Using namespace {{{
 using namespace celaeno::fun::fn;
@@ -195,10 +201,10 @@ decltype(auto) view_draw(Map auto&& map_layer_vertices, Map auto&& map_edge, std
 {
   // , Map auto&& map_vertex_tile, Range auto&& range_edge_path)
   // Get max layer id
-  constexpr u64 const size_spacing = 4;
+  // constexpr u64 const size_spacing = 4;
 
   // Find out the size of the largest layer
-  u64 const size_max_layer = fn(map_layer_vertices).as(L11(,,return _1.second.size())).max();
+  u64 const size_max_layer = fn(map_layer_vertices).as(LR(_1.second.size())).max();
   fmt::print("Max layer size: {}\n", size_max_layer);
 
   // Shift layers left by (size_max_layer-size_cur_layer)/2
@@ -293,7 +299,7 @@ decltype(auto) result_draw(Placement _placement
     logger.info()("-- e: {}", e);
   } // for
   logger.info()("-- Start draw");
-  ns_draw::svg::svg(file_name_out , _placement , _paths , L11(,,return _1));
+  ns_draw::svg::svg(file_name_out , _placement , _paths , LR(_1));
   logger.info()("-- End draw");
   logger.info()("-- Placed edges:");
   std::ranges::for_each(_node_map, [&](auto e){ logger.info()("e: {}", e); });
@@ -342,7 +348,7 @@ i64 lowest_node_id(Ops const& ops)
   i64 idx{};
 
   // Define function to compare values lt 0
-  auto f_lowest = [&idx](auto&& e) { if(e < idx){ idx=e; } return false; };
+  auto f_lowest = LR((idx=(_1 < idx)? _1 : idx, false));
 
   // Get the dummy vertex with the lowest value
   ns_search::bfs::run(0,ops.preds,ops.succs,f_lowest);
@@ -358,7 +364,7 @@ decltype(auto) is_tile_inside_cycle(Tile t, Tiles const& tiles)
   using polygon_type = boost::geometry::model::polygon<point_type>;
   /// Create and correct polygon
   polygon_type poly;
-  std::ranges::for_each(tiles,[&](auto&& _1){ boost::geometry::append(poly, point_type(_1.first, _1.second)); });
+  std::ranges::for_each(tiles,L( boost::geometry::append(poly, point_type(_1.first, _1.second)) ));
   boost::geometry::correct(poly);
   // Calculate if t is inside tiles
   point_type p(t.first, t.second);
@@ -472,10 +478,10 @@ decltype(auto) cycle_split_in_endpoints(Ops const& ops, Range auto&& cycle)
   std::pair<Nodes,Nodes> out;
 
   // Predecessors within the cycle
-  auto f_preds_in_cycle = [&](auto&& e){ return fn(ops.preds(e)).in(cycle).vec(); };
+  auto f_preds_in_cycle = LR( fn(ops.preds(_1)).in(cycle).vec() );
 
   // Successors within the cycle
-  auto f_succs_in_cycle = [&](auto&& e){ return fn(ops.succs(e)).in(cycle).vec(); };
+  auto f_succs_in_cycle = LR( fn(ops.succs(_1)).in(cycle).vec(); );
 
   // Vector that contains both halves
   Nodes whole;
@@ -491,19 +497,19 @@ decltype(auto) cycle_split_in_endpoints(Ops const& ops, Range auto&& cycle)
   whole.push_back(*it_endpoint1);
 
   // Use a bfs to construct the rest of the cycle
-  ns_search::bfs::run(*it_endpoint1, f_preds_in_cycle, [](auto&&) { return Nodes{}; },
-  [&](auto e)
+  ns_search::bfs::run(*it_endpoint1, f_preds_in_cycle, LR(Nodes{}),
+  [&](auto _1)
   {
-    if ( auto succs = f_succs_in_cycle(e); ! succs.empty() )
+    if ( auto succs = f_succs_in_cycle(_1); ! succs.empty() )
     {
-      if ( fn(succs).has(whole.front()) ) { whole.insert(whole.begin(), e); }
-      else { whole.push_back(e); }
+      if ( fn(succs).has(whole.front()) ) { whole.insert(whole.begin(), _1); }
+      else { whole.push_back(_1); }
     }
     return false;
   });
 
   // Find node with 2 succs in cycle (endpoint 2)
-  auto it_endpoint2 = std::ranges::find_if(cycle, [&](auto e){ return f_succs_in_cycle(e).size() == 2; });
+  auto it_endpoint2 = std::ranges::find_if(cycle, LR( f_succs_in_cycle(_1).size() == 2 ));
   err::err({it_endpoint2 != std::ranges::end(cycle)})("Could not find cycle endpoint");
 
   // Repeat the endpoint in both ends of the solution
@@ -511,7 +517,7 @@ decltype(auto) cycle_split_in_endpoints(Ops const& ops, Range auto&& cycle)
   else { whole.insert(whole.begin(), *it_endpoint2); }
 
   // Find the current position of endpoint_1 in whole
-  auto it_endpoint1_whole = std::ranges::find_if(whole, [&](auto e){ return e == *it_endpoint1; });
+  auto it_endpoint1_whole = std::ranges::find_if(whole, LR( _1 == *it_endpoint1; ));
   err::err({it_endpoint1_whole != std::ranges::end(whole)})("Could not find cycle endpoint");
 
   // Split the cycle in two
@@ -570,17 +576,6 @@ decltype(auto) cycle_find_nodes_in_between(Ops const& ops, Node u, Node v, Range
   //   .unique()
   //   .vec();
 } // function: cycle_find_nodes_in_between }}}
-
-// fn: merge_cycles_in_outer_cycle {{{
-//
-// Given two cycles and an intersection, merge the cycles in a new outer cycles without the
-// intersection
-//
-decltype(auto) merge_cycles(Placement const& p, Range auto&& c1, Range auto&& c2, Range auto&& cint)
-{
-  // Fetch nodes in-between cint.front() and cint.back()
-
-} // function: merge_cycles }}}
 
 // fn: make_line_equation {{{
 //
@@ -754,13 +749,13 @@ bool cycles_intersect(Map auto&& placement, Nodes c1, Nodes c2)
   c1.push_back(c1.front());
   c2.push_back(c2.front());
 
-  auto segments_c1 = fn(c1).as(L11(&,,return placement.at(_1))).slide(2).vec();
-  auto segments_c2 = fn(c2).as(L11(&,,return placement.at(_1))).slide(2).vec();
+  auto segments_c1 = fn(c1).as(LR(placement.at(_1))).slide(2).vec();
+  auto segments_c2 = fn(c2).as(LR(placement.at(_1))).slide(2).vec();
 
-  auto f_lines_intersect = L21(&,,return lines_intersect(_1.at(0), _1.at(1), _2.at(0), _2.at(1)));
+  auto f_lines_intersect = LR(lines_intersect(_1.at(0), _1.at(1), _2.at(0), _2.at(1)),2);
   for (auto&& segment_c1 : segments_c1)
   {
-    if ( fn(segments_c2).any([&](auto&& _1){ return f_lines_intersect(segment_c1, _1); }) )
+    if ( fn(segments_c2).any(LR( f_lines_intersect(segment_c1, _1) )) )
     {
       return true;
     }
@@ -1817,9 +1812,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         // Calculate chebyshev-based A* path
         auto d_astar{ns_search::a_star::run(t
           , p.at(v)
-          , [&](Tile _1) -> Tiles { return f_keep_outside_cycle(f_get_candidates(_1,1)); }
-          , [&](Tile _1) -> bool { return ! f_is_free(_1); }
-          , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
+          , LR(f_keep_outside_cycle(f_get_candidates(_1,1)))
+          , LR(! f_is_free(_1);)
+          , LR(ns_heuristics::chebyshev::run(_1,_2), 2)
           // , [&](auto&& _1){ return _1.size() == static_cast<size_t>(d_chebyshev+1); }
         )};
         // Check if path exists, and it is eq to chebyshev
@@ -1833,17 +1828,6 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
   // Get lowest node id
   static i64 lowest{lowest_node_id(ops)};
-
-  // Log
-  {
-    [[maybe_unused]] auto fold{logger.fold()};
-
-    logger.info()("Placement:");
-    for (auto e : p)
-    {
-      logger.info()("{}", e);
-    } // for
-  }
 
   // Get unique elements without changing the order
   auto path{fp::nub(cycle)};
@@ -1867,7 +1851,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   std::stack<Node> placed, unplaced;
 
   // Push all nodes to the stack
-  fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
+  fn(slice).ply(L(if( ! p.contains(_1) ){ unplaced.push(_1); })).discard();
 
   // Check if cycle was already placed
   if(unplaced.empty()) { co_yield PlaceCycleRet(p,paths,multimap_node_successor,{},false); } // if
@@ -1880,7 +1864,10 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     [[maybe_unused]] auto fold{logger.fold()};
 
     // Get current node
-    auto u{unplaced.top()}; unplaced.pop();
+    auto u = unplaced.top();
+
+    // Pop from stack
+    unplaced.pop();
 
     // Log
     logger.info()("current node unplaced: {}", u);
@@ -1889,10 +1876,10 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     if( p.contains(u) ){ continue; }
 
     // Get all neighbors
-    auto f_neighbors = [&](Node v){ return fn(ops.preds(v)).chain(ops.succs(v)).vec(); };
+    auto f_neighbors = LR( fn(ops.preds(_1)).chain(ops.succs(_1)).vec(); );
 
     // Filter nodes that are not positioned
-    Nodes neighbors_positioned{fn(f_neighbors(u)).in(p).vec()};
+    Nodes neighbors_positioned = fn(f_neighbors(u)).in(p).vec();
 
     // Log
     logger.info()("Neighbors of {} which are positioned: {}", u, neighbors_positioned);
@@ -1994,9 +1981,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       // Calculate chebyshev-based A* path
       auto d_astar{ns_search::a_star::run(chosen
           , p.at(v)
-          , [&](Tile _1) -> Tiles { return f_keep_outside_cycle(f_get_candidates(_1,1)); }
-          , [&](Tile _1) -> bool { return ! f_is_free(_1); }
-          , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
+          , LR(f_keep_outside_cycle(f_get_candidates(_1,1)))
+          , LR(! f_is_free(_1);)
+          , LR(ns_heuristics::chebyshev::run(_1,_2), 2)
           // , [&](auto&& _1){ return _1.size() == static_cast<size_t>(d_chebyshev+1); }
           )};
 
@@ -2579,12 +2566,12 @@ decltype(auto) global_backtracking(Ops const& ops
 decltype(auto) pre_processing(Ops const& ops)
 {
   auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  f_timer({}, [&]{ ns_ops::balance::outgoing::run(0,ops); });
+  f_timer({}, L(ns_ops::balance::outgoing::run(0,ops),0));
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  f_timer({}, [&]{ ns_ops::balance::paths::run(i64{},ops,view); });
+  f_timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   // view = f_timer({}, [&]{ return ns_ops::minimize::crossings::run(i64{},ops.preds, ops.succs, ops.adj, view); });
-  auto map_crossings_nodes = f_timer({}, [&]{ return ns_ops::balance::crossings::run(i64{}, ops, view); });
+  auto map_crossings_nodes = f_timer({}, LR(ns_ops::balance::crossings::run(i64{}, ops, view),0));
   unbalance(0, ops);
   return map_crossings_nodes;
 } // function: pre_processing }}}
