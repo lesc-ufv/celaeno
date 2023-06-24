@@ -113,9 +113,19 @@ std::deque<T> rebuild_path(T start, T end, Map const& m)
 } // fn: rebuild_path }}}
 
 // fn: run {{{
-template<typename T, typename F1, typename F2, typename F3>
+template<typename T
+  , typename F1
+  , typename F2
+  , typename F3
+  , typename F4 = std::function<bool(std::deque<T>)>
+  >
 std::optional<std::deque<T>>
-  run(T start, T end, F1&& f_neighbors, F2&& f_constraints, F3&& f_heuristic)
+  run(T start
+    , T end
+    , F1&& f_neighbors
+    , F2&& f_constraints
+    , F3&& f_heuristic
+    , F4&& f_is_path_valid = [](auto&&){ return true; })
 {
   // Open set in ascending order
   std::multimap<f64,T> open;
@@ -153,8 +163,19 @@ std::optional<std::deque<T>>
 
     // fmt::print("Combined cost of {}: {}\n", c, cost);
 
-    // If it is the goal, rebuild the path and return
-    if ( c == end ){ return rebuild_path(start,end,mem); }
+    // If it is the goal, rebuild the path
+    if ( c == end )
+    {
+      auto deque_path = rebuild_path(start,end,mem);
+      if ( f_is_path_valid(deque_path) )
+      {
+        return deque_path;
+      } // if
+      else
+      {
+        continue;
+      } // else
+    } // if
 
     // Insert the vertex into the closed set
     closed.insert(c);

@@ -264,14 +264,14 @@ decltype(auto) result_draw(Placement _placement
     y += std::abs(y_min);
   } // for
 
-  // Expand grid to solve crossings
-  for (auto& [n,p] : _placement)
-  {
-    auto& [x,y] = p;
-
-    x *= 2;
-    y *= 2;
-  } // for
+  // // Expand grid to solve crossings
+  // for (auto& [n,p] : _placement)
+  // {
+  //   auto& [x,y] = p;
+  //
+  //   x *= 2;
+  //   y *= 2;
+  // } // for
 
   for(auto& [pair,path] : _paths)
   {
@@ -279,8 +279,8 @@ decltype(auto) result_draw(Placement _placement
     {
       tile.first += std::abs(x_min);
       tile.second += std::abs(y_min);
-      tile.first *= 2;
-      tile.second *= 2;
+      // tile.first *= 2;
+      // tile.second *= 2;
     }
   }
 
@@ -557,7 +557,7 @@ decltype(auto) cycle_find_nodes_in_between(Ops const& ops, Node u, Node v, Range
   //       }).vec();
   //     };
   //
-  //     if ( auto opt_nodes = path_from_multimap(mmap_node, u, v, remove_by) )
+  //     if ( auto opt_nodes = path_from_multimap(multimap_node_successor, u, v, remove_by) )
   //     {
   //       logger.info()("Nodes between uv: {}\n", *opt_nodes);
   //       if ( is_reversed ) { std::ranges::reverse(*opt_nodes); }
@@ -1521,13 +1521,13 @@ struct PlaceCycleRet
   bool m_failed;
   PlaceCycleRet(Placement const& placement
     , Paths const& paths
-    , std::multimap<Node,Node> const& mmap_node
+    , std::multimap<Node,Node> const& multimap_node_successor
     , std::set<Node> const& unreachable
     , bool failed
     )
     : m_placement(placement)
     , m_paths(paths)
-    , m_mmap_node(mmap_node)
+    , m_mmap_node(multimap_node_successor)
     , m_unreachable(unreachable)
     , m_failed(failed)
   {}
@@ -1536,7 +1536,7 @@ struct PlaceCycleRet
 cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   , Placement p
   , Paths paths
-  , std::multimap<Node,Node> mmap_node
+  , std::multimap<Node,Node> multimap_node_successor
   , Range auto cycle
   , Range auto inter
   , Range auto cycle_outer
@@ -1582,10 +1582,10 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       logger.info()("Dummies to erase: {}", fn(map_dummy).key().vec());
       // Remove from placed map
       for (auto&& [node_dummy,tile] : map_dummy) { p.erase(node_dummy); } // for
-      // Remove from mmap_node map
+      // Remove from multimap_node_successor map
       bool is_path_u_to_v{fn(ops.succs(u)).has(node_target)};
       logger.info()("Path is {} to {}? {}", u, node_target, is_path_u_to_v);
-      f_edge_erase_dummy(mmap_node
+      f_edge_erase_dummy(multimap_node_successor
         , (is_path_u_to_v)? u : node_target
         , (is_path_u_to_v)? node_target : u
         , fn(map_dummy).key().vec());
@@ -1815,9 +1815,10 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         // Calculate chebyshev-based A* path
         auto d_astar{ns_search::a_star::run(t
           , p.at(v)
-          , [&](Tile dest) -> Tiles { return f_keep_outside_cycle(f_get_candidates(dest,1)); }
-          , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
+          , [&](Tile _1) -> Tiles { return f_keep_outside_cycle(f_get_candidates(_1,1)); }
+          , [&](Tile _1) -> bool { return ! f_is_free(_1); }
           , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
+          // , [&](auto&& _1){ return _1.size() == static_cast<size_t>(d_chebyshev+1); }
         )};
         // Check if path exists, and it is eq to chebyshev
         if( ! d_astar || static_cast<size_t>(d_chebyshev+1) != d_astar->size() ) { return false; } // if
@@ -1867,7 +1868,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
   fn(slice).ply([&](Node v){ if( ! p.contains(v) ){ unplaced.push(v); }  }).discard();
 
   // Check if cycle was already placed
-  if(unplaced.empty()){ co_yield PlaceCycleRet(p,paths,mmap_node,{},false); }
+  if(unplaced.empty()) { co_yield PlaceCycleRet(p,paths,multimap_node_successor,{},false); } // if
 
   // Wire tiles
   std::unordered_map<Node,std::unordered_map<Node,std::unordered_map<Node,Tile>>> wires_of;
@@ -1964,7 +1965,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
           .set();
         logger.info()("unreachable neighbors of {}: {}", u, unreachable);
 
-        co_yield PlaceCycleRet({},{},mmap_node,unreachable,true);
+        co_yield PlaceCycleRet({},{},multimap_node_successor,unreachable,true);
         break;
       } // if
       // Remove previous node from placed stack
@@ -1983,16 +1984,18 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
 
     // Block paths between u and candidate
     bool has_routes{true};
-    for (auto v : fn(neighbors_positioned).in(cycle).vec())
+    // for (auto v : fn(neighbors_positioned).in(cycle).vec())
+    for (auto v : neighbors_positioned)
     {
       // Calculate chebyshev distance
       auto d_chebyshev{f_dist_chebyshev(chosen,p.at(v))};
       // Calculate chebyshev-based A* path
       auto d_astar{ns_search::a_star::run(chosen
           , p.at(v)
-          , [&](Tile dest) -> Tiles { return f_keep_outside_cycle(f_get_candidates(dest,1)); }
-          , [&](Tile dest) -> bool { return fn(p).val().has(dest); }
+          , [&](Tile _1) -> Tiles { return f_keep_outside_cycle(f_get_candidates(_1,1)); }
+          , [&](Tile _1) -> bool { return ! f_is_free(_1); }
           , [](Tile t1, Tile t2){ return ns_heuristics::chebyshev::run(t1,t2); }
+          // , [&](auto&& _1){ return _1.size() == static_cast<size_t>(d_chebyshev+1); }
           )};
 
       // Check if path exists, and it is eq to chebyshev
@@ -2026,8 +2029,8 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
           wires_of[u][v][--lowest] = tile;
           p[lowest] = tile;
         } // for
-        // Update mmap_node from u to v
-        f_edge_update_dummy(mmap_node, u, v, fn(wires_of[u][v]).key().vec());
+        // Update multimap_node_successor from u to v
+        f_edge_update_dummy(multimap_node_successor, u, v, fn(wires_of[u][v]).key().vec());
       }
       else
       {
@@ -2038,8 +2041,8 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
           wires_of[u][v][--lowest] = tile;
           p[lowest] = tile;
         } // for
-        // Update mmap_node from v to u
-        f_edge_update_dummy(mmap_node, v, u, fn(wires_of[u][v]).key().vec());
+        // Update multimap_node_successor from v to u
+        f_edge_update_dummy(multimap_node_successor, v, u, fn(wires_of[u][v]).key().vec());
       } // else
     } // for
 
@@ -2059,7 +2062,7 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     {
       if ( has_routes )
       {
-        co_yield PlaceCycleRet(p,paths,mmap_node,{},false);
+        co_yield PlaceCycleRet(p,paths,multimap_node_successor,{},false);
       }
 
       // Remove previous node from placed stack
@@ -2191,6 +2194,56 @@ std::optional<cppcoro::generator<PlaceCycleRet>::iterator> backtrack_until_unrea
   return std::nullopt;
 } // function: backtrack_until_unreachable_position_changes }}}
 
+// fn: insert_dummy_in_between {{{
+//
+// Given a cycle, and a dummy map, insert missing dummies between cycle nodes
+//
+decltype(auto) insert_dummy_in_between(Ops const& _1_ops, auto&& _1_mmap_node, auto&& _1_cycle, Sink sink)
+{
+  err::Logger _1_logger{sink};
+
+  return fn(_1_cycle)
+    .mut([](auto e){ e.push_back(e.front()); return e; })
+    .slide(2)
+    .as([&](auto e)
+    {
+      Nodes out;
+      i64 u = e.at(0);
+      i64 v = e.at(1);
+
+      // u must be sucessor of v
+      bool is_reversed{false};
+      if ( ! fn(_1_ops.succs(u)).has(v) ) { is_reversed = true; v = std::exchange(u,v); }
+      _1_logger.info()("u,v: {},{}\n", u, v);
+      
+      // If endpoint is not v and is not introduced by A*, remove
+      auto remove_by = [&](Edges& _1)
+      {
+        _1 = fn(_1).keep([&](Edge const& __1)
+        {
+          // Check if is goal 'v'
+          if ( __1.second == v )       { return true; }
+          // Check if is introduced by A*
+          if ( ! _1_ops.has(__1.second) ) { return true; }
+          // Discard
+          return false;
+        }).vec();
+      };
+
+      if ( auto opt_nodes = path_from_multimap(_1_mmap_node, u, v, remove_by) )
+      {
+        _1_logger.info()("Nodes between uv: {}\n", *opt_nodes);
+        if ( is_reversed ) { std::ranges::reverse(*opt_nodes); }
+        return *opt_nodes;
+      }
+
+      return (is_reversed)? Nodes{v,u} : Nodes{u,v};
+    })
+    .squash()
+    .unique()
+    .vec();
+}; // fn: insert_dummy_in_between }}}
+
 // fn: global_backtracking {{{
 template<typename C>
 decltype(auto) global_backtracking(Ops const& ops
@@ -2283,7 +2336,7 @@ decltype(auto) global_backtracking(Ops const& ops
 
   // Currently placed node relationship
   // Nodes on this map are always point to their successors
-  NodeMMap mmap_node;
+  NodeMMap multimap_node_successor;
 
   // Stack generators and pair cycle/intersection
   struct StackBacktrack
@@ -2300,12 +2353,12 @@ decltype(auto) global_backtracking(Ops const& ops
   if(auto [u,v] = std::make_pair(intersection_initial.at(0),intersection_initial.at(1)); fn(ops.succs(u)).has(v) )
   {
     paths[{u,v}] = std::deque<Tile>({placement.at(u), placement.at(v)});
-    mmap_node.emplace(u,v);
+    multimap_node_successor.emplace(u,v);
   } // if
   else
   {
     paths[{v,u}] = std::deque<Tile>({placement.at(v), placement.at(u)});
-    mmap_node.emplace(v,u);
+    multimap_node_successor.emplace(v,u);
   } // if
 
   bool b_backtrack{false};
@@ -2344,7 +2397,7 @@ decltype(auto) global_backtracking(Ops const& ops
         return place_cycle(ops
             , placement
             , paths
-            , mmap_node
+            , multimap_node_successor
             , cycle
             , intersection
             , (st_generator.empty())? cycle : st_generator.top().cycle_outer
@@ -2390,7 +2443,7 @@ decltype(auto) global_backtracking(Ops const& ops
             {
               placement = opt_it.value()->m_placement;
               paths     = opt_it.value()->m_paths;
-              mmap_node = opt_it.value()->m_mmap_node;
+              multimap_node_successor = opt_it.value()->m_mmap_node;
               it_gen = *opt_it;
               break;
             } // if
@@ -2437,54 +2490,19 @@ decltype(auto) global_backtracking(Ops const& ops
       {
         placement = it_gen.value()->m_placement;
         paths     = it_gen.value()->m_paths;
-        mmap_node = it_gen.value()->m_mmap_node;
+        multimap_node_successor = it_gen.value()->m_mmap_node;
 
         // Check for half separation
         // Test resulting cycle, to see if it hasn't twisted within itself
         // // Re-create cycle with dummy nodes
-        Nodes cycle_with_dummy = fn(cycle)
-          .mut([](auto e){ e.push_back(e.front()); return e; })
-          .slide(2)
-          .as([&](auto e)
-          {
-            Nodes out;
-            i64 u = e.at(0);
-            i64 v = e.at(1);
 
-            // u must be sucessor of v
-            bool is_reversed{false};
-            if ( ! fn(ops.succs(u)).has(v) ) { is_reversed = true; v = std::exchange(u,v); }
-            logger.info()("u,v: {},{}\n", u, v);
-            
-            // If endpoint is not v and is not introduced by A*, remove
-            auto remove_by = [&](Edges& _1)
-            {
-              _1 = fn(_1).keep([&](Edge const& __1)
-              {
-                // Check if is goal 'v'
-                if ( __1.second == v )       { return true; }
-                // Check if is introduced by A*
-                if ( ! ops.has(__1.second) ) { return true; }
-                // Discard
-                return false;
-              }).vec();
-            };
+        auto f_insert_dummy_in_between = [&](auto&& _1){ return  insert_dummy_in_between(ops, multimap_node_successor, _1, logger.sink()); };
 
-            if ( auto opt_nodes = path_from_multimap(mmap_node, u, v, remove_by) )
-            {
-              logger.info()("Nodes between uv: {}\n", *opt_nodes);
-              if ( is_reversed ) { std::ranges::reverse(*opt_nodes); }
-              return *opt_nodes;
-            }
+        Nodes cycle_with_dummy = f_insert_dummy_in_between(cycle);
 
-            return (is_reversed)? Nodes{v,u} : Nodes{u,v};
-          })
-          .squash()
-          .unique()
-          .vec();
         logger.info()("Dummy Cycle: {}\n", cycle_with_dummy);
 
-        bool has_inner_crossings = cycle_has_inner_crossings(cycle_with_dummy, placement, sink);
+        bool has_inner_crossings = cycle_has_inner_crossings_2(cycle_with_dummy, placement, sink);
 
         // Check for inner_crossings
         if ( has_inner_crossings )
@@ -2496,11 +2514,22 @@ decltype(auto) global_backtracking(Ops const& ops
         {
           // Check if backtracking on the first cycle
           // Check if there is a node of outer_cycle inside cycle
-          if ( st_generator.empty() or ! cycles_intersect(placement, cycle, st_generator.top().cycle_outer) )
+          Nodes cycle_outer_with_dummy;
+          if ( ! st_generator.empty() )
+          {
+            cycle_outer_with_dummy = f_insert_dummy_in_between(st_generator.top().cycle_outer);
+            fmt::print("outer with dummies: {}\n", cycle_outer_with_dummy);
+          }
+          else
+          {
+            cycle_outer_with_dummy = cycle;
+          } // else
+
+          if ( st_generator.empty() or ! cycles_intersect(placement, cycle_with_dummy, cycle_outer_with_dummy) )
           {
             // Pass
 #ifdef DEBUG
-            result_draw(Placement{placement}, Paths{paths}, std::multimap<Node,Node>{mmap_node}, i, "", logger.sink());
+            result_draw(Placement{placement}, Paths{paths}, std::multimap<Node,Node>{multimap_node_successor}, i, "", logger.sink());
 #endif
             break;
           } // if
