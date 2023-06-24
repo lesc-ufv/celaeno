@@ -1628,9 +1628,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       {
         Tile const& tn{p[n]};
         // A position before the placed incoming edges is not good
-        if( fn(ops.preds(u)).has(n) && tn.second < t.second ) { return false; }  // if
+        if( fn(ops.preds(u)).has(n) && tn.second <= t.second ) { return false; }  // if
         // A position after the placed outgoing edges is not good
-        else if( fn(ops.succs(u)).has(n) && tn.second > t.second ) { return false; } // else if
+        else if( fn(ops.succs(u)).has(n) && tn.second >= t.second ) { return false; } // else if
       }
       return true;
     }).vec();
