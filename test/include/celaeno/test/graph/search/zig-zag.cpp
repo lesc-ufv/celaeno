@@ -83,6 +83,9 @@
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
+#include <boost/geometry/geometries/geometries.hpp>
+#include <boost/geometry/geometries/segment.hpp>
+
 
 #define L01(cap,ret,expr) [cap]                                        ret { expr; }
 #define L02(cap,ret,expr) [cap]                                        ret { expr; }
@@ -239,12 +242,65 @@ decltype(auto) view_draw(Map auto&& map_layer_vertices, Map auto&& map_edge, std
 
 } // function: view_draw }}}
 
+// fn: result_draw {{{
+decltype(auto) result_draw(Placement _placement, Paths _paths, std::multimap<Node,Node> _node_map, i64 i, Sink sink)
+{
+  err::Logger logger{sink};
+
+  // Offset coordinates to remove negative values
+  auto x_min{rg::min_element(_placement,{},[](auto e){ return e.second.first; })->second.first};
+  auto y_min{rg::min_element(_placement,{},[](auto e){ return e.second.second; })->second.second};
+
+  for (auto& [n,p] : _placement)
+  {
+    auto& [x,y] = p;
+
+    x += std::abs(x_min);
+    y += std::abs(y_min);
+  } // for
+
+  // Expand grid to solve crossings
+  for (auto& [n,p] : _placement)
+  {
+    auto& [x,y] = p;
+
+    x *= 2;
+    y *= 2;
+  } // for
+
+  for(auto& [pair,path] : _paths)
+  {
+    for(Tile& tile : path)
+    {
+      tile.first += std::abs(x_min);
+      tile.second += std::abs(y_min);
+      tile.first *= 2;
+      tile.second *= 2;
+    }
+  }
+
+  // Draw
+  logger.info()("-- Figure {}", i);
+  logger.info()("-- placement: ");
+  for (auto&& e : _placement)
+  {
+    logger.info()("-- e: {}", e);
+  } // for
+  logger.info()("-- Start draw");
+  ns_draw::svg::svg(fmt::format("out/step-{}.svg", i)
+    , _placement
+    , _paths
+    , [](auto e){ return e; });
+  logger.info()("-- End draw");
+  logger.info()("-- Placed edges:");
+  std::ranges::for_each(_node_map, [&](auto e){ logger.info()("e: {}", e); });
+} // function: result_draw }}}
+
 // fn: get_cycle_basis {{{
 decltype(auto) get_cycle_basis(std::string str_file_dimacs)
 {
-  std::string str_home = std::getenv("HOME");
-  auto str_bin_dimacs = str_home + "/Repositories/celaeno/parmcb/build/mcb-dimacs-mpi";
-  auto str_file_out = str_home + "/Repositories/celaeno/out/cycles.txt";
+  auto str_bin_dimacs = "./parmcb/build/mcb-dimacs-mpi";
+  auto str_file_out = "./out/cycles.txt";
   auto cmd = fmt::format("{} -i {} --printcycles &> {}", str_bin_dimacs, str_file_dimacs, str_file_out);
   system(cmd.c_str());
 
@@ -272,270 +328,6 @@ decltype(auto) get_cycle_basis(std::string str_file_dimacs)
   }
   return out;
 } // function: get_cycle_basis }}}
-
-// // fn: get_prox_view_2 {{{
-// template<typename T>
-// decltype(auto) get_prox_view_2(Ops const& ops, T&& map_node_layer)
-// {
-//   std::queue<Node> q;
-//
-//   for (auto [u,depth] : map_node_layer)
-//   {
-//     // Get succs
-//     Nodes succs{ops.succs(u)};
-//
-//     if( succs.empty() ){ continue; }
-//
-//     // Check if smallest successor has a dist > 1
-//     auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
-//
-//     // If dist of v to u is gt than 1, make it 1
-//     if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
-//     {
-//       map_node_layer.at(u) = depth_v - 1;
-//
-//       // Enqueue predecessors of u
-//       for( auto w : ops.preds(u) ){ q.push(w); }
-//     } // if
-//   } // for
-//
-//   while( ! q.empty() )
-//   {
-//     Node u{q.front()}; q.pop();
-//
-//     // Get succs
-//     Nodes succs{ops.succs(u)};
-//
-//     if( succs.empty() ){ continue; }
-//
-//     // Check if smallest successor has a dist > 1
-//     auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
-//
-//     // If dist of v to u is gt than 1, make it 1
-//     if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
-//     {
-//       map_node_layer.at(u) = depth_v - 1;
-//
-//       // Enqueue predecessors of u
-//       for( auto w : ops.preds(u) ){ q.push(w); }
-//     } // if
-//
-//   } // While
-//
-//   std::map<i64, Nodes> map_layer_nodes;
-//   fn(map_node_layer).ply([&](auto&& e) { map_layer_nodes[e.second].push_back(e.first); });
-//
-//   // struct: Result {{{
-//   struct Result
-//   {
-//     std::map<i64,Nodes> ln;
-//     std::map<i64,i64> nl;
-//     Result(std::map<i64,Nodes> _ln, std::map<i64,i64> _nl)
-//       : ln(std::move(_ln))
-//       , nl(std::move(_nl))
-//     {}
-//   }; // struct }}}
-//
-//   return Result(map_layer_nodes, map_node_layer);
-// } // fn: get_prox_view_2 }}}
-
-// // fn: get_prox_view {{{
-// decltype(auto) get_prox_view(Ops const& ops)
-// {
-//   std::map<Node,i64> m_node_layer;
-//
-//   struct Entry
-//   {
-//     Node u; // Current node
-//     bool is_input; // If is input or output
-//   };
-//
-//   // Visited nodes
-//   std::set<Node> set_visited;
-//
-//   // Nodes to visit
-//   std::queue<Entry> queue_visit;
-//
-//   // Search from io to the rest of the graph
-//   auto f_search_by_root = [&](Entry entry)
-//   {
-//     i64 idx_current_layer{m_node_layer.at(entry.u)};
-//
-//     // Mark as visited
-//     set_visited.insert(entry.u);
-//
-//     // Set u as initial node
-//     Nodes vec_node_curr{entry.u};
-//
-//     fmt::print("u: {}\n", entry.u);
-//
-//     while( ! vec_node_curr.empty() )
-//     {
-//       fmt::print("l: {} - vec_node_curr: {}\n", idx_current_layer, vec_node_curr);
-//
-//       // Update m_node_layer
-//       rg::for_each(vec_node_curr, [&](auto&& _1)
-//       {
-//         // Prefer lowest layer (closer to inputs)
-//         if ( ! m_node_layer.contains(_1) ) { m_node_layer[_1] = idx_current_layer; }
-//         // Fetch all predecessors/successors, and find out their max_layer + 1
-//         else
-//         {
-//           if ( (entry.is_input && idx_current_layer > m_node_layer.at(_1))
-//               or (! entry.is_input && idx_current_layer < m_node_layer.at(_1)) )
-//           {
-//             m_node_layer[_1] = idx_current_layer;
-//           }
-//         } // else
-//       });
-//
-//       // If has input or output, and is not in visited set, push into queue
-//       auto f_is_input = [&](Node _1){ return ops.preds(_1).size() == 0; };
-//       auto f_is_output = [&](Node _1){ return ops.succs(_1).size() == 0; };
-//       rg::for_each(vec_node_curr, [&](auto&& _1)
-//       {
-//         if ( ! set_visited.contains(_1) )
-//         {
-//           if ( f_is_input(_1) )
-//           {
-//             queue_visit.push({_1, true});
-//           } // if
-//           else if ( f_is_output(_1) )
-//           {
-//             queue_visit.push({_1, false});
-//           } // else if
-//         }
-//       });
-//
-//       // Update layer counter
-//       if ( entry.is_input ) { idx_current_layer++; } else { idx_current_layer--; }
-//
-//       // Transform into next layer
-//       auto f_next = (entry.is_input)? ops.succs : ops.preds;
-//       vec_node_curr = fn(vec_node_curr)
-//         .as([&](auto&& _1){ return f_next(_1); })
-//         .squash()
-//         .sort()
-//         .unique()
-//         .vec();
-//     }
-//   };
-//
-//   // Get an input and push into the queue, assume the initial layer to be 0
-//   ns_search::bfs::run(0
-//     , ops
-//     , [&](auto&& _1){ return (ops.preds(_1).size() == 0)? (queue_visit.push({_1, true}), true) : false;  });
-//
-//   // Start with the assumption that initial input is at level 0
-//   m_node_layer[queue_visit.front().u] = 0;
-//
-//   while ( ! queue_visit.empty() )
-//   {
-//     // Skip visited
-//     if ( set_visited.contains(queue_visit.front().u) ) { queue_visit.pop(); continue; }
-//     // fmt::print("-- Next on queue: {}\n", queue_visit.front().u);
-//     // Use node as search tree root
-//     f_search_by_root(queue_visit.front());
-//     // Go to next
-//     queue_visit.pop();
-//     // fmt::print("-- visited: {}\n", set_visited);
-//   } // while
-//
-//   // Correct neighbors on the same layer
-//   // // Queue node and is_successor
-//   std::queue<std::pair<Node,bool>> queue_same_layer;
-//
-//   // Error check for node with neighbors on the same layer
-//   // // Push to queue
-//   for (auto&& e : m_node_layer)
-//   {
-//     Node node = e.first;
-//     i64 node_layer = e.second;
-//     auto succs = ops.succs(node);
-//     auto preds = ops.succs(node);
-//     fn(succs).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,true}); } });
-//     fn(preds).ply([&](auto _1){ if ( m_node_layer.at(_1) == node_layer ){ queue_same_layer.push({_1,false}); } });
-//   } // for
-//
-//   while ( ! queue_same_layer.empty() )
-//   {
-//     auto [node,is_successor] = queue_same_layer.front();
-//     queue_same_layer.pop();
-//     if ( is_successor )
-//     {
-//       ++m_node_layer.at(node);
-//       fn(ops.succs(node)).ply([&](auto&& _1)
-//       {
-//         queue_same_layer.push({_1,true});
-//       });
-//     }
-//     else
-//     {
-//       --m_node_layer.at(node);
-//       fn(ops.preds(node)).ply([&](auto&& _1)
-//       {
-//         queue_same_layer.push({_1,false});
-//       });
-//     }
-//   } // while
-//
-//   // Start layer indices from 0
-//   auto map_translate_layer = fn(m_node_layer)
-//     .as(fun::snd)
-//     .sort()
-//     .unique()
-//     .zip_with_ints(i64{})
-//     .map();
-//
-//   m_node_layer = fn(m_node_layer)
-//     .as([&](auto&& _1){ return std::make_pair(_1.first, map_translate_layer.at(_1.second)); })
-//     .map();
-//
-//
-//   std::map<i64, Nodes> m_layer_nodes;
-//   fn(m_node_layer).ply([&](auto&& e)
-//   {
-//     if ( ! m_layer_nodes.contains(e.second) )
-//     {
-//       m_layer_nodes.emplace(e.second, Nodes{e.first});
-//     } // if
-//     else
-//     {
-//       m_layer_nodes.at(e.second).push_back(e.first);
-//     } // else
-//   });
-//
-//   fmt::print("-- Final layer nodes:\n");
-//   for (auto [l,nds] : m_layer_nodes)
-//   {
-//     fmt::print("l: {} - n: {}\n", l, nds);
-//   } // for
-//
-//
-//   // Error check for node with neighbors on the same layer
-//   for (auto&& e : m_node_layer)
-//   {
-//     Node node = e.first;
-//     i64 node_layer = e.second;
-//     auto succs = ops.succs(node);
-//     auto preds = ops.preds(node);
-//     err::err({ fn(succs).all([&](auto _1){ return m_node_layer.at(_1) > node_layer; }) })("Nodes on same layer");
-//     err::err({ fn(preds).all([&](auto _1){ return m_node_layer.at(_1) < node_layer; }) })("Nodes on same layer");
-//   } // for
-//
-//   // struct: Result {{{
-//   struct Result
-//   {
-//     std::map<i64,std::vector<i64>> ln;
-//     std::map<i64,i64> nl;
-//     Result(std::map<i64,std::vector<i64>>& _ln, std::map<i64,i64>& _nl)
-//       : ln(std::move(_ln))
-//       , nl(std::move(_nl))
-//     {}
-//   }; // struct }}}
-//
-//   return Result(m_layer_nodes, m_node_layer);
-// } // fn: get_prox_view }}}
 
 // fn: lowest_node_id {{{
 //
@@ -924,174 +716,87 @@ decltype(auto) cycle_has_half_separation(Ops const& ops, Nodes const& cycle, Pla
   return f_is_crossed(chf1) or f_is_crossed(chf2);
 } // function: cycle_has_half_separation }}}
 
-// fn: cycle_has_inner_crossings {{{
-//
-// This function checks if a positioned cycle halves cross between themselves
-//
-decltype(auto) cycle_has_inner_crossings(Nodes cycle
-    , Placement const& m_node_pos
-    , Sink sink)
+// fn: lines_intersect {{{
+decltype(auto) lines_intersect(Tile p1, Tile p2, Tile p3, Tile p4)
 {
-  err::Logger logger{sink};
+  // Create the line segments from the input points
+  typedef boost::geometry::model::d2::point_xy<int> point;
+  typedef boost::geometry::model::segment<point> segment;
+  segment s1(point(p1.first, p1.second), point(p2.first, p2.second));
+  segment s2(point(p3.first, p3.second), point(p4.first, p4.second));
 
-  // // Insert intermediate paths between nodes
-  // cycle = fn(cycle)
-  //   .mut([](auto e) { e.push_back(e.front()); return e; })
-  //   .slide(2)
-  //   .as([&](auto e)
-  //   {
-  //     i64 u = e.at(0);
-  //     i64 v = e.at(1);
-  //     Tile t1{u,v};
-  //     Tile t2{v,u};
-  //     Nodes out;
-  //     if ( paths.contains(t1) )
-  //     {
-  //       out.insert(out.begin(), paths.at(t1).begin(), paths.at(t1).end());
-  //     }
-  //     else if ( paths.contains(t2) )
-  //     {
-  //       out.insert(out.begin(), paths.at(t2).begin(), paths.at(t2).end());
-  //     }
-  //     else
-  //     {
-  //       out.push_back(u);
-  //       out.push_back(v);
-  //     } // else
-  //     return out;
-  //   })
-  //   .squash()
-  //   .vec();
-
-  for (auto e : m_node_pos)
+  if (boost::geometry::intersects(s1, s2))
   {
-    logger.info()("placement: {}", e);
-  } // for
-
-  // // Given three collinear points p, q, r, the function checks if 
-  // // point q lies on line segment 'pr' 
-  // auto f_on_segment = [](Tile p, Tile q, Tile r)
-  // {
-  //   if ( q == p or q == r )
-  //   {
-  //     return false;
-  //   }
-  //
-  //   if ( (q.first <= std::max(p.first, r.first))
-  //       and (q.first >= std::min(p.first, r.first))
-  //       and (q.second <= std::max(p.second, r.second))
-  //       and (q.second >= std::min(p.second, r.second)))
-  //   {
-  //     return true;
-  //   }
-  //
-  //   return false;
-  // };
-
-  auto f_orientation = [](Tile p, Tile q, Tile r)
-  {
-    int val = (q.second-p.second) * (r.first-q.first)
-     - (q.first-p.first) * (r.second-q.second); 
-
-    return (val > 0)? 1 // Clockwise orientation
-        :  (val < 0)? 2 // Counterclockwise orientation
-        :  0;           // Collinear orientation
-  };
-
-  auto f_get_intersection_point = [](Tile p1, Tile q1, Tile p2, Tile q2) -> std::optional<Tile>
-  {
-    i64 A1 = q1.second - p1.second;
-    i64 B1 = p1.first - q1.first;
-    i64 C1 = A1 * p1.first + B1 * p1.second;
-
-    i64 A2 = q2.second - p2.second;
-    i64 B2 = p2.first - q2.first;
-    i64 C2 = A2 * p2.first + B2 * p2.second;
-
-    i64 det = A1 * B2 - A2 * B1;
-
-    if (det == 0)  // lines are parallel
-    {
-      return std::nullopt;
-    }
-
-    i64 x = (B2 * C1 - B1 * C2) / det;
-    i64 y = (A1 * C2 - A2 * C1) / det;
-    return std::make_optional(Tile{x,y});
-  };
-
-  auto f_intersect = [&](Tile p1, Tile q1, Tile p2, Tile q2)
-  {
-    // Four orientations for the general and special cases
-    int o1 = f_orientation(p1, q1, p2);
-    int o2 = f_orientation(p1, q1, q2);
-    int o3 = f_orientation(p2, q2, p1);
-    int o4 = f_orientation(p2, q2, q1);
-
-    // Check if intersect
-    if ((o1 != o2) and (o3 != o4))
-    {
-      if ( auto opt_tile_intersection = f_get_intersection_point(p1,q1,p2,q2); opt_tile_intersection )
+      // The segments intersect. Check if they just share a common endpoint.
+      if (boost::geometry::equals(s1.first, s2.first) ||
+          boost::geometry::equals(s1.first, s2.second) ||
+          boost::geometry::equals(s1.second, s2.first) ||
+          boost::geometry::equals(s1.second, s2.second))
       {
-        Tile ti = *opt_tile_intersection;
-        if ( ti != p1 and ti != q1 and ti != p2 and ti != q2 )
-        {
-          return true;
-        }
+          // The segments share a common endpoint. This is not considered a crossing.
+          return false;
       }
-    }
 
-    // Skip colinear
-    // // p1 , q1 and p2 are collinear and p2 lies on segment p1q1
-    // if ((o1 == 0) and f_on_segment(p1, p2, q1))
-    // {
-    //   return true;
-    //
-    // }
-    // // p1 , q1 and q2 are collinear and q2 lies on segment p1q1
-    // if ((o2 == 0) and f_on_segment(p1, q2, q1))
-    // {
-    //   return true;
-    // }
-    //
-    // // p2 , q2 and p1 are collinear and p1 lies on segment p2q2
-    // if ((o3 == 0) and f_on_segment(p2, p1, q2))
-    // {
-    //   return true;
-    // }
-    //
-    // // p2 , q2 and q1 are collinear and q1 lies on segment p2q2
-    // if ((o4 == 0) and f_on_segment(p2, q1, q2))
-    // {
-    //   return true;
-    // }
-    
-    return false;
-  };
+      // The segments genuinely cross each other.
+      return true;
+  }
 
-  auto cycle_edges = fn(cycle)
-    .mut([](auto e) { e.push_back(e.front()); return e; })
-    .as([&](Node e){ return m_node_pos.at(e); })
-    .as([](Tile e){ return Tile{e.first*2,e.second*2}; })
-    .pairs()
-    .vec();
-  logger.info()("Cycle: {}", cycle);
-  logger.info()("Cycle edges: {}", cycle_edges);
+  // The segments do not intersect.
+  return false;
+} // function: lines_intersect }}}
 
-  for (auto const& e1 : cycle_edges)
+// fn: cycles_intersect {{{
+bool cycles_intersect(Map auto&& placement, Nodes c1, Nodes c2)
+{
+  c1.push_back(c1.front());
+  c2.push_back(c2.front());
+
+  auto segments_c1 = fn(c1).as(L11(&,,return placement.at(_1))).slide(2).vec();
+  auto segments_c2 = fn(c2).as(L11(&,,return placement.at(_1))).slide(2).vec();
+
+  auto f_lines_intersect = L21(&,,return lines_intersect(_1.at(0), _1.at(1), _2.at(0), _2.at(1)));
+  for (auto&& segment_c1 : segments_c1)
   {
-    for (auto const& e2 : cycle_edges)
+    if ( fn(segments_c2).any([&](auto&& _1){ return f_lines_intersect(segment_c1, _1); }) )
     {
-      logger.info()("Compare {} with {}", e1, e2);
-      if ( f_intersect(e1.first, e1.second, e2.first, e2.second) )
-      {
-        logger.info()("Intersected edges: {} and {}", e1, e2);
-        return true;
-      }
-    } // for
+      return true;
+    }
   } // for
 
   return false;
+} // function: cycles_intersect }}}
+
+// fn: cycle_has_inner_crossings {{{
+//
+// This function checks if a cycle crosses itself
+//
+bool cycle_has_inner_crossings(Nodes cycle , Placement const& m_node_pos , Sink sink)
+{
+  err::err({ cycle.front() == cycle.back() })("Requires node on front to equal the one on back");
+
+  err::Logger logger{sink};
+
+  namespace bg = boost::geometry;
+  using point = bg::model::point<i64, 2, bg::cs::cartesian>;
+  using polygon = bg::model::polygon<point>;
+
+  auto cycle_edges = fn(cycle)
+    // .mut([](auto e) { e.push_back(e.front()); return e; })
+    .as([&](Node e){ return m_node_pos.at(e); })
+    .as([](Tile e){ return Tile{e.first,e.second}; })
+    .vec();
+
+  fmt::print("Edges: {}\n", cycle_edges);
+
+  polygon poly;
+  std::ranges::for_each(cycle_edges, [&](auto&& _1){ bg::append(poly, point(_1.first, _1.second)); });
+  bg::correct(poly);
+
+  if ( ! bg::is_valid(poly) ) { return true; }
+
+  err::err({ bg::is_valid(poly) })("Invalid polygon");
+
+  return ! bg::is_simple(poly);
 } // function: cycle_has_inner_crossings }}}
 
 // fn: minimal_basis_bfs_ordering {{{
@@ -1782,7 +1487,8 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
     //     logger.info()("Support tile: {}", tile_support);
     //     tile_candidates = fn(tile_candidates).keep([&](auto&& __1)
     //     {
-    //       return f_dist_chebyshev(__1, tile_support) == m_edge_weight_supports.at({u,*opt_support});
+    //       return f_dist_chebyshev(__1, tile_support) == m_edge_weight_supports.at({u,*opt_support})
+    //         or f_dist_chebyshev(__1, tile_support) == m_edge_weight_supports.at({u,*opt_support})+1;
     //     }).vec();
     //   } // if
     // } // if
@@ -2449,7 +2155,6 @@ decltype(auto) global_backtracking(Ops const& ops
     cppcoro::generator<PlaceCycleRet> generator;
     std::optional<cppcoro::generator<PlaceCycleRet>::iterator> it_gen = std::nullopt;
 
-
     if( ! b_backtrack )
     {
       intersection = pair_intersection_basis.back().first;
@@ -2549,8 +2254,6 @@ decltype(auto) global_backtracking(Ops const& ops
     logger.info()("Cycle Outer  : {}", cycle_outer);
     logger.info()("Intersection : {}", intersection);
 
-    if ( ! it_gen ) { it_gen = generator.begin(); }
-
     // If a solution is found from current placement
     // - Update final solution
     // - Push generator to backtracking stack
@@ -2611,68 +2314,7 @@ decltype(auto) global_backtracking(Ops const& ops
 
         bool has_inner_crossings = cycle_has_inner_crossings(cycle_with_dummy, placement, sink);
 
-        if ( ! placement.empty() )
-        {
-          Placement _placement {placement};
-          Paths _paths {paths};
-          std::multimap<Node,Node> _node_map{mmap_node};
-
-          // Offset coordinates to remove negative values
-          auto x_min{rg::min_element(_placement,{},[](auto e){ return e.second.first; })->second.first};
-          auto y_min{rg::min_element(_placement,{},[](auto e){ return e.second.second; })->second.second};
-
-          for (auto& [n,p] : _placement)
-          {
-            auto& [x,y] = p;
-
-            x += std::abs(x_min);
-            y += std::abs(y_min);
-          } // for
-
-          // Expand grid to solve crossings
-          for (auto& [n,p] : _placement)
-          {
-            auto& [x,y] = p;
-
-            x *= 2;
-            y *= 2;
-          } // for
-
-          for(auto& [pair,path] : _paths)
-          {
-            for(Tile& tile : path)
-            {
-              tile.first += std::abs(x_min);
-              tile.second += std::abs(y_min);
-              tile.first *= 2;
-              tile.second *= 2;
-            }
-          }
-
-          // Draw
-#ifdef DEBUG
-          // Draw only cycles with inner crossings
-          if ( ! has_inner_crossings )
-          {
-            logger.info()("-- Figure {}", i+1);
-            logger.info()("-- cycle: {}", cycle);
-            logger.info()("-- placement: ");
-            for (auto&& e : placement)
-            {
-              logger.info()("-- e: {}", e);
-            } // for
-            logger.info()("-- Start draw");
-            ns_draw::svg::svg(fmt::format("out/step-{}.svg", ++i)
-              , _placement
-              , _paths
-              , [](auto e){ return e; });
-            logger.info()("-- End draw");
-            logger.info()("-- Placed edges:");
-            std::ranges::for_each(_node_map, [&](auto e){ logger.info()("e: {}", e); });
-          } // if has_inner_crossings
-#endif
-        }
-
+        // Check for inner_crossings
         if ( has_inner_crossings )
         {
           logger.info()("Cycle {} has inner crossings\n", i);
@@ -2681,7 +2323,21 @@ decltype(auto) global_backtracking(Ops const& ops
         else
         {
           logger.info()("Cycle {} has no inner crossings\n", i);
-          break;
+
+          // Check if backtracking on the first cycle
+          // Check if there is a node of outer_cycle inside cycle
+          if ( st_generator.empty() or ! cycles_intersect(placement, cycle, st_generator.top().cycle_outer) )
+          {
+            // Pass
+#ifdef DEBUG
+            result_draw(Placement{placement}, Paths{paths}, std::multimap<Node,Node>{mmap_node}, i, logger.sink());
+#endif
+            break;
+          } // if
+
+          // Failed
+          it_gen = std::next(it_gen.value());
+
         } // else
       }
     };
@@ -2707,6 +2363,8 @@ decltype(auto) global_backtracking(Ops const& ops
       logger.info()("-- Failed for cycle: {}", cycle);
     } // else
 
+    // Increase idx
+    ++i;
   } // while
 
 
@@ -2779,7 +2437,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Balance cycles
   //
   
-  Basis e_basis = get_cycle_basis("$HOME/Repositories/celaeno/out/3-out.dimacs");
+  Basis e_basis = get_cycle_basis("./out/3-out.dimacs");
 
   // Read cycle output
   // Decode to original values in graph
