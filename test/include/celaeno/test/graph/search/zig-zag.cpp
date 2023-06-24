@@ -1628,9 +1628,9 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
       {
         Tile const& tn{p[n]};
         // A position before the placed incoming edges is not good
-        if( fn(ops.preds(u)).has(n) && tn.second <= t.second ) { return false; }  // if
+        if( fn(ops.preds(u)).has(n) && tn.second < t.second ) { return false; }  // if
         // A position after the placed outgoing edges is not good
-        else if( fn(ops.succs(u)).has(n) && tn.second >= t.second ) { return false; } // else if
+        else if( fn(ops.succs(u)).has(n) && tn.second > t.second ) { return false; } // else if
       }
       return true;
     }).vec();
@@ -1736,17 +1736,17 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         return std::abs(coords_low.first - t.first);
       }
 
-      // // only +y
-      // if ( t.second > coords_high.second )
-      // {
-      //   return std::abs(t.second - coords_high.second);
-      // }
-      //
-      // // only -y
-      // if ( t.second < coords_low.second )
-      // {
-      //   return std::abs(coords_low.second - t.second);
-      // }
+      // only +y
+      if ( t.second > coords_high.second )
+      {
+        return std::abs(t.second - coords_high.second);
+      }
+
+      // only -y
+      if ( t.second < coords_low.second )
+      {
+        return std::abs(coords_low.second - t.second);
+      }
 
       // Inside
       return i64{};
@@ -2518,6 +2518,7 @@ decltype(auto) global_backtracking(Ops const& ops
           if ( ! st_generator.empty() )
           {
             cycle_outer_with_dummy = f_insert_dummy_in_between(st_generator.top().cycle_outer);
+            // logger.info()("outer with dummies: {}\n", cycle_outer_with_dummy);
           }
           else
           {
