@@ -2518,7 +2518,6 @@ decltype(auto) global_backtracking(Ops const& ops
           if ( ! st_generator.empty() )
           {
             cycle_outer_with_dummy = f_insert_dummy_in_between(st_generator.top().cycle_outer);
-            fmt::print("outer with dummies: {}\n", cycle_outer_with_dummy);
           }
           else
           {
