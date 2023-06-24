@@ -786,7 +786,7 @@ bool cycle_has_inner_crossings(Nodes cycle , Placement const& m_node_pos , Sink 
   fmt::print("Edges: {}\n", cycle_edges);
 
   polygon poly;
-  std::ranges::for_each(cycle_edges, [&](auto&& _1){ bg::append(poly, point(_1.first, _1.second)); });
+  std::ranges::for_each(cycle_edges, L( bg::append(poly, point(_1.first, _1.second)) ));
   bg::correct(poly);
 
   if ( ! bg::is_valid(poly) ) { return true; }
@@ -990,7 +990,7 @@ Basis minimal_basis_bfs_ordering(Ops const& ops, Basis basis, MEdgeWeight const&
       {
         out.push_back(*it_curr);
         out.push_back(*it_comp);
-        basis = fn(basis).keep([&](auto&& _1){ return _1 != *it_curr && _1 != *it_comp; }).vec();
+        basis = fn(basis).keep(LR( _1 != *it_curr && _1 != *it_comp; )).vec();
         stop = true;
         break;
       }
@@ -1017,9 +1017,7 @@ Basis minimal_basis_bfs_ordering(Ops const& ops, Basis basis, MEdgeWeight const&
   // Partition the vector into adjacencies of cur
   for(auto it{out.begin()}; it != out.end(); ++it)
   {
-    cut = std::partition(cut
-      , out.end()
-      , [&](Base const& b) { return fn(b).in(*it).vec().size() >= 2; });
+    cut = std::partition(cut , out.end() , LR( fn(_1).in(*it).vec().size() >= 2 ));
   }
 
   return out;
@@ -1242,57 +1240,23 @@ Nodes cycle_merge_on_intersection(Ops const& ops, R1 r1, R2 r2, R3 r3, Sink sink
   // Remove intersection from r1
   r1.erase(r1.begin(), std::next(r1.begin(), r3.size()));
 
-  // Check for undetected edges
-  auto f_neigh = [&](auto&& _1){ return fn(ops.preds(_1)).chain(ops.succs(_1)).vec(); };
-
-  // r3 = fn(r1)
-  //   // Remove intersection
-  //   .dif(r3)
-  //   // Transform into neighbors of nodes
-  //   .as([&](auto&& _1){ return f_neigh(_1); })
-  //   // Squash vectors in vector
-  //   .squash().sort().unique()
-  //   // Intersection with outer cycle uniquely
-  //   .in(r2).sort().unique()
-  //   // Include original intersection nodes uniquely
-  //   .chain(r3).sort().unique()
-  //   // Rotate outer cycle until it matches the whole intersection
-  //   .mut([&](auto&& _1)
-  //   {
-  //     // Rotate until nodes in r2 slice are all in _1
-  //     return fn(r2).rot([&](auto&& __1)
-  //     {
-  //       return fn(__1).cut(u64{},_1.size()).in(_1).vec().size() == _1.size();
-  //     })
-  //     // Cut for the size of the intersection
-  //     .mut([&](auto&& __1){ return Nodes{__1.begin(), std::next(__1.begin(), _1.size())}; })
-  //     .vec();
-  //   })
-  //   .vec();
-
   // Erase intersection from r2
   r2.erase(r2.begin(), std::next(r2.begin(), r3.size()));
 
   // Reduce intersection to first and last elements
-  r3 = fn(r3).mut([](auto&& _1){ return Nodes{_1.front(), _1.back()}; }).vec();
+  r3 = fn(r3).mut(LR( (Nodes{_1.front(), _1.back()}) )).vec();
 
   // Introduce first an last elements
   Nodes merge = fn(r1).push_front(r3.back()).push_back(r3.front()).rev().chain(r2).vec();
 
   // Check for sequentiality
-  auto f_seq = [&](auto&& _1, auto&& _2){ return fn(ops.succs(_1)).has(_2) or fn(ops.preds(_1)).has(_2); };
-  // err::err({ fn(merge)
-  //   .push_back(merge.at(0))
-  //   .slide(2)
-  //   .all([&](auto&& _1){ return f_seq(_1.at(0),_1.at(1)); })
-  // })( "Non sequential result in merge cycles" );
-  if ( ! fn(merge)
+  auto f_seq = LR( fn(ops.succs(_1)).has(_2) or fn(ops.preds(_1)).has(_2), 2 );
+
+  err::err({ fn(merge)
     .push_back(merge.at(0))
     .slide(2)
-    .all([&](auto&& _1){ return f_seq(_1.at(0),_1.at(1)); }))
-  {
-    err::err()( "Non sequential result in merge cycles" );
-  }
+    .all([&](auto&& _1){ return f_seq(_1.at(0),_1.at(1)); })
+  })( "Non sequential result in merge cycles" );
 
   return merge;
 } // function: cycle_merge_on_intersection }}}
@@ -1302,8 +1266,8 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&&
 {
   Edges out;
 
-  auto f_degree_out = [&](Node n) { return ops.succs(n).size(); };
-  auto f_degree_in = [&](Node n) { return ops.preds(n).size(); };
+  auto f_degree_out = LR( ops.succs(_1).size() );
+  auto f_degree_in  = LR( ops.preds(_1).size() );
 
   auto f_make_cuts = [&](Range auto&& _1, Range auto&& _2) -> Edges
   {
@@ -1312,7 +1276,7 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&&
     // For each node, try to connect to another node of _2
     for (auto it_c1{_1.begin()}; it_c1 != _1.end(); ++it_c1)
     {
-      auto it_c2 = std::ranges::find_if(_2, [&](auto&& __1){ return view.at(__1) > view.at(*it_c1); });
+      auto it_c2 = std::ranges::find_if(_2, LR( view.at(__1) > view.at(*it_c1), 1, __ ));
       if ( it_c2 == std::ranges::end(_2) ) { break; } // if
       if ( f_degree_out(*it_c1) < 2 && f_degree_in(*it_c2) < 2 )
       {
@@ -1355,7 +1319,7 @@ decltype(auto) get_cycle_supports(Ops const& ops, Range auto&& cycle, Map auto&&
 
     auto cuts = ( cuts_c1.size() >= cuts_c2.size() )? cuts_c1 : cuts_c2;
 
-    fn(cuts).ply([&](auto c){ out.emplace_back(c.first, c.second); });
+    fn(cuts).ply(L( out.emplace_back(_1.first, _1.second) ));
   } // if cycle.size() > 4
     // for
 
@@ -1447,22 +1411,13 @@ Tiles Adjacencies::tiles()
   (void) ns_search::bfs::run(
       m_src
     , f_tiles_adjacent
-    , [](auto&&){ return Tiles{}; }
-    , [&](Tile t)
+    , LR( Tiles{}; )
+    , [&](Tile _1)
       {
-        auto dist_cur{ns_heuristics::chebyshev::run(m_src,t)};
-
-        if( dist_cur > m_dist_exact )
-        {
-          return true; // stop
-        } // if
-
-        if( dist_cur == m_dist_exact )
-        {
-          m_adjacencies.push_back(t);
-        } // else if
-
-        return false; // continue
+        auto dist_cur = ns_heuristics::chebyshev::run(m_src,_1);
+        return (dist_cur > m_dist_exact)? true
+          : ( dist_cur == m_dist_exact )? (m_adjacencies.push_back(_1), false)
+          : false;
       }
   );
 
@@ -2187,11 +2142,11 @@ std::optional<cppcoro::generator<PlaceCycleRet>::iterator> backtrack_until_unrea
 //
 // Given a cycle, and a dummy map, insert missing dummies between cycle nodes
 //
-decltype(auto) insert_dummy_in_between(Ops const& _1_ops, auto&& _1_mmap_node, auto&& _1_cycle, Sink sink)
+decltype(auto) insert_dummy_in_between(Ops const& ops, auto&& multimap_node_successor, auto&& cycle, Sink sink)
 {
-  err::Logger _1_logger{sink};
+  err::Logger logger{sink};
 
-  return fn(_1_cycle)
+  return fn(cycle)
     .mut([](auto e){ e.push_back(e.front()); return e; })
     .slide(2)
     .as([&](auto e)
@@ -2202,8 +2157,8 @@ decltype(auto) insert_dummy_in_between(Ops const& _1_ops, auto&& _1_mmap_node, a
 
       // u must be sucessor of v
       bool is_reversed{false};
-      if ( ! fn(_1_ops.succs(u)).has(v) ) { is_reversed = true; v = std::exchange(u,v); }
-      _1_logger.info()("u,v: {},{}\n", u, v);
+      if ( ! fn(ops.succs(u)).has(v) ) { is_reversed = true; v = std::exchange(u,v); }
+      logger.info()("u,v: {},{}\n", u, v);
       
       // If endpoint is not v and is not introduced by A*, remove
       auto remove_by = [&](Edges& _1)
@@ -2213,15 +2168,15 @@ decltype(auto) insert_dummy_in_between(Ops const& _1_ops, auto&& _1_mmap_node, a
           // Check if is goal 'v'
           if ( __1.second == v )       { return true; }
           // Check if is introduced by A*
-          if ( ! _1_ops.has(__1.second) ) { return true; }
+          if ( ! ops.has(__1.second) ) { return true; }
           // Discard
           return false;
         }).vec();
       };
 
-      if ( auto opt_nodes = path_from_multimap(_1_mmap_node, u, v, remove_by) )
+      if ( auto opt_nodes = path_from_multimap(multimap_node_successor, u, v, remove_by) )
       {
-        _1_logger.info()("Nodes between uv: {}\n", *opt_nodes);
+        logger.info()("Nodes between uv: {}\n", *opt_nodes);
         if ( is_reversed ) { std::ranges::reverse(*opt_nodes); }
         return *opt_nodes;
       }
