@@ -326,9 +326,9 @@ decltype(auto) get_cycle_basis(std::string str_file_dimacs)
     Base base;
     for(auto searchStart(str_cycles.cbegin()); std::regex_search(searchStart, str_cycles.cend(), match, re); )
     {
-        base.emplace_back(std::stoi(match[1]));
-        base.emplace_back(std::stoi(match[2]));
-        searchStart = match.suffix().first;
+      base.emplace_back(std::stoi(match[1]));
+      base.emplace_back(std::stoi(match[2]));
+      searchStart = match.suffix().first;
     }
     if ( ! base.empty() )
     {
@@ -795,176 +795,6 @@ bool cycle_has_inner_crossings(Nodes cycle , Placement const& m_node_pos , Sink 
 
   return ! bg::is_simple(poly);
 } // function: cycle_has_inner_crossings }}}
-
-// fn: cycle_has_inner_crossings_2 {{{
-//
-// This function checks if a positioned cycle halves cross between themselves
-//
-decltype(auto) cycle_has_inner_crossings_2(Nodes cycle
-    , Placement const& m_node_pos
-    , Sink sink)
-{
-  err::Logger logger{sink};
-
-  // // Insert intermediate paths between nodes
-  // cycle = fn(cycle)
-  //   .mut([](auto e) { e.push_back(e.front()); return e; })
-  //   .slide(2)
-  //   .as([&](auto e)
-  //   {
-  //     i64 u = e.at(0);
-  //     i64 v = e.at(1);
-  //     Tile t1{u,v};
-  //     Tile t2{v,u};
-  //     Nodes out;
-  //     if ( paths.contains(t1) )
-  //     {
-  //       out.insert(out.begin(), paths.at(t1).begin(), paths.at(t1).end());
-  //     }
-  //     else if ( paths.contains(t2) )
-  //     {
-  //       out.insert(out.begin(), paths.at(t2).begin(), paths.at(t2).end());
-  //     }
-  //     else
-  //     {
-  //       out.push_back(u);
-  //       out.push_back(v);
-  //     } // else
-  //     return out;
-  //   })
-  //   .squash()
-  //   .vec();
-
-  for (auto e : m_node_pos)
-  {
-    logger.info()("placement: {}", e);
-  } // for
-
-  // // Given three collinear points p, q, r, the function checks if 
-  // // point q lies on line segment 'pr' 
-  // auto f_on_segment = [](Tile p, Tile q, Tile r)
-  // {
-  //   if ( q == p or q == r )
-  //   {
-  //     return false;
-  //   }
-  //
-  //   if ( (q.first <= std::max(p.first, r.first))
-  //       and (q.first >= std::min(p.first, r.first))
-  //       and (q.second <= std::max(p.second, r.second))
-  //       and (q.second >= std::min(p.second, r.second)))
-  //   {
-  //     return true;
-  //   }
-  //
-  //   return false;
-  // };
-
-  auto f_orientation = [](Tile p, Tile q, Tile r)
-  {
-    int val = (q.second-p.second) * (r.first-q.first)
-     - (q.first-p.first) * (r.second-q.second); 
-
-    return (val > 0)? 1 // Clockwise orientation
-        :  (val < 0)? 2 // Counterclockwise orientation
-        :  0;           // Collinear orientation
-  };
-
-  auto f_get_intersection_point = [](Tile p1, Tile q1, Tile p2, Tile q2) -> std::optional<Tile>
-  {
-    i64 A1 = q1.second - p1.second;
-    i64 B1 = p1.first - q1.first;
-    i64 C1 = A1 * p1.first + B1 * p1.second;
-
-    i64 A2 = q2.second - p2.second;
-    i64 B2 = p2.first - q2.first;
-    i64 C2 = A2 * p2.first + B2 * p2.second;
-
-    i64 det = A1 * B2 - A2 * B1;
-
-    if (det == 0)  // lines are parallel
-    {
-      return std::nullopt;
-    }
-
-    i64 x = (B2 * C1 - B1 * C2) / det;
-    i64 y = (A1 * C2 - A2 * C1) / det;
-    return std::make_optional(Tile{x,y});
-  };
-
-  auto f_intersect = [&](Tile p1, Tile q1, Tile p2, Tile q2)
-  {
-    // Four orientations for the general and special cases
-    int o1 = f_orientation(p1, q1, p2);
-    int o2 = f_orientation(p1, q1, q2);
-    int o3 = f_orientation(p2, q2, p1);
-    int o4 = f_orientation(p2, q2, q1);
-
-    // Check if intersect
-    if ((o1 != o2) and (o3 != o4))
-    {
-      if ( auto opt_tile_intersection = f_get_intersection_point(p1,q1,p2,q2); opt_tile_intersection )
-      {
-        Tile ti = *opt_tile_intersection;
-        if ( ti != p1 and ti != q1 and ti != p2 and ti != q2 )
-        {
-          return true;
-        }
-      }
-    }
-
-    // Skip colinear
-    // // p1 , q1 and p2 are collinear and p2 lies on segment p1q1
-    // if ((o1 == 0) and f_on_segment(p1, p2, q1))
-    // {
-    //   return true;
-    //
-    // }
-    // // p1 , q1 and q2 are collinear and q2 lies on segment p1q1
-    // if ((o2 == 0) and f_on_segment(p1, q2, q1))
-    // {
-    //   return true;
-    // }
-    //
-    // // p2 , q2 and p1 are collinear and p1 lies on segment p2q2
-    // if ((o3 == 0) and f_on_segment(p2, p1, q2))
-    // {
-    //   return true;
-    // }
-    //
-    // // p2 , q2 and q1 are collinear and q1 lies on segment p2q2
-    // if ((o4 == 0) and f_on_segment(p2, q1, q2))
-    // {
-    //   return true;
-    // }
-    
-    return false;
-  };
-
-  auto cycle_edges = fn(cycle)
-    .mut([](auto e) { e.push_back(e.front()); return e; })
-    .as([&](Node e){ return m_node_pos.at(e); })
-    .as([](Tile e){ return Tile{e.first*2,e.second*2}; })
-    .pairs()
-    .vec();
-  logger.info()("Cycle: {}", cycle);
-  logger.info()("Cycle edges: {}", cycle_edges);
-
-  for (auto const& e1 : cycle_edges)
-  {
-    for (auto const& e2 : cycle_edges)
-    {
-      logger.info()("Compare {} with {}", e1, e2);
-      if ( f_intersect(e1.first, e1.second, e2.first, e2.second) )
-      {
-        logger.info()("Intersected edges: {} and {}", e1, e2);
-        return true;
-      }
-    } // for
-  } // for
-
-  return false;
-} // function: cycle_has_inner_crossings_2 }}}
 
 // fn: minimal_basis_bfs_ordering {{{
 Basis minimal_basis_bfs_ordering(Ops const& ops, Basis basis, MEdgeWeight const& m_edge_weight)
@@ -2446,7 +2276,7 @@ decltype(auto) global_backtracking(Ops const& ops
 
         logger.info()("Dummy Cycle: {}\n", cycle_with_dummy);
 
-        bool has_inner_crossings = cycle_has_inner_crossings_2(cycle_with_dummy, placement, sink);
+        bool has_inner_crossings = cycle_has_inner_crossings(cycle_with_dummy, placement, sink);
 
         // Check for inner_crossings
         if ( has_inner_crossings )
