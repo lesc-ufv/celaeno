@@ -116,7 +116,6 @@ decltype(auto) create_crossing_layers(Ops const& ops, R1&& r1, R2&& rc)
   return map_layer_nodes;
 } // function: create_crossing_layers }}}
 
-
 // view_collapse {{{
 template<typename V>
 decltype(auto) view_collapse(Ops const& ops, V&& map_layer_nodes)
@@ -469,13 +468,10 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
 
 // fn: run {{{
 template<SignedIntegral T = i64, typename V>
-std::map<i64,Cross<i64>> run(T root, Ops const& ops, V&& view)
+decltype(auto) run(Ops const& ops, V& view)
 {
-  // Crossings
-  std::map<i64, Cross<i64>> out;
-
   // Create a depth view
-  auto [ln,nl] = view;
+  auto const& [ln,nl] = view;
 
   // Create overlapping layer indices
   auto layers{fp::overlapping_pairs(fp::numbers({},ln.size()))};
@@ -484,126 +480,91 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops, V&& view)
   using MapLayerNodes = std::remove_cvref_t<decltype(ln)>;
   MapLayerNodes map_layer_nodes;
 
-  // Push initial layer
+  // Push initial layer new view
   i64 idx_map_layer_nodes {};
   map_layer_nodes[idx_map_layer_nodes] = ln.at(idx_map_layer_nodes);
 
   for (auto const& [i,j] : layers)
   {
-    auto const& n1{ln.at(i)};
-    auto const& n2{ln.at(j)};
+    auto&& n1 = ln.at(i);
+    auto&& n2 = ln.at(j);
 
-    auto result{run(j,n1,n2,ops)};
+    auto result = run(j,n1,n2,ops);
 
-    // Check if node is crossing
-    auto f_is_crossing = [&](T u){ return result.contains(u); };
-
-    auto crossing_layers = create_crossing_layers(ops, n2, result);
-    for (auto&& e : crossing_layers)
+    auto map_layer_crossings = create_crossing_layers(ops, n2, result);
+    for (auto& e : map_layer_crossings) { std::ranges::reverse(e.second); } // for
+    for (auto&& it = map_layer_crossings.rbegin(); it != map_layer_crossings.rend(); ++it)
     {
-      fmt::print("CLayer: {}\n", e);
+      map_layer_nodes[++idx_map_layer_nodes] = it->second;
     } // for
-
-    // // Create additional layers going down from j
-    // std::set<T> layer_visited;
-    //
-    // layer_visited.insert(n2.begin(), n2.end());
-    //
-    // auto layer_crossings = fn(ln.at(j))
-    //   .as(LR(ops.preds(_1))).squash().sort().unique()
-    //   .in(result)
-    //   // .keep(LR(fn(ops.succs(_1)).in(n2).vec().size() == 2))
-    //   .keep(LR(fn(ops.succs(_1)).dif(layer_visited).vec().empty()))
-    //   .vec();
-    //
-    // layer_visited.insert(layer_crossings.begin(), layer_crossings.end());
-    //
-    // while ( ! layer_crossings.empty() )
-    // {
-    //   map_layer_nodes[++idx_map_layer_nodes] = layer_crossings;
-    //   layer_crossings = fn(layer_crossings)
-    //     // Transforms the current layer into the predecessor layer
-    //     .as(LR(ops.preds(_1))).squash().sort().unique()
-    //     // Keep only crossing nodes
-    //     .in(result)
-    //     // Keep nodes which successors are all part of the layer_visited set
-    //     .keep(LR(fn(ops.succs(_1)).dif(layer_visited).vec().empty()))
-    //     .vec();
-    //   layer_visited.insert(layer_crossings.begin(), layer_crossings.end());
-    // } // while
-
-
-    for (auto const& [k,v] : result)
-    {
-      out.emplace(k,v);
-    } // for
+    map_layer_nodes[++idx_map_layer_nodes] = n2;
   } // for
 
-  for (auto e : map_layer_nodes)
-  {
-    fmt::print("map_layer_nodes: {}\n", e);
-  } // for
+  // Rebuild view
+  view.ln = map_layer_nodes;
+  view.nl.clear();
+  rg::for_each(view.ln, LV( rg::for_each(_1.second, LV( view.nl[__1] = _1.first , 1, __ )) ));
 
 
+  // //
+  // // Passtrough balancing dummies
+  // //
   //
-  // Passtrough balancing dummies
+  // // Check if a node is a balancing dummy
+  // auto f_is_balancing_dummy =
+  // [&](T u)
+  // {
+  //   return ops.preds(u).size() == 1 && ops.succs(u).size() == 1;
+  // };
   //
-
-  // Check if a node is a balancing dummy
-  auto f_is_balancing_dummy =
-  [&](T u)
-  {
-    return ops.preds(u).size() == 1 && ops.succs(u).size() == 1;
-  };
-
-  // Get nodes until they are not a balancing dummy
-  auto f_get_not_balancing_dummy =
-  [&]<typename F>(T u, F f)
-  {
-    while( f_is_balancing_dummy(u) )
-    {
-      u = f(u).at(0);
-    }
-    return u;
-  };
-
-  for (auto e : out)
-  {
-    fmt::print("Crossing: {}\n", e);
-  } // for
-
-
-  for (auto& [dummy_cross,m_cross] : out)
-  {
-    Cross<i64> m_new_cross;
-
-    for (auto& [parent,child] : m_cross)
-    {
-      i64 new_parent{parent};
-      i64 new_child{child};
-
-      if( f_is_balancing_dummy(parent) )
-      {
-        // fmt::print("Parent {} is balancing dummy\n", parent);
-        new_parent = f_get_not_balancing_dummy(parent,ops.preds);
-        // fmt::print("new_parent: {}\n", new_parent);
-      } // if
-
-      if( f_is_balancing_dummy(child) )
-      {
-        // fmt::print("Child {} is balancing dummy", child);
-        new_child = f_get_not_balancing_dummy(child,ops.succs);
-        // fmt::print("new_child: {}\n", new_child);
-      } // if
-
-      m_new_cross[new_parent] = new_child;
-    } // for
-
-    m_cross = m_new_cross;
-  } // for
+  // // Get nodes until they are not a balancing dummy
+  // auto f_get_not_balancing_dummy =
+  // [&]<typename F>(T u, F f)
+  // {
+  //   while( f_is_balancing_dummy(u) )
+  //   {
+  //     u = f(u).at(0);
+  //   }
+  //   return u;
+  // };
+  //
+  // for (auto e : out)
+  // {
+  //   fmt::print("Crossing: {}\n", e);
+  // } // for
+  //
+  //
+  // for (auto& [dummy_cross,m_cross] : out)
+  // {
+  //   Cross<i64> m_new_cross;
+  //
+  //   for (auto& [parent,child] : m_cross)
+  //   {
+  //     i64 new_parent{parent};
+  //     i64 new_child{child};
+  //
+  //     if( f_is_balancing_dummy(parent) )
+  //     {
+  //       // fmt::print("Parent {} is balancing dummy\n", parent);
+  //       new_parent = f_get_not_balancing_dummy(parent,ops.preds);
+  //       // fmt::print("new_parent: {}\n", new_parent);
+  //     } // if
+  //
+  //     if( f_is_balancing_dummy(child) )
+  //     {
+  //       // fmt::print("Child {} is balancing dummy", child);
+  //       new_child = f_get_not_balancing_dummy(child,ops.succs);
+  //       // fmt::print("new_child: {}\n", new_child);
+  //     } // if
+  //
+  //     m_new_cross[new_parent] = new_child;
+  //   } // for
+  //
+  //   m_cross = m_new_cross;
+  // } // for
 
 
-  return out;
+  return view;
 } // function: run }}}
 
 } // namespace celaeno::graph::operations::balance::crossings }}}

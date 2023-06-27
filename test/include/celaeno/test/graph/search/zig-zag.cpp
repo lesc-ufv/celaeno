@@ -2425,9 +2425,14 @@ decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
   //   fmt::print("l: {} - nds: {}\n", l, nds);
   // } // for
   // view = f_timer({}, [&]{ return ns_ops::minimize::crossings::run(i64{},ops.preds, ops.succs, ops.adj, view); });
-  auto map_crossings_nodes = f_timer({}, LR(ns_ops::balance::crossings::run(i64{}, ops, view),0));
+  view = f_timer({}, LR(ns_ops::balance::crossings::run(ops, view),0));
   // view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/2-out.v");
+  fmt::print("Layer/Nodes:\n");
+  for (auto& [l,nds] : view.ln)
+  {
+    fmt::print("l: {} - n: {}\n", l, nds);
+  } // for
   // // Push inputs down
   // for (auto& [n,l] : view.nl)
   // {
@@ -2474,7 +2479,6 @@ decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
   // view_draw(view.ln, edges, "out/sort-test.svg");
   //
   unbalance(0, ops);
-  return map_crossings_nodes;
 } // function: pre_processing }}}
 
 // fn: decode_node_ids {{{
@@ -2541,7 +2545,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Pre-processings
   //
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/0-out.v");
-  auto map_crossings_nodes = pre_processing(ops, metadata.data(),g.data());
+  pre_processing(ops, metadata.data(),g.data());
   f_timer({}, f_write_d, g.data(), ops.preds, ops.succs, "out/out.dimacs");
   Basis e_basis = get_cycle_basis("./out/out.dimacs");
   Basis basis = decode_node_ids(ops, e_basis, logger.sink());
