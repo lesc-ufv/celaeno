@@ -74,6 +74,49 @@ template<SignedIntegral T>
 using Cross = std::map<T,T>;
 // }}}
 
+// fn: create_crossing_layers {{{
+template<Range R1, Range R2>
+decltype(auto) create_crossing_layers(Ops const& ops, R1&& r1, R2&& rc)
+{
+  using Node = typename std::remove_cvref_t<R1>::value_type;
+
+  // Return a map of layer to node vector
+  std::map<i64,std::vector<Node>> map_layer_nodes;
+
+  // Mark initial layer as visited
+  std::set<Node> set_visited_node(r1.begin(), r1.end());
+
+  // Transforms layer into predecessors
+  auto f_as_predecessors = [&](Ops const& _1_ops, auto&& _1_r1, auto&& _1_rc)
+  {
+    return fn(_1_r1)
+      // Transforms the current layer into the predecessor layer
+      .as(LR(_1_ops.preds(_1))).squash().sort().unique()
+      // Keep only crossing nodes
+      .in(_1_rc)
+      // Keep nodes which successors are all part of the set_visited_node set
+      .keep(LR(fn(_1_ops.succs(_1)).dif(set_visited_node).vec().empty()))
+      .vec();
+  };
+
+  // Create additional layers going down
+  auto layer_crossings = f_as_predecessors(ops, r1, rc);
+
+  // Insert current layer nodes into visited set
+  set_visited_node.insert(layer_crossings.begin(), layer_crossings.end());
+
+  // Keep going until it hits no predecessor crossings
+  for (i64 idx_map_layer_nodes{}; ! layer_crossings.empty(); )
+  {
+    map_layer_nodes[++idx_map_layer_nodes] = layer_crossings;
+    layer_crossings = f_as_predecessors(ops, layer_crossings, rc);
+    set_visited_node.insert(layer_crossings.begin(), layer_crossings.end());
+  } // for
+
+  return map_layer_nodes;
+} // function: create_crossing_layers }}}
+
+
 // view_collapse {{{
 template<typename V>
 decltype(auto) view_collapse(Ops const& ops, V&& map_layer_nodes)
@@ -304,19 +347,21 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
            *  c   nc
           */
           ops.link(n_parent,idx);
-          // Link dummy with child
-          //  np  p
-          //  \\
-          //   \d 
-          //    \\
-          //  c   nc
+          /* Link dummy with child
+          *   np  p
+          *   \\
+          *    \d 
+          *     \\
+          *   c   nc
+          */
           ops.link(idx,n_child);
-          // Unlink parent & child
-          //  np  p
-          //   \
-          //    d 
-          //     \
-          //  c   nc
+          /* Unlink parent & child
+           *  np  p
+           *   \
+           *    d 
+           *     \
+           *  c   nc
+          */
           ops.unlink(n_parent,n_child);
 
           err::err({! f_is_crossing(n_child)})
@@ -331,45 +376,50 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
             } // for
           } // if
 
-          // Update parent of child
-          //     np     |  np 
-          //     |\     |  |  
-          //     d |    |  d  
-          //     |/     |  | 
-          //     nc     |  nc
+          /* Update parent of child
+           *     np     |  np 
+           *     |\     |  |  
+           *     d |    |  d  
+           *     |/     |  | 
+           *     nc     |  nc
+          */
           parents.at(std::distance(acc.begin(),it3)) = idx;
 
-          // Link parent with dummy
-          //  np  p
-          //   \ //
-          //    d/
-          //    / \
-          //  c   nc
+          /* Link parent with dummy
+           *  np  p
+           *   \ //
+           *    d/
+           *    / \
+           *  c   nc
+          */
           ops.link(parent,idx);
-          // Link dummy with child
-          //  np  p
-          //   \ //
-          //    d/
-          //   // \
-          //  c   nc
+          /* Link dummy with child
+           *  np  p
+           *   \ //
+           *    d/
+           *   // \
+           *  c   nc
+          */
           ops.link(idx,child);
-          // Unlink parent & child
-          //  np  p
-          //   \ /
-          //    d
-          //   / \
-          //  c   nc
+          /* Unlink parent & child
+           *  np  p
+           *   \ /
+           *    d
+           *   / \
+           *  c   nc
+          */
           ops.unlink(parent,child);
 
           err::err({! f_is_crossing(n_child)})
             ("Set id crossings must not contain n_child");
 
-          // Update children in result
-          //  np  p
-          //   \ /
-          //    d
-          //   / \
-          //  c   nc
+          /* Update children in result
+           *  np  p
+           *   \ /
+           *    d
+           *   / \
+           *  c   nc
+          */
           if( f_is_crossing(parent) )
           {
             for (auto& [u,v] : out[parent])
@@ -408,10 +458,10 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
     ++i;
   } // for
 
-  for (auto&& [l, nds] : map_layer_crossings)
-  {
-    fmt::print("L: {} - C: {}\n", l, nds);
-  } // for
+  // for (auto&& [l, nds] : map_layer_crossings)
+  // {
+  //   fmt::print("L: {} - C: {}\n", l, nds);
+  // } // for
 
   return out;
 
@@ -435,7 +485,8 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops, V&& view)
   MapLayerNodes map_layer_nodes;
 
   // Push initial layer
-  map_layer_nodes[0] = ln.at(0);
+  i64 idx_map_layer_nodes {};
+  map_layer_nodes[idx_map_layer_nodes] = ln.at(idx_map_layer_nodes);
 
   for (auto const& [i,j] : layers)
   {
@@ -444,11 +495,55 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops, V&& view)
 
     auto result{run(j,n1,n2,ops)};
 
+    // Check if node is crossing
+    auto f_is_crossing = [&](T u){ return result.contains(u); };
+
+    auto crossing_layers = create_crossing_layers(ops, n2, result);
+    for (auto&& e : crossing_layers)
+    {
+      fmt::print("CLayer: {}\n", e);
+    } // for
+
+    // // Create additional layers going down from j
+    // std::set<T> layer_visited;
+    //
+    // layer_visited.insert(n2.begin(), n2.end());
+    //
+    // auto layer_crossings = fn(ln.at(j))
+    //   .as(LR(ops.preds(_1))).squash().sort().unique()
+    //   .in(result)
+    //   // .keep(LR(fn(ops.succs(_1)).in(n2).vec().size() == 2))
+    //   .keep(LR(fn(ops.succs(_1)).dif(layer_visited).vec().empty()))
+    //   .vec();
+    //
+    // layer_visited.insert(layer_crossings.begin(), layer_crossings.end());
+    //
+    // while ( ! layer_crossings.empty() )
+    // {
+    //   map_layer_nodes[++idx_map_layer_nodes] = layer_crossings;
+    //   layer_crossings = fn(layer_crossings)
+    //     // Transforms the current layer into the predecessor layer
+    //     .as(LR(ops.preds(_1))).squash().sort().unique()
+    //     // Keep only crossing nodes
+    //     .in(result)
+    //     // Keep nodes which successors are all part of the layer_visited set
+    //     .keep(LR(fn(ops.succs(_1)).dif(layer_visited).vec().empty()))
+    //     .vec();
+    //   layer_visited.insert(layer_crossings.begin(), layer_crossings.end());
+    // } // while
+
+
     for (auto const& [k,v] : result)
     {
       out.emplace(k,v);
     } // for
   } // for
+
+  for (auto e : map_layer_nodes)
+  {
+    fmt::print("map_layer_nodes: {}\n", e);
+  } // for
+
 
   //
   // Passtrough balancing dummies
@@ -471,6 +566,12 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops, V&& view)
     }
     return u;
   };
+
+  for (auto e : out)
+  {
+    fmt::print("Crossing: {}\n", e);
+  } // for
+
 
   for (auto& [dummy_cross,m_cross] : out)
   {
@@ -501,11 +602,6 @@ std::map<i64,Cross<i64>> run(T root, Ops const& ops, V&& view)
     m_cross = m_new_cross;
   } // for
 
-
-  // for (auto e : out)
-  // {
-  //   fmt::print("Crossing: {}\n", e);
-  // } // for
 
   return out;
 } // function: run }}}

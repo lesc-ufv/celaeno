@@ -2418,8 +2418,8 @@ decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  // auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
-  // f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/1-out.v");
+  auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
+  f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/1-out.v");
   // for (auto&& [l,nds] : view.ln)
   // {
   //   fmt::print("l: {} - nds: {}\n", l, nds);
@@ -2427,7 +2427,7 @@ decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
   // view = f_timer({}, [&]{ return ns_ops::minimize::crossings::run(i64{},ops.preds, ops.succs, ops.adj, view); });
   auto map_crossings_nodes = f_timer({}, LR(ns_ops::balance::crossings::run(i64{}, ops, view),0));
   // view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  // f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/2-out.v");
+  f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/2-out.v");
   // // Push inputs down
   // for (auto& [n,l] : view.nl)
   // {
