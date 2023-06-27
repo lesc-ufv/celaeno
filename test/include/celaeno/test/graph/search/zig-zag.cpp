@@ -2088,7 +2088,8 @@ decltype(auto) insert_dummy_in_between(Ops const& ops, auto&& multimap_node_succ
 }; // fn: insert_dummy_in_between }}}
 
 // fn: global_backtracking {{{
-decltype(auto) global_backtracking(Ops const& ops, Basis& basis, Sink sink)
+template<typename V>
+decltype(auto) global_backtracking(Ops const& ops, Basis& basis, V&& view, Sink sink)
 {
   err::Logger logger{sink};
 
@@ -2101,12 +2102,8 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, Sink sink)
     logger.info()("-- Base: {}\n", base);
   } // for
 
-  // Calculate graph depth-view
-  auto view = f_timer({}, [&] { return ns_views::depth::run(i64{}, ops.preds, ops.succs).nl; });
-  // auto depth_view = f_timer({}, [&] { return ns_views::depth::run(i64{}, ops.preds, ops.succs); });
-  // auto view = f_timer({}, [&] { return get_prox_view_2(ops, depth_view.nl); }).nl;
   logger.info()("-- Built prox depth");
-  for (auto e : view)
+  for (auto e : view.nl)
   {
     fmt::print("prox e: {}\n", e);
   } // for
@@ -2116,7 +2113,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, Sink sink)
   MEdgeWeight m_edge_weight;
   for( auto const& cycle : basis )
   {
-    auto m_cycle_edge_weight {edge_weights(ops, cycle, view)};
+    auto m_cycle_edge_weight {edge_weights(ops, cycle, view.nl)};
     fn(m_cycle_edge_weight).ply([&](auto e)
     {
       m_edge_weight[e.first] = e.second;
@@ -2239,7 +2236,7 @@ decltype(auto) global_backtracking(Ops const& ops, Basis& basis, Sink sink)
             , intersection
             , (st_generator.empty())? cycle : st_generator.top().cycle_outer
             , m_edge_weight
-            , view
+            , view.nl
             , logger.sink()
           );
       });
@@ -2420,65 +2417,9 @@ decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
   f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/1-out.v");
-  // for (auto&& [l,nds] : view.ln)
-  // {
-  //   fmt::print("l: {} - nds: {}\n", l, nds);
-  // } // for
-  // view = f_timer({}, [&]{ return ns_ops::minimize::crossings::run(i64{},ops.preds, ops.succs, ops.adj, view); });
   view = f_timer({}, LR(ns_ops::balance::crossings::run(ops, view),0));
-  // view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/2-out.v");
-  fmt::print("Layer/Nodes:\n");
-  for (auto& [l,nds] : view.ln)
-  {
-    fmt::print("l: {} - n: {}\n", l, nds);
-  } // for
-  // // Push inputs down
-  // for (auto& [n,l] : view.nl)
-  // {
-  //   if ( ops.preds(n).size() == 0 and l != 0 ) { l = 0; }
-  // } // for
-  // view.ln.clear();
-  // fn(view.nl).ply(L( view.ln[_1.second].push_back(_1.first) ));
-  //
-  // // Distance from begin to node _1
-  // auto f_layer_distance = [&](auto&& _1, auto&& rng)
-  // {
-  //   auto it_position = rg::find(rng,_1);
-  //   err::err({ it_position != rg::end(rng) })("Could not find successor in next layer");
-  //   return std::distance(rng.begin(), it_position);
-  // };
-  //
-  // fmt::print("Layers:\n");
-  // for (auto&& [l,nds] : view.ln)
-  // {
-  //   fmt::print("l: {} - nds: {}\n", l, nds);
-  // } // for
-  //
-  // auto collapsed = ns_ops::balance::crossings::view_collapse(ops, view.ln);
-  // fmt::print("Collapsed: {}\n", collapsed);
-  //
-  // // fmt::print("Layers (sorted):\n");
-  // // for (auto& [l,nds] : view.ln)
-  // // {
-  // //   nds = fn(nds).sort({}, [&](auto&& _1)
-  // //   {
-  // //     return f_layer_distance(_1);
-  // //   }).vec();
-  // // } // for
-  // // for (auto&& [l,nds] : view.ln)
-  // // {
-  // //   fmt::print("l: {} - nds: {}\n", l, nds);
-  // // } // for
-  //
-  // for (auto& [l,nds] : view.ln)
-  // {
-  //   nds = fn(nds).sort({}, [&](auto&& _1){ return f_layer_distance(_1,collapsed); }).vec();
-  // } // for
-  //
-  // view_draw(view.ln, edges, "out/sort-test.svg");
-  //
-  unbalance(0, ops);
+  return view;
 } // function: pre_processing }}}
 
 // fn: decode_node_ids {{{
@@ -2545,13 +2486,23 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Pre-processings
   //
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/0-out.v");
-  pre_processing(ops, metadata.data(),g.data());
+  auto view = pre_processing(ops, metadata.data(),g.data());
+  fmt::print("Layer/Nodes:\n");
+  for (auto& [l,nds] : view.ln)
+  {
+    fmt::print("l: {} - n: {}\n", l, nds);
+  } // for
+
+  auto view_collapsed = ns_ops::balance::crossings::view_collapse(ops, view.ln);
+  fmt::print("Collapsed view: {}\n", view_collapsed);
+
+  // unbalance(0, ops);
   f_timer({}, f_write_d, g.data(), ops.preds, ops.succs, "out/out.dimacs");
   Basis e_basis = get_cycle_basis("./out/out.dimacs");
   Basis basis = decode_node_ids(ops, e_basis, logger.sink());
-  auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
 
-  exit(0);
+  // exit(0);
+
   // f_timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
   // basis = fn(basis).as( LR(insert_dummy_in_between(ops, g.data(), _1, logger.sink())) ).vec();
   //
@@ -2586,7 +2537,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Perform placement
   //
   auto start {std::chrono::system_clock::now()};
-  auto [placement, routing] = global_backtracking(ops,basis,logger.sink());
+  auto [placement, routing] = global_backtracking(ops,basis,view,logger.sink());
   auto end {std::chrono::system_clock::now()};
   std::chrono::duration<f64> dur {end-start};
   std::stringstream ss; ss << dur.count();

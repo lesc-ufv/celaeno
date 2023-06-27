@@ -64,9 +64,7 @@ namespace fp = fplus;
 namespace fw = fplus::fwd;
 
 namespace err = celaeno::err;
-namespace ns_views = celaeno::graph::views;
 namespace ns_search = celaeno::graph::search;
-namespace ns_operations = celaeno::graph::operations;
 // }}}
 
 // Aliases {{{
@@ -474,7 +472,7 @@ decltype(auto) run(Ops const& ops, V& view)
   auto const& [ln,nl] = view;
 
   // Create overlapping layer indices
-  auto layers{fp::overlapping_pairs(fp::numbers({},ln.size()))};
+  auto layers = fp::overlapping_pairs(fp::numbers({},ln.size()));
 
   // Create new layers from crossings
   using MapLayerNodes = std::remove_cvref_t<decltype(ln)>;
@@ -486,11 +484,13 @@ decltype(auto) run(Ops const& ops, V& view)
 
   for (auto const& [i,j] : layers)
   {
-    auto&& n1 = ln.at(i);
-    auto&& n2 = ln.at(j);
+    // Fetch adjacent layers
+    auto&& [n1,n2] = std::tie(ln.at(i), ln.at(j));
 
+    // Calculate crossings
     auto result = run(j,n1,n2,ops);
 
+    // Save crossings as new layers of the graph
     auto map_layer_crossings = create_crossing_layers(ops, n2, result);
     for (auto& e : map_layer_crossings) { std::ranges::reverse(e.second); } // for
     for (auto&& it = map_layer_crossings.rbegin(); it != map_layer_crossings.rend(); ++it)
@@ -504,65 +504,6 @@ decltype(auto) run(Ops const& ops, V& view)
   view.ln = map_layer_nodes;
   view.nl.clear();
   rg::for_each(view.ln, LV( rg::for_each(_1.second, LV( view.nl[__1] = _1.first , 1, __ )) ));
-
-
-  // //
-  // // Passtrough balancing dummies
-  // //
-  //
-  // // Check if a node is a balancing dummy
-  // auto f_is_balancing_dummy =
-  // [&](T u)
-  // {
-  //   return ops.preds(u).size() == 1 && ops.succs(u).size() == 1;
-  // };
-  //
-  // // Get nodes until they are not a balancing dummy
-  // auto f_get_not_balancing_dummy =
-  // [&]<typename F>(T u, F f)
-  // {
-  //   while( f_is_balancing_dummy(u) )
-  //   {
-  //     u = f(u).at(0);
-  //   }
-  //   return u;
-  // };
-  //
-  // for (auto e : out)
-  // {
-  //   fmt::print("Crossing: {}\n", e);
-  // } // for
-  //
-  //
-  // for (auto& [dummy_cross,m_cross] : out)
-  // {
-  //   Cross<i64> m_new_cross;
-  //
-  //   for (auto& [parent,child] : m_cross)
-  //   {
-  //     i64 new_parent{parent};
-  //     i64 new_child{child};
-  //
-  //     if( f_is_balancing_dummy(parent) )
-  //     {
-  //       // fmt::print("Parent {} is balancing dummy\n", parent);
-  //       new_parent = f_get_not_balancing_dummy(parent,ops.preds);
-  //       // fmt::print("new_parent: {}\n", new_parent);
-  //     } // if
-  //
-  //     if( f_is_balancing_dummy(child) )
-  //     {
-  //       // fmt::print("Child {} is balancing dummy", child);
-  //       new_child = f_get_not_balancing_dummy(child,ops.succs);
-  //       // fmt::print("new_child: {}\n", new_child);
-  //     } // if
-  //
-  //     m_new_cross[new_parent] = new_child;
-  //   } // for
-  //
-  //   m_cross = m_new_cross;
-  // } // for
-
 
   return view;
 } // function: run }}}
