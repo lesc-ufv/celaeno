@@ -159,7 +159,8 @@ std::optional<std::deque<T>>
 
     // Stop algorithm if distance is 2 times greater than dist_be
     // TODO detect when algorithm is circlying around instead
-    if( f_heuristic(start,c) > dist_be*4 ){ break; }
+    // if( f_heuristic(start,c) > dist_be*2 ){ break; }
+    if( f_heuristic(start,c) > dist_be ){ break; }
 
     // fmt::print("Combined cost of {}: {}\n", c, cost);
 

@@ -47,6 +47,7 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/err/err.hpp>
 #include <celaeno/fun/fun.hpp>
+#include <celaeno/fun/macros.hpp>
 
 #include <celaeno/graph/search/bfs.hpp>
 
@@ -429,7 +430,15 @@ Writer::Writer( std::map<i64,GateType> m_id_type
 
       auto preds{f_pred(node)};
 
-      if( preds.size() == 2)
+      if( preds.size() > 2)
+      {
+        std::string str_out = fmt::format("  assign {} = {}" , f_prefix(node) , f_prefix(preds.at(0)));
+        preds.erase(preds.begin());
+        std::ranges::for_each(preds, LV(str_out += fmt::format(" {} {}", op, f_prefix(_1))) );
+        str_out += ";\n";
+        return str_out;
+      }
+      else if( preds.size() == 2)
       {
         return fmt::format(this->template_assign
           , f_prefix(node)

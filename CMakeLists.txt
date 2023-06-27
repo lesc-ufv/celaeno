@@ -46,9 +46,9 @@ if(NOT Boost_FOUND)
   find_package(Boost REQUIRED)
 endif()
 
-if(NOT pybind11_FOUND)
-  find_package(pybind11 REQUIRED)
-endif()
+# if(NOT pybind11_FOUND)
+#   find_package(pybind11 REQUIRED)
+# endif()
 
 if(NOT cppcoro_FOUND)
   find_package(cppcoro REQUIRED)

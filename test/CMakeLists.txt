@@ -82,7 +82,7 @@ function(add_test target)
       FunctionalPlus::FunctionalPlus
       Threads::Threads
       cppcoro::cppcoro
-      pybind11::embed
+      # pybind11::embed
   )
 
   target_include_directories(${target}

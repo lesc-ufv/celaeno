@@ -467,7 +467,7 @@ struct Fun
   // fn: dif {{{
   //
   // Keeps all elements that are in current view and NOT in r
-  // e.g.: [1,2,3].dif([0,1,2,3,4]) == [0,4]
+  // e.g.: [1,2,3,5].dif([0,1,2,3,4]) == [5]
   //
   // @param r: Input range to compare elements to
   //

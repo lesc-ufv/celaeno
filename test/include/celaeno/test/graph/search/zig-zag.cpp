@@ -77,8 +77,8 @@
 #include <celaeno/graph/operations/balance/incoming.hpp>
 #include <celaeno/graph/operations/count/crossings.hpp>
 
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
+// #include <pybind11/embed.h>
+// #include <pybind11/stl.h>
 
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
@@ -91,6 +91,7 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/variadic/size.hpp>
 
+// Macros {{{
 #define AUTO_FORWARD_DECL(z, n, prefix) BOOST_PP_COMMA_IF(n) [[maybe_unused]] auto&& BOOST_PP_CAT(prefix, BOOST_PP_INC(n))
 
 #define LAMB_1(body) [&]([[maybe_unused]] auto&& _1) { body; }
@@ -105,6 +106,7 @@
 #define LAMBR_3(body, n, prefix) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, prefix)) -> decltype(auto) { return body; }
 
 #define LR(...) GET_MACRO(__VA_ARGS__, LAMBR_3, LAMBR_2, LAMBR_1)(__VA_ARGS__)
+// }}}
 
 // Using namespace {{{
 using namespace celaeno::fun::fn;
@@ -113,7 +115,7 @@ using namespace celaeno::aliases;
 // }}}
 
 // namespaces {{{
-namespace py = pybind11;
+// namespace py = pybind11;
 namespace err = celaeno::err;
 namespace fp = fplus;
 namespace rg = ranges;
@@ -442,6 +444,75 @@ std::optional<Nodes> path_from_multimap(std::multimap<Node,Node> const& mm
 
   return out;
 } // function: path_from_multimap }}}
+
+// // fn: get_prox_view_2 {{{
+// template<typename T>
+// decltype(auto) get_prox_view_2(Ops const& ops, T&& map_node_layer)
+// {
+//   std::queue<Node> q;
+//
+//   for (i64 i{}; i < 1000; ++i)
+//   {
+//     for (auto [u,depth] : map_node_layer)
+//     {
+//       // Get succs
+//       Nodes succs{ops.succs(u)};
+//
+//       if( succs.empty() ){ continue; }
+//
+//       // Check if smallest successor has a dist > 1
+//       auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
+//
+//       // If dist of v to u is gt than 1, make it 1
+//       if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
+//       {
+//         map_node_layer.at(u) = depth_v - 1;
+//
+//         // Enqueue predecessors of u
+//         for( auto w : ops.preds(u) ){ q.push(w); }
+//       } // if
+//     } // for
+//   } // for
+//
+//   // while( ! q.empty() )
+//   // {
+//   //   Node u{q.front()}; q.pop();
+//   //
+//   //   // Get succs
+//   //   Nodes succs{ops.succs(u)};
+//   //
+//   //   if( succs.empty() ){ continue; }
+//   //
+//   //   // Check if smallest successor has a dist > 1
+//   //   auto v{fn(succs).as([&](Node _1){ return std::make_pair(map_node_layer.at(_1),_1); }).min().second};
+//   //
+//   //   // If dist of v to u is gt than 1, make it 1
+//   //   if( auto depth_v{map_node_layer.at(v)}; depth_v > 1 )
+//   //   {
+//   //     map_node_layer.at(u) = depth_v - 1;
+//   //
+//   //     // Enqueue predecessors of u
+//   //     for( auto w : ops.preds(u) ){ q.push(w); }
+//   //   } // if
+//   //
+//   // } // While
+//
+//   std::map<i64, Nodes> map_layer_nodes;
+//   fn(map_node_layer).ply([&](auto&& e) { map_layer_nodes[e.second].push_back(e.first); });
+//
+//   // struct: Result {{{
+//   struct Result
+//   {
+//     std::map<i64,Nodes> ln;
+//     std::map<i64,i64> nl;
+//     Result(std::map<i64,Nodes> _ln, std::map<i64,i64> _nl)
+//       : ln(std::move(_ln))
+//       , nl(std::move(_nl))
+//     {}
+//   }; // struct }}}
+//
+//   return Result(map_layer_nodes, map_node_layer);
+// } // fn: get_prox_view_2 }}}
 
 // fn: cycle_find_endpoints {{{
 //
@@ -782,8 +853,6 @@ bool cycle_has_inner_crossings(Nodes cycle , Placement const& m_node_pos , Sink 
     .as([&](Node e){ return m_node_pos.at(e); })
     .as([](Tile e){ return Tile{e.first,e.second}; })
     .vec();
-
-  fmt::print("Edges: {}\n", cycle_edges);
 
   polygon poly;
   std::ranges::for_each(cycle_edges, L( bg::append(poly, point(_1.first, _1.second)) ));
@@ -1281,13 +1350,13 @@ auto place_intersection(Ops const& ops
   if ( fn(ops.succs(u)).has(v) != 0 )
   {
 
-    placement[v] = std::make_pair(-1,-1);
+    placement[v] = std::make_pair( 0,-1);
     placement[u] = std::make_pair( 0, 0);
   } // if
   else
   {
     placement[v] = std::make_pair( 0, 0);
-    placement[u] = std::make_pair(-1,-1);
+    placement[u] = std::make_pair( 0,-1);
   } // else
 
   return placement;
@@ -1518,17 +1587,17 @@ cppcoro::generator<PlaceCycleRet> place_cycle(Ops const& ops
         return std::abs(coords_low.first - t.first);
       }
 
-      // only +y
-      if ( t.second > coords_high.second )
-      {
-        return std::abs(t.second - coords_high.second);
-      }
-
-      // only -y
-      if ( t.second < coords_low.second )
-      {
-        return std::abs(coords_low.second - t.second);
-      }
+      // // only +y
+      // if ( t.second > coords_high.second )
+      // {
+      //   return std::abs(t.second - coords_high.second);
+      // }
+      //
+      // // only -y
+      // if ( t.second < coords_low.second )
+      // {
+      //   return std::abs(coords_low.second - t.second);
+      // }
 
       // Inside
       return i64{};
@@ -2019,21 +2088,13 @@ decltype(auto) insert_dummy_in_between(Ops const& ops, auto&& multimap_node_succ
 }; // fn: insert_dummy_in_between }}}
 
 // fn: global_backtracking {{{
-template<typename C>
-decltype(auto) global_backtracking(Ops const& ops
-  , Basis& basis
-  , [[maybe_unused]] C&& map_crossings_nodes
-  , Sink sink)
+decltype(auto) global_backtracking(Ops const& ops, Basis& basis, Sink sink)
 {
   err::Logger logger{sink};
 
   // Solution
   Placement placement;
   Paths paths;
-
-  // Get minimal basis
-  // auto basis =
-  //   f_timer({}, [&] { return minimal_basis_2(i64{},ops,map_crossings_nodes,logger.sink()); });
 
   for (auto&& base : basis)
   {
@@ -2042,6 +2103,8 @@ decltype(auto) global_backtracking(Ops const& ops
 
   // Calculate graph depth-view
   auto view = f_timer({}, [&] { return ns_views::depth::run(i64{}, ops.preds, ops.succs).nl; });
+  // auto depth_view = f_timer({}, [&] { return ns_views::depth::run(i64{}, ops.preds, ops.succs); });
+  // auto view = f_timer({}, [&] { return get_prox_view_2(ops, depth_view.nl); }).nl;
   logger.info()("-- Built prox depth");
   for (auto e : view)
   {
@@ -2348,15 +2411,68 @@ decltype(auto) global_backtracking(Ops const& ops
 } // fn: global_backtracking }}}
 
 // fn: pre_processing {{{
-decltype(auto) pre_processing(Ops const& ops)
+decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
 {
   auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, L(ns_ops::balance::outgoing::run(0,ops),0));
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+  // auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
+  // f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/1-out.v");
+  // for (auto&& [l,nds] : view.ln)
+  // {
+  //   fmt::print("l: {} - nds: {}\n", l, nds);
+  // } // for
   // view = f_timer({}, [&]{ return ns_ops::minimize::crossings::run(i64{},ops.preds, ops.succs, ops.adj, view); });
   auto map_crossings_nodes = f_timer({}, LR(ns_ops::balance::crossings::run(i64{}, ops, view),0));
+  // view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+  // f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/2-out.v");
+  // // Push inputs down
+  // for (auto& [n,l] : view.nl)
+  // {
+  //   if ( ops.preds(n).size() == 0 and l != 0 ) { l = 0; }
+  // } // for
+  // view.ln.clear();
+  // fn(view.nl).ply(L( view.ln[_1.second].push_back(_1.first) ));
+  //
+  // // Distance from begin to node _1
+  // auto f_layer_distance = [&](auto&& _1, auto&& rng)
+  // {
+  //   auto it_position = rg::find(rng,_1);
+  //   err::err({ it_position != rg::end(rng) })("Could not find successor in next layer");
+  //   return std::distance(rng.begin(), it_position);
+  // };
+  //
+  // fmt::print("Layers:\n");
+  // for (auto&& [l,nds] : view.ln)
+  // {
+  //   fmt::print("l: {} - nds: {}\n", l, nds);
+  // } // for
+  //
+  // auto collapsed = ns_ops::balance::crossings::view_collapse(ops, view.ln);
+  // fmt::print("Collapsed: {}\n", collapsed);
+  //
+  // // fmt::print("Layers (sorted):\n");
+  // // for (auto& [l,nds] : view.ln)
+  // // {
+  // //   nds = fn(nds).sort({}, [&](auto&& _1)
+  // //   {
+  // //     return f_layer_distance(_1);
+  // //   }).vec();
+  // // } // for
+  // // for (auto&& [l,nds] : view.ln)
+  // // {
+  // //   fmt::print("l: {} - nds: {}\n", l, nds);
+  // // } // for
+  //
+  // for (auto& [l,nds] : view.ln)
+  // {
+  //   nds = fn(nds).sort({}, [&](auto&& _1){ return f_layer_distance(_1,collapsed); }).vec();
+  // } // for
+  //
+  // view_draw(view.ln, edges, "out/sort-test.svg");
+  //
   unbalance(0, ops);
   return map_crossings_nodes;
 } // function: pre_processing }}}
@@ -2425,13 +2541,26 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Pre-processings
   //
   f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/0-out.v");
-  auto map_crossings_nodes = pre_processing(ops);
-  f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/1-out.v");
+  auto map_crossings_nodes = pre_processing(ops, metadata.data(),g.data());
   f_timer({}, f_write_d, g.data(), ops.preds, ops.succs, "out/out.dimacs");
   Basis e_basis = get_cycle_basis("./out/out.dimacs");
   Basis basis = decode_node_ids(ops, e_basis, logger.sink());
   auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
 
+  exit(0);
+  // f_timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
+  // basis = fn(basis).as( LR(insert_dummy_in_between(ops, g.data(), _1, logger.sink())) ).vec();
+  //
+  // for (auto&& base : basis)
+  // {
+  //   fmt::print("Base: {}\n", base);
+  // } // for
+  //
+  // f_timer({}, f_write_v, metadata.data(), f_p, f_s, "out/2-out.v");
+  //
+  // exit(0);
+  //
+  // // logger.info()("-- Built cycle supports");
   // logger.info()("-- Cycle supports:");
   // for (auto&& base : basis)
   // {
@@ -2453,7 +2582,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Perform placement
   //
   auto start {std::chrono::system_clock::now()};
-  auto [placement, routing] = global_backtracking(ops,basis,map_crossings_nodes,logger.sink());
+  auto [placement, routing] = global_backtracking(ops,basis,logger.sink());
   auto end {std::chrono::system_clock::now()};
   std::chrono::duration<f64> dur {end-start};
   std::stringstream ss; ss << dur.count();
@@ -2480,3 +2609,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   return EXIT_SUCCESS;
 } // main }}}
+
+// cmd: set noautochdir
+// cmd: chdir ~/Repositories/celaeno
+// cmd: GdbStart gdb --args ./build/test/g_search_zz test/data/synth-91/C17.v
