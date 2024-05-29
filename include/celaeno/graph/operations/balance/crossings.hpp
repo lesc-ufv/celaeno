@@ -455,11 +455,6 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
     ++i;
   } // for
 
-  // for (auto&& [l, nds] : map_layer_crossings)
-  // {
-  //   fmt::print("L: {} - C: {}\n", l, nds);
-  // } // for
-
   return out;
 
 } // function: run }}}

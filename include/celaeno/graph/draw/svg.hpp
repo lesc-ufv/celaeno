@@ -162,7 +162,7 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
   // Check output file state
   if ( ! of.good())
   {
-    spdlog::error("{}@{} Not possible to create file {}", __FILE__,__LINE__,filename);
+    spdlog::error("{}@{} Not possible to create file", __FILE__,__LINE__);
     exit(1);
   } // if
 
@@ -194,7 +194,7 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
     tile.second = tile.second*tile_size+circle_offset;
   } // for
 
-  for (auto&& [pair,path] : paths)
+  for (auto&& path : paths)
   {
     size_t size_path{path.size()};
 
@@ -276,7 +276,7 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
   } // for
 
   // @ Stream/File writting
-  header << fmt::format(h_template,view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);
+  header << fmt::format(fmt::runtime(h_template),view_box_x*tile_size+circle_offset*2, view_box_y*tile_size+circle_offset*2);
 
   // Vertices and labels
   for (auto [v,tile] : vertex_tile)
@@ -285,13 +285,13 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
     // Draw pseudo-nodes with black filling
     if (v < 0)
     {
-      vertices << fmt::format(v_template, "white", vertex_radius, x, y, "black");
-      vertices << fmt::format(v_label_template, x, y, 10, "white", f_label(v));
+      vertices << fmt::format(fmt::runtime(v_template), "white", vertex_radius, x, y, "black");
+      vertices << fmt::format(fmt::runtime(v_label_template), x, y, 10, "white", f_label(v));
     } // if
     else
     {
-      vertices << fmt::format(v_template, "black", vertex_radius, x, y, "white");
-      vertices << fmt::format(v_label_template, x, y, 10, "black", f_label(v));
+      vertices << fmt::format(fmt::runtime(v_template), "black", vertex_radius, x, y, "white");
+      vertices << fmt::format(fmt::runtime(v_label_template), x, y, 10, "black", f_label(v));
     } // else
   } // for
 
@@ -301,95 +301,62 @@ void svg(S&& filename, Map&& vertex_tile, Paths&& paths, F&& f_label)
   // Arrow head
   of << a_head;
 
-  // Draw grid
-  std::stringstream tiles;
-  for (i64 x{}; x <= view_box_x; ++x)
-  {
-    for (i64 y{}; y <= view_box_y; ++y)
-    {
-      constexpr std::string_view tile
-      {
-        "<rect x='{}' y='{}' width='{}' height='{}' fill='none' stroke='gray' stroke-width='1'/>\n"
-      };
+  // // Draw grid
+  // std::stringstream tiles;
+  // for (i64 x{}; x <= view_box_x; ++x)
+  // {
+  //   for (i64 y{}; y <= view_box_y; ++y)
+  //   {
+  //     constexpr std::string_view tile
+  //     {
+  //       "<rect x='{}' y='{}' width='{}' height='{}' fill='none' stroke='gray' stroke-width='1'/>\n"
+  //     };
+  //
+  //     tiles << fmt::format(tile
+  //       , x*tile_size
+  //       , y*tile_size
+  //       , tile_size
+  //       , tile_size
+  //     );
+  //   } // for
+  // } // for
 
-      tiles << fmt::format(tile
-        , x*tile_size
-        , y*tile_size
-        , tile_size
-        , tile_size
-      );
-    } // for
-  } // for
+  // // Draw grid
+  // std::stringstream tiles;
+  // for (i64 y{}; y <= view_box_y; ++y)
+  // {
+  //   constexpr std::string_view tile
+  //   {
+  //     "<line x1='{}' y1='{}' x2='{}' y2='{}' stroke='black' stroke-width='1'/>\n"
+  //   };
+  //
+  //   tiles << fmt::format(fmt::runtime(tile)
+  //     , 0
+  //     , y*tile_size
+  //     , view_box_x*tile_size
+  //     , y*tile_size
+  //   );
+  // } // for
+  // for (i64 x{}; x <= view_box_x; ++x)
+  // {
+  //   constexpr std::string_view tile
+  //   {
+  //     "<line x1='{}' y1='{}' x2='{}' y2='{}' stroke='black' stroke-width='1'/>\n"
+  //   };
+  //
+  //   tiles << fmt::format(fmt::runtime(tile)
+  //     , x*tile_size
+  //     , 0
+  //     , x*tile_size
+  //     , view_box_x*tile_size
+  //   );
+  // } // for
 
-  of << fmt::format("{}\n", tiles.str());
+  // of << fmt::format("{}\n", tiles.str());
   of << fmt::format("{}\n", vertices.str());
   of << fmt::format("{}\n", edges.str());
   of << fmt::format("{}\n", footer);
   of.close();
 } // function: svg }}}
-
-// // fn: run  {{{
-// template<SignedIntegral S, typename L, String Str>
-// decltype(auto) run(S root, Ops ops, L&& f_label, Str&& fn)
-// {
-//
-// #if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-//   spdlog::set_level(spdlog::level::debug);
-//   spdlog::debug("Algorithm: celaeno::graph::draw::svg");
-// #endif
-//
-// #ifdef DEBUG_SVG_HPP
-//   // Create logging sink
-//   auto logger{spdlog::basic_logger_mt("celaeno::graph::draw::svg", "logs.txt")};
-// #endif
-//
-//   //
-//   // Pre-processing
-//   //
-//   ns_balance::paths::run(root,ops);
-//   ns_balance::outgoing::run(root,ops);
-//   ns_balance::paths::run(root,ops);
-//   // ns_minimize::pseudo::run(root,ops);
-//
-//   //
-//   // Layer ordering
-//   //
-//   // auto layers {ns_minimize::crossings::run(root,f_nop,f_succ,f_adj,f_link,f_unlink)};
-//   auto depth_view{ns_views::depth::run(root, ops.preds, ops.succs).ln};
-//   auto layers {fp::get_map_values(depth_view)};
-//
-//   //
-//   // Tile Placement and Edge Routing
-//   //
-// #ifdef DEBUG_SVG_HPP
-//   // Placement
-//   auto [vertex_tile,time_placement]{runtime(
-//     [&]{ return ns_representations::grid::run(root, ops, layers);
-//   })};
-//
-//   // Routing
-//   auto [paths,time_routing]{runtime(
-//     [&,vertex_tile=vertex_tile]{return route(ops, vertex_tile, layers);}
-//   )};
-//
-//   // Area
-//   auto [x,y] = ns_representations::grid::area(vertex_tile);
-//
-//   // Logging
-//   logger->info("File: {}", fn);
-//   logger->info("Placement Time: {}", time_placement);
-//   logger->info("Routing Time: {}", time_routing);
-//   logger->info("Area: {}x{}", x,y);
-// #else
-//   auto vertex_tile {ns_representations::grid::run(root, ops, layers)};
-//   auto paths{route(ops, vertex_tile, layers)};
-// #endif
-//
-// #ifndef DEBUG_DISABLE_OUTPUT
-//   // Write output .svg file
-//   svg(fmt::format("{}.svg", fn), vertex_tile, paths, f_label);
-// #endif // DEBUG_DISABLE_OUTPUT
-//
-// } // function: run }}}
 
 } // namespace celaeno::graph::draw::svg }}}

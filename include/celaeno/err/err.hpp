@@ -31,14 +31,12 @@ using namespace celaeno::aliases;
 class Location
 {
   private:
-  // Private members {{{
     char const* m_str_file=__builtin_FILE();
     u32 m_str_line=__builtin_LINE();
     char const* m_str_fun=__builtin_FUNCTION();
-  // }}}
 
   public:
-  // Constructors {{{
+  // Constructors
     Location(
         char const* str_file = __builtin_FILE()
       , u32 str_line = __builtin_LINE()
@@ -48,15 +46,13 @@ class Location
       , m_str_line(str_line)
       , m_str_fun(str_fun)
     {}
-  // }}}
 
-  // public member functions {{{
+  // public member functions
   auto get() const
   {
     std::string basename = std::filesystem::path(m_str_file).filename();
     return fmt::format("{}:{} `{}`: ", basename, m_str_line, m_str_fun);
   }
-  // }}}
 
 }; // class: Location }}}
 
@@ -70,60 +66,29 @@ class Location
 //
 // @e.g: err({! c.empty()}) ("Error on iteration {}, empty container", i)
 //
-[[nodiscard]] decltype(auto) err(
+[[nodiscard]] inline decltype(auto) err(
     [[maybe_unused]] std::set<bool> const& conds = {}
   , [[maybe_unused]] Location const& loc = {})
 {
-  return [&]<String M, Printable... Args>(
-      [[maybe_unused]] M&& m
-    , [[maybe_unused]] Args&&... args )
+  return [&]<String M, Printable... Args>(M && m,  Args&&... args)
   {
     if( conds.contains(false) || conds.empty() )
     {
       auto loc_curr = loc.get() + m;
-#ifdef DEBUG
-      spdlog::error(loc_curr, std::forward<Args>(args)...);
-#endif // DEBUG
-      exit(1);
+      spdlog::error(fmt::runtime(loc_curr), std::forward<Args>(args)...);
+      throw std::runtime_error("Condition failed");
     } // if
   }; // anonymous lambda
 } // fn: err }}}
 
 // fn: info {{{
-[[nodiscard]] decltype(auto) info([[maybe_unused]] Location const& loc = {})
+[[nodiscard]] inline decltype(auto) info(Location const& loc = {})
 {
-  return [&]<String M, Printable... Args>(
-      [[maybe_unused]] M&& m
-    , [[maybe_unused]] Args&&... args )
+  return [&]<String M, Printable... Args>(M&& m, Args&&... args)
   {
-#ifdef DEBUG
-    spdlog::info(loc.get() + std::forward<M>(m), std::forward<Args>(args)...);
-#endif // DEBUG
+    spdlog::info(fmt::runtime(loc.get() + std::forward<M>(m)), std::forward<Args>(args)...);
   }; // anonymous lambda
 } // fn: info }}}
-
-// class: Fold {{{
-class Fold
-{
-  private:
-    std::shared_ptr<spdlog::logger> m_logger;
-
-  public:
-    Fold(std::shared_ptr<spdlog::logger> logger, std::string const& suffix)
-      : m_logger(logger)
-    {
-#ifdef DEBUG
-      m_logger->info("{{{" + suffix);
-#endif
-    } // Fold
-
-    ~Fold()
-    {
-#ifdef DEBUG
-      m_logger->info("}}}");
-#endif
-    } // ~Fold
-}; // class: Fold }}}
 
 // class: Logger {{{
 class Logger
@@ -133,61 +98,37 @@ class Logger
     std::shared_ptr<spdlog::logger> m_logger;
 
   public:
-    Logger(std::shared_ptr<spdlog::logger> logger, Location const& loc = {})
+    Logger(std::shared_ptr<spdlog::logger> logger)
       : m_logger(logger)
-    {
-#ifdef DEBUG
-      m_logger->info("{{{" + loc.get()); // }}}
-      m_logger->flush();
-#endif
-    }
+    {}
 
-    Logger(Location const& loc = {})
-      : m_logger(spdlog::basic_logger_st("celaeno", m_log_filename, true))
+    Logger()
+      : m_logger(spdlog::get("celaeno"))
     {
-#ifdef DEBUG
-      m_logger->info("{{{" + loc.get()); // }}}
-      m_logger->flush();
-#endif
-    }
+      // Try to create new logger if could not get existing one
+      if ( not m_logger )
+      {
+        spdlog::set_pattern("[%L] %v");
+        m_logger = spdlog::basic_logger_st("celaeno", m_log_filename, true);
+      } // if
+    } // Logger
 
-    ~Logger()
-    {
-      // {{{
-#ifdef DEBUG
-      m_logger->info("}}}");
-      m_logger->flush();
-#endif
-    }
+    std::shared_ptr<spdlog::logger> sink() { return m_logger; }
 
-    std::shared_ptr<spdlog::logger> sink()
-    {
-      return m_logger;
-    }
-
-    decltype(auto) info([[maybe_unused]] Location const& loc = {})
+    decltype(auto) info(Location const& loc = {})
     {
       return [&]<String M, Printable... Args>(M&& m, Args&&... args)
       {
-#ifdef DEBUG
         auto loc_curr = loc.get() + m;
-        m_logger->info(loc_curr, std::forward<Args>(args)...);
+        m_logger->info(fmt::runtime(loc_curr), std::forward<Args>(args)...);
         m_logger->flush();
-#endif
       }; // anonymous lambda
     } // fn: info
-
-    decltype(auto) fold(Location const& loc = {})
-    {
-      return Fold{m_logger,loc.get()};
-    } // fold
 
 }; // class: Logger }}}
 
 // class: Logger {{{
-
-char const * const Logger::m_log_filename = "celaeno.log";
-
+inline char const * const Logger::m_log_filename = "celaeno.log";
 // class: Logger }}}
 
 } // namespace celaeno::err }}}

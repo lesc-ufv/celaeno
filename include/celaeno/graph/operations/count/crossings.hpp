@@ -146,14 +146,14 @@ T run(R&& l1, R&& l2, S&& f_succ)
 } // function: run }}}
 
 // fn: run {{{
-template<SignedIntegral T = i64>
-T run(T root, Ops const& ops)
+template<SignedIntegral T = i64, typename V>
+T run(T root, Ops const& ops, V&& ln)
 {
   // Balance paths
-  ns_operations::balance::paths::run(root,ops);
+  // ns_operations::balance::paths::run(root,ops);
 
   // Create a depth view
-  auto ln{ns_views::depth::run(root,ops.preds,ops.succs).ln};
+  // auto ln{ns_views::depth::run(root,ops.preds,ops.succs).ln};
 
   // Count crossings between each layer
   T count{};

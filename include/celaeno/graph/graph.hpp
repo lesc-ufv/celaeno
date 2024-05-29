@@ -116,13 +116,16 @@ class Graph
   // Constructors {{{
   public:
     Graph() noexcept;
-    Graph(Graph const& src) = delete;
+    Graph(Graph const& src);
     Graph(Graph&& src) = delete;
     Graph(std::initializer_list<std::pair<T,T>> t) noexcept;
   // }}}
 
   // Public Methods {{{
+
     // Element Access {{{
+    // // Get vertices of graph
+    std::vector<T> vertices() const;
     // // Get the successors of a node u
     template<typename U> requires ConvertibleTo<T,U>
     std::vector<T> successors(U u) const;
@@ -172,6 +175,12 @@ Graph<T>::Graph() noexcept
 }
 
 template<Arithmetic T>
+Graph<T>::Graph(Graph const& src)
+  : g ( std::make_unique<Vertices<T>>(*src.g) )
+{
+}
+
+template<Arithmetic T>
 Graph<T>::Graph(std::initializer_list<std::pair<T,T>> t) noexcept
   : Graph()
 {
@@ -182,6 +191,12 @@ Graph<T>::Graph(std::initializer_list<std::pair<T,T>> t) noexcept
 // Public Methods {{{
 
 // Element Access {{{
+template<Arithmetic T>
+std::vector<T> Graph<T>::vertices() const
+{
+  return fp::unique(fp::sort(fp::append(fp::get_map_keys(*g), fp::get_map_values(*g))));
+}
+
 template<Arithmetic T>
 template<typename U> requires ConvertibleTo<T,U>
 std::vector<T> Graph<T>::successors(U u) const

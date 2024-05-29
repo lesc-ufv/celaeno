@@ -94,12 +94,6 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, V& view)
   // vl = Vertex → Level; lv = Level  → Vertex
   auto& [lv,vl] = view;
 
-  fmt::print("From balance paths:\n");
-  for (auto&& [l, nds] : lv)
-  {
-    fmt::print("l: {} - n: {}\n", l, nds);
-  } // for
-
   // Create the vector with levels indices
   std::vector<T> levels = fn(lv).as(fun::fst).sort().vec();
 

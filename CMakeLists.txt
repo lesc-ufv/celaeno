@@ -35,49 +35,19 @@ cmake_policy(VERSION 3.7..3.15)
 
 project(celaeno DESCRIPTION "C++ 20 Generic Algorithms" LANGUAGES CXX)
 
-# Conan
-set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-
 # Compiler
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
 
 # External libraries
-if(NOT Boost_FOUND)
-  find_package(Boost REQUIRED)
-endif()
-
-# if(NOT pybind11_FOUND)
-#   find_package(pybind11 REQUIRED)
-# endif()
-
-if(NOT cppcoro_FOUND)
-  find_package(cppcoro REQUIRED)
-endif()
-
-if(NOT doctest_FOUND)
-  find_package(doctest REQUIRED)
-endif()
-
-if(NOT spdlog_FOUND)
-  find_package(spdlog REQUIRED)
-endif()
-
-if(NOT fmt_FOUND)
-  find_package(fmt REQUIRED)
-endif()
-
-if(NOT FunctionalPlus_FOUND)
-  find_package(FunctionalPlus REQUIRED)
-endif()
-
-if(NOT range-v3_FOUND)
-  find_package(range-v3 REQUIRED)
-endif()
-
-if(NOT argparse_FOUND)
-  find_package(argparse REQUIRED)
-endif()
-
+find_package(Boost REQUIRED)
+find_package(cppcoro REQUIRED)
+find_package(doctest REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
+find_package(FunctionalPlus REQUIRED)
+find_package(range-v3 REQUIRED)
+find_package(argparse REQUIRED)
+find_package(magic_enum REQUIRED)
 
 # Source files
 add_subdirectory(include)

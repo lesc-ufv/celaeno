@@ -1,68 +1,48 @@
-# vim: set expandtab syntax=dockerfile fdm=marker ts=2 sw=2 tw=100 et :
+FROM archlinux:latest
 
-FROM ubuntu:latest
-
-# Arguments
-ARG VIM
-ARG DEBUG_SVG_HPP
-ARG DEBUG_SHOW_ALG
-ARG DEBUG_SHOW_HDL
-ARG OPT_SEQ
-
-RUN apt update && apt install -y build-essential ninja-build make cmake clang git python3-pip \
-  clang-tools nnn fish sudo
-
-# Opt vim install
-RUN if [ -n "$VIM" ] ; then apt install -y neovim nodejs npm; fi
-
-# Install conan with pip3
-RUN pip3 install -I conan
+RUN pacman -Sy
+RUN pacman -S --noconfirm archlinux-keyring
+RUN rm -r /etc/pacman.d/gnupg
+RUN pacman-key --init
+RUN pacman-key --populate
+RUN pacman -Syu --noconfirm
+RUN pacman --noconfirm -S clang git ninja base-devel cmake python-pipx bash
 
 # Configure user
 ARG USER=user
 ENV HOME /home/$USER
 RUN mkdir /home/$USER
 RUN groupadd $USER
-RUN useradd -u 1000 -g $USER -s /bin/fish $USER
+RUN useradd -u 1000 -g $USER -s /bin/bash $USER
 RUN echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER && chmod 0440 /etc/sudoers.d/$USER
 RUN chown -R user:user /home/user
 ## Change to new user
 USER $USER
 WORKDIR $HOME
 
-# Configure conan
-RUN conan profile new default --detect
-RUN conan profile update settings.compiler.libcxx=libstdc++11 default
-
-# Configure project
-# RUN git clone https://gitlab.com/formigoni/celaeno.git celaeno
-# WORKDIR $HOME/celaeno
-# RUN git checkout development
-
+# # Install conan with pipx
+# RUN pipx install conan
+#
+# # Configure PATH
+# ENV PATH /home/user/.local/bin:$PATH
+#
+# # Configure conan
+# RUN conan profile detect --force
+#
 # # Install dependencies
-# RUN mkdir build && cd build && conan install .. --build missing && cd ..
-# 
-# # Configure project
-# RUN cmake -H. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release \
-#   -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
-#   && cp ./build/compile_commands.json .
-# 
-# # Project options # -z → string is empty
-# RUN  if [[ ! -z $DEBUG_SVG_HPP ]]; then cmake -H. -Bbuild -DDEBUG_SVG_HPP; fi
-# RUN  if [[ ! -z $DEBUG_SHOW_ALG ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_ALG; fi
-# RUN  if [[ ! -z $DEBUG_SHOW_HDL ]]; then cmake -H. -Bbuild -DDEBUG_SHOW_HDL; fi
-# RUN  if [[ ! -z $OPT_SEQ ]]; then cmake -H. -Bbuild -DOPT_SEQ; fi
-# 
-# # Build project
-# RUN cmake --build build
-
-# Configure Neovim
-RUN if [[ ! -z "$VIM" ]] ; then \
-  git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim \
-  && mkdir -p $HOME/.config/nvim \
-  && cp -r $HOME/celaeno/doc/nvim/* $HOME/.config/nvim/ \
-  && mv $HOME/.config/nvim/vimrc $HOME/.config/nvim/init.vim \
-  ; fi
+# RUN conan install . --build=missing -g CMakeDeps -g CMakeToolchain -s build_type=Debug
+#
+# # Create cmake preset
+# RUN cmake --preset conan-debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=1
+#
+# # Build
+# RUN cmake --build --preset conan-debug
+#
+# # For LSPs to have symbol completion on code
+# RUN cp ./build/compile_commands.json .
 
 # Start shell
-CMD ["fish"]
+CMD ["bash"]
+
+
+# vim: set expandtab syntax=dockerfile fdm=marker ts=2 sw=2 tw=100 conceallevel=0 et :

@@ -75,6 +75,10 @@ using namespace celaeno::aliases;
 enum class GateType{INPUT,NOT,AND,NAND,OR,NOR,XOR,XNOR,MAJ3,DUMMY,};
 // }}}
 
+// Using declarations {{{
+using Metadata = std::map<i64,GateType>;
+// }}}
+
 // class Reader {{{
 template<typename T>
 class Reader
@@ -99,7 +103,7 @@ class Reader
   // }}}
 
   // Element Access {{{
-    std::map<i64,GateType> const& data() const noexcept;
+    Metadata const& data() const noexcept;
   // }}}
 
   // Private Methods {{{
@@ -224,7 +228,7 @@ std::map<i64,GateType> const& Reader<T>::data() const noexcept
 template<typename T>
 bool Reader<T>::on_assign( std::string const& _line ) const
 {
-  std::regex r{fmt::format(expr_assign, expr_id)};
+  std::regex r{fmt::format(fmt::runtime(expr_assign), expr_id)};
 
   std::smatch m;
   if( std::regex_match(_line,m,r) )
@@ -243,7 +247,7 @@ bool Reader<T>::on_assign( std::string const& _line ) const
 template<typename T>
 bool Reader<T>::on_and( std::string const& _line ) const
 {
-  std::regex r{fmt::format(expr_and, expr_id, "&")};
+  std::regex r{fmt::format(fmt::runtime(expr_and), expr_id, "&")};
 
   std::smatch m;
   if( std::regex_match(_line,m,r) )
@@ -262,7 +266,7 @@ bool Reader<T>::on_and( std::string const& _line ) const
 template<typename T>
 bool Reader<T>::on_or( std::string const& _line ) const
 {
-  std::regex r{fmt::format(expr_or, expr_id, "\\|")};
+  std::regex r{fmt::format(fmt::runtime(expr_or), expr_id, "\\|")};
 
   std::smatch m;
   if( std::regex_match(_line,m,r) )
@@ -478,7 +482,7 @@ Writer::Writer( std::map<i64,GateType> m_id_type
   // Assignments
   for (auto&& e : assignments)
   {
-    ofile << fmt::format(e);
+    ofile << fmt::format(fmt::runtime(e));
   } // for
 
   // Footer

@@ -39,6 +39,7 @@
 
 #include <fmt/core.h>
 
+#include <cstdint>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #include <spdlog/spdlog.h>
@@ -2414,10 +2415,14 @@ decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
   f_timer({}, L(ns_ops::balance::outgoing::run(0,ops),0));
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   f_timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
-  view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+  // view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
   f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/1-out.v");
+  i64 num_crossings = ns_ops::count::crossings::run(0, ops, view.ln);
+  fmt::print("Number of crossings: {}\n", num_crossings);
   view = f_timer({}, LR(ns_ops::balance::crossings::run(ops, view),0));
+  fmt::print("Number of layers: {}\n", view.ln.size());
+  fmt::print("Largest layer size: {}\n", fn(view.ln).as(LR(_1.second.size())).max() );
   f_timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/2-out.v");
   return view;
 } // function: pre_processing }}}
@@ -2493,15 +2498,23 @@ int main([[maybe_unused]] int argc, char const* argv[])
     fmt::print("l: {} - n: {}\n", l, nds);
   } // for
 
+  for (auto& [n,l] : view.nl)
+  {
+    if ( ops.preds(n).size() == 0 and l != 0 ) { l = 0; }
+  } // for
+
+  view.ln.clear();
+  fn(view.nl).ply([&](auto&& e) { view.ln[e.second].push_back(e.first); });
+
   auto view_collapsed = ns_ops::balance::crossings::view_collapse(ops, view.ln);
   fmt::print("Collapsed view: {}\n", view_collapsed);
+
+  exit(0);
 
   // unbalance(0, ops);
   f_timer({}, f_write_d, g.data(), ops.preds, ops.succs, "out/out.dimacs");
   Basis e_basis = get_cycle_basis("./out/out.dimacs");
   Basis basis = decode_node_ids(ops, e_basis, logger.sink());
-
-  // exit(0);
 
   // f_timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
   // basis = fn(basis).as( LR(insert_dummy_in_between(ops, g.data(), _1, logger.sink())) ).vec();

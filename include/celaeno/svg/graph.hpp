@@ -57,7 +57,6 @@
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 #include <celaeno/graph/operations/minimize/pseudo.hpp>
 #include <celaeno/graph/operations/minimize/edge-length.hpp>
-#include <celaeno/graph/representations/grid/layered.hpp>
 
 
 // namespace celaeno::svg::graph {{{

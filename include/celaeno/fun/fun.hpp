@@ -689,7 +689,6 @@ template<Range R>
 
 } // namespace: fn }}}
 
-
 // Helper function objects {{{
 [[maybe_unused]] auto fst = [](auto&& _1){ return _1.first; };
 [[maybe_unused]] auto snd = [](auto&& _1){ return _1.second; };

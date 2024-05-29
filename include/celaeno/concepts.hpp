@@ -49,7 +49,7 @@ template<typename... P>
 concept Printable =
 requires(P&&... p)
 {
-  ((fmt::print("{}",std::forward<P>(p))), ...);
+  ((fmt::print(fmt::runtime("{}"),std::forward<P>(p))), ...);
 };
 
 // Basic Types {{{
@@ -65,9 +65,27 @@ concept SignedIntegral = std::signed_integral<U>;
 template<typename T, typename U = std::decay_t<T>>
 concept Float = std::floating_point<U>;
 
+template<typename T>
+concept Numeric = std::integral<std::decay_t<T>> or std::floating_point<std::decay_t<T>>;
+
 template<typename T, typename U = std::decay_t<T>>
 concept String =
 requires(U u) { { std::string{u} } -> std::same_as<std::string>; };
+
+template<typename T>
+concept StringConvertible = std::is_convertible_v<std::decay_t<T>, std::string>;
+
+template<typename T>
+concept StringConstructible = std::constructible_from<std::string, std::decay_t<T>>;
+
+template<typename T>
+concept StreamInsertable = requires(T t, std::ostream& os)
+{
+  { os << t } -> std::same_as<std::ostream&>;
+};
+
+template<typename T>
+concept AsString = StringConvertible<T> or StringConstructible<T> or Numeric<T> or StreamInsertable<T>;
 // }}}
 
 // Ranges {{{
@@ -87,6 +105,9 @@ concept Matrix = Range<M> && Range<R>;
 // Type Traits {{{
 
 // Trait {{{
+template<typename T>
+concept Enum = std::is_enum_v<T>;
+
 template<typename T, typename U = std::decay_t<T>>
 concept Arithmetic =
 requires(U u)
@@ -184,5 +205,7 @@ concept Returns = requires(F f, Args&&... args)
 // }}}
 
 // }}}
+
+
 
 } // namespace celaeno::concepts }}}

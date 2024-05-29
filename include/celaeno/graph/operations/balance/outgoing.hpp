@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <fplus/fplus.hpp>
 #include <range/v3/all.hpp>
 #ifndef NDEBUG
