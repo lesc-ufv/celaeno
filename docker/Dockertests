@@ -25,7 +25,7 @@ WORKDIR $CELAENO_DIR
 # Compile
 RUN "$CONAN" profile detect -f
 RUN "$CONAN" install . --build=missing -g CMakeDeps -g CMakeToolchain
-RUN cmake --preset conan-release -DCMAKE_BUILD_TYPE=Release
+RUN cmake --preset conan-release -DCMAKE_BUILD_TYPE=Release -DCELAENO_APPLETS=ON
 RUN cmake --build --preset conan-release
 
 # vim: set expandtab syntax=dockerfile fdm=marker ts=2 sw=2 tw=100 conceallevel=0 et :

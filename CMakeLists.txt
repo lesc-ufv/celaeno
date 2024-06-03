@@ -38,6 +38,13 @@ project(celaeno DESCRIPTION "C++ 20 Generic Algorithms" LANGUAGES CXX)
 # Compiler
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER}")
 
+# Create compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Select what to compile
+option(CELAENO_APPLETS "Compile celaeno applets" OFF)
+option(CELAENO_TESTS "Compile celaeno tests" OFF)
+
 # External libraries
 find_package(Boost REQUIRED)
 find_package(cppcoro REQUIRED)
@@ -53,10 +60,14 @@ find_package(magic_enum REQUIRED)
 add_subdirectory(include)
 
 # Tests
-add_subdirectory(applet)
+if( ${CELAENO_APPLETS} )
+  add_subdirectory(applet)
+endif()
 
 # Tests
-add_subdirectory(test)
+if( ${CELAENO_TESTS} )
+  add_subdirectory(test)
+endif()
 
 # Install
 include(GNUInstallDirs)
