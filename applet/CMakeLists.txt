@@ -76,7 +76,6 @@ function(add_applet target)
   target_link_libraries(${target}
     PRIVATE
       celaeno
-      boost::boost
       argparse::argparse
       fmt::fmt
       spdlog::spdlog
