@@ -12,7 +12,7 @@ cd "$DIR_PROJECT"
 docker build . -t celaeno -f docker/Dockerfile.applets --build-arg="CELAENO_DIR=$(pwd)"
 
 # Copy the built binary
-docker run -it --rm -v "$(pwd)":/host celaeno cp ./build/Release/applet/mapper /host/applet/mapper
+docker run -it --rm -v "$(pwd)":/host celaeno cp -r ./build /host
 
 # Setup compile_commands and conan libraries
 docker run -it --rm \
