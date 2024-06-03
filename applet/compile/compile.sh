@@ -13,4 +13,4 @@ docker build . -t celaeno -f docker/Dockerfile.applets --build-arg="CELAENO_DIR=
 docker run -it --rm \
   -e DIR_PROJECT="$DIR_PROJECT" \
   -v "$(pwd)":/host \
-  celaeno /host/applet/compile_commands/impl_compile.sh
+  celaeno /host/applet/compile/impl_compile.sh
