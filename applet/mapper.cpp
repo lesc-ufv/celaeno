@@ -90,23 +90,6 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/variadic/size.hpp>
 
-// Macros {{{
-#define AUTO_FORWARD_DECL(z, n, prefix) BOOST_PP_COMMA_IF(n) [[maybe_unused]] auto&& BOOST_PP_CAT(prefix, BOOST_PP_INC(n))
-
-#define LAMB_1(body) [&]([[maybe_unused]] auto&& _1) { body; }
-#define LAMB_2(body, n) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, _)) { body; }
-#define LAMB_3(body, n, prefix) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, prefix)) { body; }
-
-#define GET_MACRO(_1,_2,_3,NAME,...) NAME
-#define L(...) GET_MACRO(__VA_ARGS__, LAMB_3, LAMB_2, LAMB_1)(__VA_ARGS__)
-
-#define LAMBR_1(body) [&]([[maybe_unused]] auto&& _1) -> decltype(auto) { return body; }
-#define LAMBR_2(body, n) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, _)) -> decltype(auto) { return body; }
-#define LAMBR_3(body, n, prefix) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, prefix)) -> decltype(auto) { return body; }
-
-#define LR(...) GET_MACRO(__VA_ARGS__, LAMBR_3, LAMBR_2, LAMBR_1)(__VA_ARGS__)
-// }}}
-
 // Using namespace {{{
 using namespace celaeno::fun::fn;
 using namespace celaeno::concepts;
@@ -194,9 +177,9 @@ auto timer(Location const& loc, F&& f, Args&&... args)
 decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
 {
   auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  timer({}, L(ns_ops::balance::outgoing::run(0,ops),0));
+  timer({}, [&]{ns_ops::balance::outgoing::run(0,ops);});
   view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  timer({}, L(ns_ops::balance::paths::run(i64{},ops,view),0));
+  timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
   // view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
   timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/1-out.v");
