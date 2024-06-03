@@ -1,48 +1,31 @@
-FROM archlinux:latest
+FROM alpine:latest
 
-RUN pacman -Sy
-RUN pacman -S --noconfirm archlinux-keyring
-RUN rm -r /etc/pacman.d/gnupg
-RUN pacman-key --init
-RUN pacman-key --populate
-RUN pacman -Syu --noconfirm
-RUN pacman --noconfirm -S clang git ninja base-devel cmake python-pipx bash
+# Update repositories to edge
+RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/main/ > /etc/apk/repositories
+RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/community/ >> /etc/apk/repositories
+RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/testing/ >> /etc/apk/repositories
 
-# Configure user
-ARG USER=user
-ENV HOME /home/$USER
-RUN mkdir /home/$USER
-RUN groupadd $USER
-RUN useradd -u 1000 -g $USER -s /bin/bash $USER
-RUN echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER && chmod 0440 /etc/sudoers.d/$USER
-RUN chown -R user:user /home/user
-## Change to new user
-USER $USER
-WORKDIR $HOME
+# Install deps
+RUN apk update && apk upgrade
+RUN apk add --no-cache build-base git libbsd-dev py3-pip cmake clang clang-dev \
+  make e2fsprogs-dev e2fsprogs-libs e2fsprogs-static libcom_err musl musl-dev \
+  bash pcre-tools boost-dev libjpeg-turbo-dev libjpeg-turbo-static libpng-dev \
+  libpng-static zlib-static
 
-# # Install conan with pipx
-# RUN pipx install conan
-#
-# # Configure PATH
-# ENV PATH /home/user/.local/bin:$PATH
-#
-# # Configure conan
-# RUN conan profile detect --force
-#
-# # Install dependencies
-# RUN conan install . --build=missing -g CMakeDeps -g CMakeToolchain -s build_type=Debug
-#
-# # Create cmake preset
-# RUN cmake --preset conan-debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=1
-#
-# # Build
-# RUN cmake --build --preset conan-debug
-#
-# # For LSPs to have symbol completion on code
-# RUN cp ./build/compile_commands.json .
+# Install conan
+RUN python3 -m venv /conan
+RUN . /conan/bin/activate && pip3 install conan
+ENV CONAN "/conan/bin/conan"
 
-# Start shell
-CMD ["bash"]
+# Copy boot directory
+ARG CELAENO_DIR
+COPY . $CELAENO_DIR
+WORKDIR $CELAENO_DIR
 
+# Compile
+RUN "$CONAN" profile detect -f
+RUN "$CONAN" install . --build=missing -g CMakeDeps -g CMakeToolchain
+RUN cmake --preset conan-release -DCMAKE_BUILD_TYPE=Release
+RUN cmake --build --preset conan-release
 
 # vim: set expandtab syntax=dockerfile fdm=marker ts=2 sw=2 tw=100 conceallevel=0 et :

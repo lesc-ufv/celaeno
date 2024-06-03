@@ -53,6 +53,9 @@ find_package(magic_enum REQUIRED)
 add_subdirectory(include)
 
 # Tests
+add_subdirectory(applet)
+
+# Tests
 add_subdirectory(test)
 
 # Install
