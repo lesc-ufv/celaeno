@@ -36,6 +36,7 @@
 #include <tuple>
 #include <optional>
 #include <variant>
+#include <filesystem>
 
 #include <fmt/core.h>
 
@@ -98,6 +99,7 @@ using namespace celaeno::aliases;
 
 // namespaces {{{
 // namespace py = pybind11;
+namespace fs = std::filesystem;
 namespace err = celaeno::err;
 namespace fp = fplus;
 namespace rg = ranges;
@@ -218,6 +220,9 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
   auto f_write_d = [&]<typename... Args>(Args&&... args) { ns_io_dimacs::Writer(std::forward<Args>(args)...); };
+
+  // Create output directory
+  std::error_code ec{}; fs::create_directory("./out", ec);
 
   //
   // Pre-processings
