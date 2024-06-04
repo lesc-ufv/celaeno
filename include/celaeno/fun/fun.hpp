@@ -596,7 +596,17 @@ struct Fun
     return make_view<Out>(view | rv::reverse);
   } // fn: rev }}}
 
-  // fn: slide {{{
+  // fn: chunk {{{
+  //
+  // Places a sliding window of size n in current view
+  //
+  template<typename Out = void>
+  [[nodiscard]] auto chunk(int n)
+  {
+    return make_view<Out>(view | rv::chunk(n));
+  } // fn: chunk }}}
+
+  // fn: chunk {{{
   //
   // Places a sliding window of size n in current view
   //

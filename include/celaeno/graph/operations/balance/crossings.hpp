@@ -121,6 +121,8 @@ decltype(auto) view_collapse(Ops const& ops, V&& map_layer_nodes)
 {
   using Key = typename std::remove_cvref_t<typename std::remove_cvref_t<V>::key_type>;
   using Node = typename std::remove_cvref_t<typename std::remove_cvref_t<V>::mapped_type>::value_type;
+  using Position = i64;
+  using Positions = std::vector<Position>;
   using Nodes = std::vector<Node>;
   using NodeSet = std::unordered_set<Node>;
 
@@ -136,12 +138,17 @@ decltype(auto) view_collapse(Ops const& ops, V&& map_layer_nodes)
 
   // Initialize collapse nodes with first layer
   Nodes nodes_collapsed = map_layer_nodes.at(id_lowest_layer);
+  Positions positions_collapsed = fp::numbers(i64{}, static_cast<i64>(nodes_collapsed.size()));
   NodeSet nodes_visited;
 
   for (auto it_entry{map_layer_nodes.begin()}; it_entry != std::prev(map_layer_nodes.end()); ++it_entry)
   {
     auto nodes_i = it_entry->second;
     auto nodes_j = std::next(it_entry)->second;
+    // spdlog::info(fmt::format("Collapse into layer: {}", nodes_i));
+    // spdlog::info(fmt::format("Collapsed layer: {}", nodes_j));
+    // spdlog::info(fmt::format("Collapsed nodes: {}", nodes_collapsed));
+    // spdlog::info(fmt::format("Positions collapsed: {}", positions_collapsed));
     // Collapse nodes of current layer into nodes_collapsed
     // // For each node of current layer
     // // // Fetch successors nodes in next layer
@@ -163,10 +170,24 @@ decltype(auto) view_collapse(Ops const& ops, V&& map_layer_nodes)
       // // Put u in-between successors
       if ( succs.size() == 2 )
       {
+        // spdlog::info(fmt::format("Positions collapsed: {}", positions_collapsed));
         auto it_collapsed = rg::find(nodes_collapsed, u);
-        err::err({ it_collapsed != rg::end(nodes_collapsed) })("Could not find u in nodes collapsed");
-        it_collapsed = nodes_collapsed.insert(it_collapsed             , succs.at(0));
-        nodes_collapsed.insert(std::next(it_collapsed,2), succs.at(1));
+        err::err({ it_collapsed != rg::end(nodes_collapsed) })
+          (fmt::format("Could not find {} in nodes collapsed: {}", u, nodes_collapsed));
+        auto distance = std::distance(nodes_collapsed.begin(),it_collapsed);
+
+        {
+          auto position = positions_collapsed.at(distance);
+          positions_collapsed.insert(positions_collapsed.begin() + distance, position-1);
+          positions_collapsed.insert(positions_collapsed.begin() + distance + 2, position+1);
+        }
+
+        {
+          nodes_collapsed.insert(nodes_collapsed.begin() + distance, succs.at(0));
+          nodes_collapsed.insert(nodes_collapsed.begin() + distance + 2, succs.at(1));
+          // spdlog::info(fmt::format("Positions collapsed {}: {}", positions_collapsed.size(), positions_collapsed));
+          // spdlog::info(fmt::format("Collapsed nodes {}: {}", nodes_collapsed.size(), nodes_collapsed));
+        }
       } // if
       // Case 2: u has one successor in layer+1
       // // Put successor v after the first predecessor found in nodes_collapsed
@@ -176,16 +197,24 @@ decltype(auto) view_collapse(Ops const& ops, V&& map_layer_nodes)
         auto it_first_predecessor = rg::find_first_of(nodes_collapsed, nodes_preds);
         err::err({ it_first_predecessor != rg::end(nodes_collapsed) })
           ("Could not find predecessors of {} successor of {} on {}", succs.at(0), u, nodes_collapsed);
-        nodes_collapsed.insert(std::next(it_first_predecessor), succs.at(0));
+
+        auto distance = std::distance(nodes_collapsed.begin(), it_first_predecessor);
+
+        positions_collapsed.insert(positions_collapsed.begin() + distance, positions_collapsed.at(distance)-1);
+        nodes_collapsed.insert(nodes_collapsed.begin() + distance, succs.at(0));
+
+        // spdlog::info(fmt::format("Positions collapsed {}: {}", positions_collapsed.size(), positions_collapsed));
+        // spdlog::info(fmt::format("Collapsed nodes {}: {}", nodes_collapsed.size(), nodes_collapsed));
       } // if
 
       // Visit successors of u in next 
       nodes_visited.insert(succs.begin(), succs.end());
     } // for
+    // spdlog::info("------------------------------");
 
   } // for
 
-  return nodes_collapsed;
+  return std::make_pair(nodes_collapsed, positions_collapsed);
 } // function: view_collapse }}}
 
 // fn: run {{{

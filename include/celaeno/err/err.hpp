@@ -51,7 +51,7 @@ class Location
   auto get() const
   {
     std::string basename = std::filesystem::path(m_str_file).filename();
-    return fmt::format("{}:{} `{}`: ", basename, m_str_line, m_str_fun);
+    return fmt::format("{}@{}: ", basename, m_str_line);
   }
 
 }; // class: Location }}}

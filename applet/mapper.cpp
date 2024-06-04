@@ -55,6 +55,7 @@
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/io/verilog.hpp>
 #include <celaeno/graph/io/dimacs.hpp>
+#include <celaeno/graph/io/dot.hpp>
 
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/draw/svg.hpp>
@@ -112,6 +113,7 @@ namespace ns_ops = celaeno::graph::operations;
 namespace ns_heuristics = celaeno::heuristics;
 namespace ns_io_verilog = celaeno::graph::io::verilog;
 namespace ns_io_dimacs = celaeno::graph::io::dimacs;
+namespace ns_io_dot = celaeno::graph::io::dot;
 namespace ns_search = celaeno::graph::search;
 namespace ns_views = celaeno::graph::views;
 // }}}
@@ -178,19 +180,38 @@ auto timer(Location const& loc, F&& f, Args&&... args)
 // fn: pre_processing {{{
 decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
 {
-  auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+  // Balance outgoing edges to a maximum of 2
   timer({}, [&]{ns_ops::balance::outgoing::run(0,ops);});
-  view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+
+  // Create depth-view
+  auto view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
+
+  // Balance paths
   timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
-  // view = ns_views::depth::run(i64{}, ops.preds, ops.succs);
-  auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
-  timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/1-out.v");
-  i64 num_crossings = ns_ops::count::crossings::run(0, ops, view.ln);
-  fmt::print("Number of crossings: {}\n", num_crossings);
+
+  // Write to file
+  auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_dot::Writer(std::forward<Args>(args)...); };
+  timer({}, f_write_v, view, ops, "out/1-out.dot");
+
+  // Count number of crossings
+  fmt::print("Number of crossings: {}\n", ns_ops::count::crossings::run(0, ops, view.ln));
+
+  // Balance crossings
   view = timer({}, LR(ns_ops::balance::crossings::run(ops, view),0));
   fmt::print("Number of layers: {}\n", view.ln.size());
   fmt::print("Largest layer size: {}\n", fn(view.ln).as(LR(_1.second.size())).max() );
-  timer({}, f_write_v, metadata, ops.preds, ops.succs, "out/2-out.v");
+  fmt::print("Balance crossings layer/nodes:\n");
+  for (auto&& [l,nds] : view.ln)
+  {
+    fmt::print("l: {} - n: {}\n", l, nds);
+  } // for
+
+  // Write to file
+  timer({}, f_write_v, view, ops, "out/2-out.dot");
+
+  // Balance paths
+  timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
+
   return view;
 } // function: pre_processing }}}
 
@@ -218,33 +239,22 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u, f_h);
 
-  auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_verilog::Writer(std::forward<Args>(args)...); };
-  auto f_write_d = [&]<typename... Args>(Args&&... args) { ns_io_dimacs::Writer(std::forward<Args>(args)...); };
-
   // Create output directory
   std::error_code ec{}; fs::create_directory("./out", ec);
 
-  //
   // Pre-processings
-  //
-  timer({}, f_write_v, metadata.data(), f_p, f_s, "out/0-out.v");
   auto view = pre_processing(ops, metadata.data(),g.data());
-  fmt::print("Layer/Nodes:\n");
-  for (auto& [l,nds] : view.ln)
-  {
-    fmt::print("l: {} - n: {}\n", l, nds);
-  } // for
 
-  for (auto& [n,l] : view.nl)
-  {
-    if ( ops.preds(n).size() == 0 and l != 0 ) { l = 0; }
-  } // for
+  // Collapse
+  auto [nodes_collapsed, positions_collapsed] = ns_ops::balance::crossings::view_collapse(ops, view.ln);
+  auto map_node_position = fn(nodes_collapsed)
+    .zip(positions_collapsed)
+    .as([&](auto&& e){ return std::make_pair(e.first, std::make_pair(e.second, view.nl.at(e.first))); })
+    .map();
 
-  view.ln.clear();
-  fn(view.nl).ply([&](auto&& e) { view.ln[e.second].push_back(e.first); });
-
-  auto view_collapsed = ns_ops::balance::crossings::view_collapse(ops, view.ln);
-  fmt::print("Collapsed view: {}\n", view_collapsed);
+  // Write to file
+  auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_dot::Writer(std::forward<Args>(args)...); };
+  timer({}, f_write_v, view, ops, "out/3-out.dot", map_node_position);
 
   return EXIT_SUCCESS;
 } // main }}}
