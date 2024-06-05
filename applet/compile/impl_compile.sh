@@ -5,8 +5,8 @@ set -xe
 DIR_PROJECT="${DIR_PROJECT:?"DIR_PROJECT is undefined"}"
 
 # Find used libraries
-readarray -t LIB_NAMES < <(pcregrep -o2 "isystem (.*?/p/(.*?)/p/include)" ./build/Release/compile_commands.json)
-readarray -t LIB_PATHS < <(pcregrep -o1 "isystem (.*?/p/(.*?)/p/include)" ./build/Release/compile_commands.json)
+readarray -t LIB_NAMES < <(pcregrep -o2 "isystem (.*?/p/(.*?)/p/include)" ./build/Debug/compile_commands.json)
+readarray -t LIB_PATHS < <(pcregrep -o1 "isystem (.*?/p/(.*?)/p/include)" ./build/Debug/compile_commands.json)
 
 # Create libs directory
 DIR_LIB="/host/conan-libs"
@@ -16,7 +16,7 @@ mkdir -p "$DIR_LIB"
 # Copy compile_commands.json
 COMPILE_COMMANDS_JSON=/host/compile_commands.json
 echo "COMPILE_COMMANDS_JSON: $COMPILE_COMMANDS_JSON"
-cp ./build/Release/compile_commands.json "$COMPILE_COMMANDS_JSON"
+cp ./build/Debug/compile_commands.json "$COMPILE_COMMANDS_JSON"
 
 for (( i=0; i < "${#LIB_NAMES[@]}"; i++ )); do
   # Copy the library to the create directory

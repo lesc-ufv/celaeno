@@ -70,6 +70,7 @@
 #include <celaeno/heuristics/manhattan.hpp>
 
 #include <celaeno/graph/operations/balance/crossings.hpp>
+#include <celaeno/graph/operations/balance/unbalance.hpp>
 #include <celaeno/graph/operations/minimize/crossings.hpp>
 
 
@@ -209,8 +210,13 @@ decltype(auto) pre_processing(Ops const& ops, auto&& metadata, auto&& edges)
   // Write to file
   timer({}, f_write_v, view, ops, "out/2-out.dot");
 
-  // Balance paths
-  timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
+  view = timer({}, LR(ns_ops::balance::unbalance::run(0, ops, view),0));
+
+  // Write to file
+  timer({}, f_write_v, view, ops, "out/3-out.dot");
+
+  // // Balance paths
+  // timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
 
   return view;
 } // function: pre_processing }}}
@@ -254,7 +260,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
 
   // Write to file
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_dot::Writer(std::forward<Args>(args)...); };
-  timer({}, f_write_v, view, ops, "out/3-out.dot", map_node_position);
+  timer({}, f_write_v, view, ops, "out/4-out.dot", map_node_position);
 
   return EXIT_SUCCESS;
 } // main }}}
