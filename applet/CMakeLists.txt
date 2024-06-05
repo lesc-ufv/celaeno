@@ -49,7 +49,7 @@ function(add_applet target)
 
   target_compile_options(${target}
     PRIVATE
-      -std=c++2a
+      -std=c++23
       $<IF:$<CONFIG:Debug>,
         -Wall
         -Wextra

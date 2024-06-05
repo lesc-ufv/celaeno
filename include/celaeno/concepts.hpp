@@ -174,6 +174,24 @@ concept IsPairsOf = requires(U... u)
   { ((u.first),...) } -> std::convertible_to<std::decay_t<T>>;
   { ((u.second),...) } -> std::convertible_to<std::decay_t<T>>;
 };
+
+//
+// Check if T is less than comparable with U
+//
+template<typename T, typename U>
+concept LessThanComparable = requires (T t, U u)
+{
+  { t < u } -> std::same_as<bool>;
+};
+
+//
+// Check if T is less than or equal comparable with U
+//
+template<typename T, typename U>
+concept LessThanEqualComparable = requires (T t, U u)
+{
+  { t <= u } -> std::same_as<bool>;
+};
 // }}}
 
 // Function {{{
@@ -205,7 +223,5 @@ concept Returns = requires(F f, Args&&... args)
 // }}}
 
 // }}}
-
-
 
 } // namespace celaeno::concepts }}}

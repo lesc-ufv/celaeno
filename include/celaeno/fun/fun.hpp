@@ -700,8 +700,35 @@ template<Range R>
 } // namespace: fn }}}
 
 // Helper function objects {{{
-[[maybe_unused]] auto fst = [](auto&& _1){ return _1.first; };
-[[maybe_unused]] auto snd = [](auto&& _1){ return _1.second; };
+[[maybe_unused]] inline auto fst = [](auto&& _1){ return _1.first; };
+[[maybe_unused]] inline auto snd = [](auto&& _1){ return _1.second; };
+
+namespace unary
+{
+
+template<typename T>
+class greater
+{
+  private:
+    std::reference_wrapper<T> m_ref;
+  public:
+    greater(T& t) : m_ref(t) {}
+    template<LessThanComparable<T> U>
+    bool operator()(U&& u) { return m_ref.get() < u; }
+};
+template<typename T>
+
+class greater_equal
+{
+  private:
+    std::reference_wrapper<T> m_ref;
+  public:
+    greater_equal(T& t) : m_ref(t) {}
+    template<LessThanEqualComparable<T> U>
+    bool operator()(U&& u) { return m_ref.get() <= u; }
+};
+
+} // namespace unary
 // }}}
 
 
