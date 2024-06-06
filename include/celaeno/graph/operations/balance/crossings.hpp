@@ -179,8 +179,39 @@ decltype(auto) view_collapse(Ops const& ops
         err::err({succs_p.size() == 1})("Size of successors of p is not 1: {}"_fmt(succs_p));
         Node v = succs_p.at(0);
 
+        enum class Direction
+        {
+          LEFT,
+          RIGHT,
+        };
+
+        std::optional<Direction> opt_direction = std::nullopt;
+        if ( preds.size() == 2 and preds_in_layer.size() == 1 )
+        {
+          // If first pred found in nodes_collapsed is parent, should position
+          // to the right, else if is predecessor w should position to the left
+          //          u
+          //        |  | -> Put u to the right of p if is first match
+          //        p  |
+          //           w
+          //          u
+          //        |  | -> Put u to the left of p if w is first match
+          //        |  p
+          //        w
+          if ( *std::ranges::find_first_of(nodes_collapsed, preds) == p )
+          {
+            opt_direction = Direction::RIGHT;
+          } // if
+          else
+          {
+            opt_direction = Direction::LEFT;
+          } // else
+        } // if
+
         // 2.2 If the order is pv, put u before p, i.e.: upv
-        if (auto it_fst = std::ranges::find_first_of(nodes_collapsed, Nodes{p,v}); *it_fst == p )
+        if (auto it_fst = std::ranges::find_first_of(nodes_collapsed, Nodes{p,v});
+           (not opt_direction and *it_fst == p)
+        or (opt_direction and *opt_direction == Direction::LEFT))
         {
           auto distance_p = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p));
           auto position_p = positions_collapsed.at(distance_p);
@@ -204,7 +235,7 @@ decltype(auto) view_collapse(Ops const& ops
           positions_collapsed.insert(positions_collapsed.begin()+distance_insert, position_p-1);
         } // if
         // 2.3 Else if the order is vp, put u after p, i.e.: vpu
-        else if ( *it_fst == v )
+        else if ( (not opt_direction and *it_fst == v) or ( opt_direction and *opt_direction == Direction::RIGHT ))
         {
           // Find distance to p in nodes_collapsed
           auto distance_p = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p));
@@ -248,30 +279,36 @@ decltype(auto) view_collapse(Ops const& ops
         // 3.1 The position of u is k=(p1+p2)/2
         Node p1 = preds.at(0);
         Node p2 = preds.at(1);
-        auto position_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
-        auto position_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
-        auto k = ( positions_collapsed.at(position_p1) + positions_collapsed.at(position_p2) ) / 2;
+        auto distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
+        auto distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
+        auto position_p1 = positions_collapsed.at(distance_p1);
+        auto position_p2 = positions_collapsed.at(distance_p2);
+        double k = (static_cast<double>(position_p1) + position_p2) / 2.0;
         
         // 3.2 Find the position l that is greater or equal to k in positions_collapsed
-        auto it = std::ranges::find_if(positions_collapsed, fun::unary::greater_equal(k));
+        auto it = std::find_if(positions_collapsed.begin() + std::min(distance_p1, distance_p2)
+          , positions_collapsed.end()
+          , fun::unary::greater_equal(std::floor(k)));
         err::err({ it != positions_collapsed.end() })("Failed to find greate_equal position");
         auto position_l = std::distance(positions_collapsed.begin(), it) + 1;
 
-        // 3.5 Increment following positions by 1 if abs_diff(position_p2, position_p2) < 2
+        // 3.5 Increment following positions by 1 if abs_diff(distance_p2, distance_p2) < 2
         // This is to set node 'u' in-between p1 and p2
         //      u
         //     | |
         //    p1  p2
-        if ( fp::abs_diff(position_p2, position_p1) < 2 and map_node_layer.at(p1) == map_node_layer.at(p2) )
+        if ( std::round(k) != k
+        and map_node_layer.at(p1) == map_node_layer.at(p2)
+        and fp::abs_diff(map_node_layer.at(u), map_node_layer.at(p1)) == 0 ) 
         {
-          std::for_each(positions_collapsed.begin()+((position_p2 > position_p1)? position_p2 : position_p1)
+          std::for_each(positions_collapsed.begin() + std::max(distance_p1, distance_p2)
             , positions_collapsed.end()
             , [](auto& e){ e += 1; });
-          k += 1;
+          k = std::ceil(k);
         } // if
 
         // 3.3 Put k in position l of positions_collapsed
-        positions_collapsed.insert(positions_collapsed.begin()+position_l, k);
+        positions_collapsed.insert(positions_collapsed.begin()+position_l, std::floor(k));
 
         // 3.4 Put u in position l of nodes_collapsed
         nodes_collapsed.insert(nodes_collapsed.begin()+position_l, u);
