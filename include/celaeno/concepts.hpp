@@ -185,12 +185,32 @@ concept LessThanComparable = requires (T t, U u)
 };
 
 //
+// Check if T is greater than comparable with U
+//
+template<typename T, typename U>
+concept GreaterThanComparable = requires (T t, U u)
+{
+  { t > u } -> std::same_as<bool>;
+};
+
+
+//
 // Check if T is less than or equal comparable with U
 //
 template<typename T, typename U>
 concept LessThanEqualComparable = requires (T t, U u)
 {
   { t <= u } -> std::same_as<bool>;
+};
+// }}}
+
+//
+// Check if T is greater than or equal comparable with U
+//
+template<typename T, typename U>
+concept GreaterThanEqualComparable = requires (T t, U u)
+{
+  { t >= u } -> std::same_as<bool>;
 };
 // }}}
 

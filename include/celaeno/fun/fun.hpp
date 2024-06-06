@@ -713,19 +713,41 @@ class greater
     std::reference_wrapper<T> m_ref;
   public:
     greater(T& t) : m_ref(t) {}
-    template<LessThanComparable<T> U>
-    bool operator()(U&& u) { return m_ref.get() < u; }
+    template<GreaterThanComparable<T> U>
+    bool operator()(U&& u) { return u > m_ref.get(); }
 };
-template<typename T>
 
+template<typename T>
 class greater_equal
 {
   private:
     std::reference_wrapper<T> m_ref;
   public:
     greater_equal(T& t) : m_ref(t) {}
+    template<GreaterThanEqualComparable<T> U>
+    bool operator()(U&& u) { return u >= m_ref.get(); }
+};
+
+template<typename T>
+class less
+{
+  private:
+    std::reference_wrapper<T> m_ref;
+  public:
+    less(T& t) : m_ref(t) {}
+    template<LessThanComparable<T> U>
+    bool operator()(U&& u) { return u < m_ref.get(); }
+};
+
+template<typename T>
+class less_equal
+{
+  private:
+    std::reference_wrapper<T> m_ref;
+  public:
+    less_equal(T& t) : m_ref(t) {}
     template<LessThanEqualComparable<T> U>
-    bool operator()(U&& u) { return m_ref.get() <= u; }
+    bool operator()(U&& u) { return u <= m_ref.get(); }
 };
 
 } // namespace unary
