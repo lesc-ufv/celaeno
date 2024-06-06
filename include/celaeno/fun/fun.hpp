@@ -710,44 +710,88 @@ template<typename T>
 class greater
 {
   private:
-    std::reference_wrapper<T> m_ref;
+    std::variant<std::reference_wrapper<T>,T> m_ref;
   public:
-    greater(T& t) : m_ref(t) {}
+    greater(T& t) : m_ref(std::reference_wrapper<T>(t)) {}
+    greater(T&& t) : m_ref(std::forward<T>(t)) {}
     template<GreaterThanComparable<T> U>
-    bool operator()(U&& u) { return u > m_ref.get(); }
+    bool operator()(U&& u)
+    {
+      if ( std::holds_alternative<T>(m_ref) )
+      {
+        return u > std::get<T>(m_ref);
+      } // if
+      else
+      {
+        return u > std::get<std::reference_wrapper<T>>(m_ref).get();
+      } // else
+    }
 };
 
 template<typename T>
 class greater_equal
 {
   private:
-    std::reference_wrapper<T> m_ref;
+    std::variant<std::reference_wrapper<T>,T> m_ref;
   public:
-    greater_equal(T& t) : m_ref(t) {}
+    greater_equal(T& t) : m_ref(std::reference_wrapper<T>(t)) {}
+    greater_equal(T&& t) : m_ref(std::forward<T>(t)) {}
     template<GreaterThanEqualComparable<T> U>
-    bool operator()(U&& u) { return u >= m_ref.get(); }
+    bool operator()(U&& u)
+    {
+      if ( std::holds_alternative<T>(m_ref) )
+      {
+        return u >= std::get<T>(m_ref);
+      } // if
+      else
+      {
+        return u >= std::get<std::reference_wrapper<T>>(m_ref).get();
+      } // else
+    }
 };
 
 template<typename T>
 class less
 {
   private:
-    std::reference_wrapper<T> m_ref;
+    std::variant<std::reference_wrapper<T>,T> m_ref;
   public:
-    less(T& t) : m_ref(t) {}
+    less(T& t) : m_ref(std::reference_wrapper<T>(t)) {}
+    less(T&& t) : m_ref(std::forward<T>(t)) {}
     template<LessThanComparable<T> U>
-    bool operator()(U&& u) { return u < m_ref.get(); }
+    bool operator()(U&& u)
+    {
+      if ( std::holds_alternative<T>(m_ref) )
+      {
+        return u < std::get<T>(m_ref);
+      } // if
+      else
+      {
+        return u < std::get<std::reference_wrapper<T>>(m_ref).get();
+      } // else
+    }
 };
 
 template<typename T>
 class less_equal
 {
   private:
-    std::reference_wrapper<T> m_ref;
+    std::variant<std::reference_wrapper<T>,T> m_ref;
   public:
-    less_equal(T& t) : m_ref(t) {}
+    less_equal(T& t) : m_ref(std::reference_wrapper<T>(t)) {}
+    less_equal(T&& t) : m_ref(std::forward<T>(t)) {}
     template<LessThanEqualComparable<T> U>
-    bool operator()(U&& u) { return u <= m_ref.get(); }
+    bool operator()(U&& u)
+    {
+      if ( std::holds_alternative<T>(m_ref) )
+      {
+        return u <= std::get<T>(m_ref);
+      } // if
+      else
+      {
+        return u <= std::get<std::reference_wrapper<T>>(m_ref).get();
+      } // else
+    }
 };
 
 } // namespace unary
