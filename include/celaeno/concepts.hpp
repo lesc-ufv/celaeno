@@ -193,6 +193,15 @@ concept GreaterThanComparable = requires (T t, U u)
   { t > u } -> std::same_as<bool>;
 };
 
+//
+// Check if T is equal comparable with U
+//
+template<typename T, typename U>
+concept EqualComparable = requires (T t, U u)
+{
+  { t == u } -> std::same_as<bool>;
+};
+
 
 //
 // Check if T is less than or equal comparable with U

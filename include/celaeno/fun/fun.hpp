@@ -794,6 +794,28 @@ class less_equal
     }
 };
 
+template<typename T>
+class equal
+{
+  private:
+    std::variant<std::reference_wrapper<T>,T> m_ref;
+  public:
+    equal(T& t) : m_ref(std::reference_wrapper<T>(t)) {}
+    equal(T&& t) : m_ref(std::forward<T>(t)) {}
+    template<EqualComparable<T> U>
+    bool operator()(U&& u)
+    {
+      if ( std::holds_alternative<T>(m_ref) )
+      {
+        return u == std::get<T>(m_ref);
+      } // if
+      else
+      {
+        return u == std::get<std::reference_wrapper<T>>(m_ref).get();
+      } // else
+    }
+};
+
 } // namespace unary
 // }}}
 

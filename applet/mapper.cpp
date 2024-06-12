@@ -252,7 +252,7 @@ int main([[maybe_unused]] int argc, char const* argv[])
   auto view = pre_processing(ops, metadata.data(),g.data());
 
   // Collapse
-  auto [nodes_collapsed, positions_collapsed] = ns_ops::balance::crossings::view_collapse(ops, view.ln, view.nl);
+  auto [nodes_collapsed, positions_collapsed] = timer({}, [&]{ return ns_ops::balance::crossings::view_collapse(ops, view.ln, view.nl); });
   auto map_node_position = fn(nodes_collapsed)
     .zip(positions_collapsed)
     .as([&](auto&& e){ return std::make_pair(e.first, std::make_pair(e.second, view.nl.at(e.first))); })
