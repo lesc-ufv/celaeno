@@ -44,27 +44,29 @@
 #include <range/v3/all.hpp>
 #include <fplus/fplus.hpp>
 
-// {{{ celaeno::graph
+// celaeno::graph
 namespace celaeno::graph
 {
 
-// Using namespace {{{
+namespace
+{
+
+// Using namespace
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
 
-// Namespaces {{{
+// Namespaces
 namespace rg = ranges;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-// }}}
 
-// Aliases {{{
+// Aliases
 template<typename T>
 using Vertices = std::multimap<T,T>;
 template<typename T>
 using Storage = std::unique_ptr<Vertices<T>>;
-// }}}
+
+}
 
 // Graph ops {{{
 class Ops
@@ -320,4 +322,4 @@ void Graph<T>::erase(U&& u)
 
 // }}}
 
-} // namespace celaeno::graph }}}
+} // namespace celaeno::graph

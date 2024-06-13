@@ -45,32 +45,36 @@
 
 #include <celaeno/concepts.hpp>
 #include <celaeno/aliases.hpp>
-#include <celaeno/err/err.hpp>
+#include <celaeno/log/log.hpp>
 #include <celaeno/graph/graph.hpp>
 
 namespace celaeno::graph::search::zig_zag
 {
-// Using declarations {{{
-using Ops = celaeno::graph::Ops;
-// }}}
 
-// Namespaces {{{
+namespace
+{
+
+// Using declarations
+using Ops = celaeno::graph::Ops;
+
+// Namespaces
 namespace fp = fplus;
 namespace rg = ranges;
-// }}}
+namespace ns_log = celaeno::log;
 
-// Using namespaces {{{
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
 
-// enum: DIR {{{
+// enum: DIR
 enum class DIR
 {
   OUT_IN,
   IN_OUT,
 };
-// }}}
+
+}
+
 
 // fn: run {{{
 template<SignedIntegral T, typename C = std::function<bool(i64)>>
@@ -81,10 +85,8 @@ std::vector<T> run(T root,
   C&& f_cb = [](auto){ return false; }
 )
 {
-#if defined(DEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::search::zig_zag");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::search::zig_zag");
+
   // Keep track of current direction
   DIR dir{DIR::OUT_IN};
 

@@ -15,7 +15,7 @@ namespace celaeno::math::cantor_pairing
 {
 
 template<typename T>
-auto cantor_pairing(T&& z)
+auto run(T&& z)
 {
   using _T = std::remove_reference_t<T>;
   using float32_t = float;

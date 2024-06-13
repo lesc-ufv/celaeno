@@ -35,7 +35,7 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/err/err.hpp>
+#include <celaeno/log/log.hpp>
 #include <fmt/ranges.h>
 #include <range/v3/all.hpp>
 
@@ -45,17 +45,21 @@
 namespace celaeno::fun
 {
 
-// using namespaces {{{
+namespace 
+{
+
+// using namespaces
 using namespace celaeno::aliases;
 using namespace celaeno::concepts;
-using namespace celaeno::err;
-// }}}
+using namespace celaeno::log;
 
 // namespaces {{{
 namespace rg = ranges;
 namespace ra = ranges::actions;
 namespace rv = ranges::views;
 // }}}
+
+} // namespace 
 
 // class: Fun {{{
 template<typename V>
@@ -679,7 +683,7 @@ struct Fun
   template<typename F, typename S>
   decltype(auto) test(F&& f, S&& s)
   {
-    rg::for_each(view, [&](auto e) { err::err(f(e))(s); });
+    rg::for_each(view, [&](auto e) { log::err(f(e))(s); });
   } // function: assert
   // }}}
 

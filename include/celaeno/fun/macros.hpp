@@ -52,8 +52,4 @@
 #define LAMBR_3(body, n, prefix) [&](BOOST_PP_REPEAT(n, AUTO_FORWARD_DECL, prefix)) -> decltype(auto) { return body; }
 
 #define LR(...) GET_MACRO(__VA_ARGS__, LAMBR_3, LAMBR_2, LAMBR_1)(__VA_ARGS__)
-
-#define _LR LR(
-#define _LV LV(
-#define _LE )
 // }}}

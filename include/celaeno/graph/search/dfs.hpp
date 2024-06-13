@@ -44,34 +44,35 @@
 #endif
 
 #include <celaeno/concepts.hpp>
+#include <celaeno/log/log.hpp>
 
-// namespace celaeno::graph::search::dfs {{{
+// namespace celaeno::graph::search::dfs
 namespace celaeno::graph::search::dfs
 {
 
-// Namespaces {{{
+namespace
+{
+
+// Namespaces
 namespace rg = ranges;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
-// }}}
+namespace ns_log = celaeno::log;
 
-// Using namespaces {{{
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
 
-// Algorithm {{{
+}
+
+// fn: run {{{
 template<SignedIntegral T, typename P, typename S, typename C = std::function<bool(int64_t)>>
 std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;})
   requires CallableWith<P,i64>
   && CallableWith<S,i64>
   && CallableWith<C,i64>
 {
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::search::dfs");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::search::dfs");
 
   // Create adjacent helper
   auto nb = [&](auto&& u){ return fp::append(pred(u),succ(u)); };
@@ -117,4 +118,4 @@ std::vector<T> run(T root, P&& pred, S&& succ, C&& cb = [](auto&&){return false;
   return result;
 } // function: run }}}
 
-} // namespace celaeno::graph::search::dfs }}}
+} // namespace celaeno::graph::search::dfs

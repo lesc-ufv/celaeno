@@ -43,36 +43,38 @@
 #include <celaeno/literals.hpp>
 #include <celaeno/fun/fun.hpp>
 #include <celaeno/fun/macros.hpp>
-#include <celaeno/err/err.hpp>
+#include <celaeno/log/log.hpp>
 
 #include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/graph/views/depth.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 
-// namespace celaeno::graph::operations::balance::crossings {{{
+// namespace celaeno::graph::operations::balance::crossings
 namespace celaeno::graph::operations::balance::crossings
 {
 
-// using namespace {{{
+namespace
+{
+
+// using namespace
 using namespace celaeno::aliases;
 using namespace celaeno::concepts;
 using namespace celaeno::fun::fn;
-// }}}
 
-// namespaces {{{
+// namespaces
 namespace rg = ranges;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 
-namespace err = celaeno::err;
 namespace fun = celaeno::fun;
 namespace ns_search = celaeno::graph::search;
-// }}}
+namespace ns_log = celaeno::log;
 
-// Aliases {{{
+// Aliases
 template<SignedIntegral T>
 using Cross = std::map<T,T>;
-// }}}
+
+}
 
 // fn: create_crossing_layers {{{
 template<Range R1, Range R2>
@@ -130,14 +132,14 @@ decltype(auto) view_collapse(Ops const& ops
   using Nodes = std::vector<Node>;
   using NodeSet = std::unordered_set<Node>;
 
-  err::err( { ! map_layer_nodes.empty() } )("Empty view");
+  log::err( { ! map_layer_nodes.empty() } )("Empty view");
 
   // Fetch lowest layer id
   Key id_lowest_layer = fn(map_layer_nodes).key().min();
 
   // Assume that the first layer only contains inputs
   auto f_is_input = LR(ops.preds(_1).empty());
-  err::err( { fn(map_layer_nodes.at(id_lowest_layer)).all(LR(f_is_input(_1))) } )
+  log::err( { fn(map_layer_nodes.at(id_lowest_layer)).all(LR(f_is_input(_1))) } )
     ("First layer must only contain inputs");
 
   // Initialize collapse nodes and positions with first layer
@@ -166,7 +168,7 @@ decltype(auto) view_collapse(Ops const& ops
       auto preds = ops.preds(u);
       auto preds_in_layer = fn(preds).in(std::prev(it_entry)->second).vec();
 
-      err::err({preds.size() != 0})("Empty preds for {}"_fmt(u));
+      log::err({preds.size() != 0})("Empty preds for {}"_fmt(u));
 
       // 2. If there is only 1 predecessor p
       if ( preds.size() == 1
@@ -176,7 +178,7 @@ decltype(auto) view_collapse(Ops const& ops
 
         // 2.1 Get successor of p, v, that is not u
         Nodes succs_p = fn(ops.succs(p)).dif(std::vector<Node>{u}).vec();
-        err::err({succs_p.size() == 1})("Size of successors of p is not 1: {}"_fmt(succs_p));
+        log::err({succs_p.size() == 1})("Size of successors of p is not 1: {}"_fmt(succs_p));
         Node v = succs_p.at(0);
 
         enum class Direction
@@ -265,7 +267,7 @@ decltype(auto) view_collapse(Ops const& ops
         } // else if
         else
         {
-          err::err()("Could not bind parent nor child");
+          log::err()("Could not bind parent nor child");
         } // else
 
         // 2.6 Adjust positions to only contain an increasing sequence
@@ -366,7 +368,7 @@ decltype(auto) view_collapse(Ops const& ops
         auto it = std::find_if(positions_collapsed.begin() + std::min(distance_p1, distance_p2)
           , positions_collapsed.end()
           , fun::unary::greater_equal(std::floor(k)));
-        err::err({ it != positions_collapsed.end() })("Failed to find greate_equal position");
+        log::err({ it != positions_collapsed.end() })("Failed to find greate_equal position");
         auto position_l = std::distance(positions_collapsed.begin(), it) + 1;
 
         // 3.5 Increment following positions by 1 if abs_diff(distance_p2, distance_p2) < 2
@@ -393,7 +395,7 @@ decltype(auto) view_collapse(Ops const& ops
         continue;
       } // if
 
-      err::err()("Invalid preds size of {}"_fmt(preds.size()));
+      log::err()("Invalid preds size of {}"_fmt(preds.size()));
     } // for
   } // for
 
@@ -404,11 +406,8 @@ decltype(auto) view_collapse(Ops const& ops
 template<SignedIntegral T = i64, Range R>
 std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
 {
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::balance::crossings");
 
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::operations::balance::crossings");
-#endif
   // Return cross id → Crossed nodes [src,dest]
   std::map<i64, Cross<i64>> out;
 
@@ -463,7 +462,7 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
   //
 
   // Test for empty successors vec
-  err::err({!succs.empty()})("Empty successors map!");
+  log::err({!succs.empty()})("Empty successors map!");
 
   // First vector accumulates all values
   auto& acc{*succs.begin()};
@@ -573,7 +572,7 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
           */
           ops.unlink(n_parent,n_child);
 
-          err::err({! f_is_crossing(n_child)})
+          log::err({! f_is_crossing(n_child)})
             ("Set id crossings must not contain n_child");
 
           // Update children of previous crossing
@@ -619,7 +618,7 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
           */
           ops.unlink(parent,child);
 
-          err::err({! f_is_crossing(n_child)})
+          log::err({! f_is_crossing(n_child)})
             ("Set id crossings must not contain n_child");
 
           /* Update children in result
@@ -715,4 +714,4 @@ decltype(auto) run(Ops const& ops, V& view)
   return view;
 } // function: run }}}
 
-} // namespace celaeno::graph::operations::balance::crossings }}}
+} // namespace celaeno::graph::operations::balance::crossings

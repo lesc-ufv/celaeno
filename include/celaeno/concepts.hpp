@@ -41,7 +41,7 @@
 #include <fmt/ranges.h>
 #include <celaeno/aliases.hpp>
 
-// namespace celaeno::concepts {{{
+// namespace celaeno::concepts
 namespace celaeno::concepts
 {
 
@@ -251,6 +251,4 @@ concept Returns = requires(F f, Args&&... args)
 };
 // }}}
 
-// }}}
-
-} // namespace celaeno::concepts }}}
+} // namespace celaeno::concepts

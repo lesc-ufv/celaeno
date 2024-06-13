@@ -12,10 +12,15 @@
 #include <boost/algorithm/string.hpp>
 #include <celaeno/concepts.hpp>
 
-namespace ns_concept = celaeno::concepts;
-
 namespace ns_string
 {
+
+namespace
+{
+
+namespace ns_concept = celaeno::concepts;
+
+} // namespace
 
 // replace_substrings() {{{
 inline std::string replace_substrings(std::string string

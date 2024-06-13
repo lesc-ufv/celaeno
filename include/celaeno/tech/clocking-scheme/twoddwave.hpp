@@ -35,18 +35,21 @@
 
 #include <spdlog/spdlog.h>
 
-// namespace celaeno::tech::clock_scheme {{{
+// namespace celaeno::tech::clock_scheme
 namespace celaeno::tech::clock_scheme
 {
 
-// using namespace {{{
-using namespace celaeno::aliases;
-// }}}
+namespace
+{
 
-// Aliases {{{
+// using namespace
+using namespace celaeno::aliases;
+
+// Aliases
 using Phase = i32;
 using Cutout = std::vector<std::vector<Phase>>;
-// }}}
+
+}
 
 // 2DDWave: V. Vankamamidi, M. Ottavi and F. Lombardi, "Clocking and Cell {{{
 // Placement for QCA," 2006 Sixth IEEE Conference on Nanotechnology, 2006,
@@ -59,17 +62,17 @@ struct TwoddWave
     Phase operator()(i64 x, i64 y);
 }; // struct: TwoddWave
 
-const Cutout TwoddWave::twoddwave =
+inline const Cutout TwoddWave::twoddwave =
 {{
   {{0, 1, 2}},
   {{1, 2, 0}},
   {{2, 0, 1}},
 }};
 
-Phase TwoddWave::operator()(i64 x, i64 y)
+inline Phase TwoddWave::operator()(i64 x, i64 y)
 {
   return this->twoddwave.at(x % 3).at(y % 3);
 }
 // struct: TwoddWave }}}
 
-} // namespace celaeno::tech::clock_scheme }}}
+} // namespace celaeno::tech::clock_scheme

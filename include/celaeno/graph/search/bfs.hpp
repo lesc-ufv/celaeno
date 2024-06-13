@@ -35,8 +35,6 @@
 #include <vector>
 #include <queue>
 #include <set>
-#include <tuple>
-#include <concepts>
 #include <type_traits>
 
 #include <range/v3/all.hpp>
@@ -45,12 +43,16 @@
   #include <spdlog/spdlog.h>
 #endif
 
-#include <celaeno/graph/graph.hpp>
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/log/log.hpp>
+#include <celaeno/graph/graph.hpp>
 
-// namespace celaeno::graph::search::bfs {{{
+// namespace celaeno::graph::search::bfs
 namespace celaeno::graph::search::bfs
+{
+
+namespace
 {
 
 // Using declarations {{{
@@ -60,6 +62,7 @@ using Ops = celaeno::graph::Ops;
 // Namespaces {{{
 namespace fp = fplus;
 namespace ra = ranges::actions;
+namespace ns_log = celaeno::log;
 // }}}
 
 // Using namespaces {{{
@@ -83,7 +86,9 @@ template<typename T>
 using CbType = std::function<bool(typename BaseType<T>::type)>;
 // }}}
 
-// Algorithm {{{
+}
+
+// run {{{
 template<typename T , typename P , typename S , typename C = CbType<T>>
 decltype(auto) run(T root
     , P&& f_pred
@@ -92,13 +97,9 @@ decltype(auto) run(T root
   requires (CallableWith<P,T> or CallableWith<P,typename T::value_type>)
   && (CallableWith<S,T> or CallableWith<S,typename T::value_type>)
   && (CallableWith<C,T> or CallableWith<C,typename T::value_type>)
-
 {
 
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::search::bfs");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::search::bfs");
 
   // Create adjacent helper
   auto f_nb = [&](auto&& u){ return fp::append(f_pred(u),f_succ(u)); };
@@ -161,4 +162,4 @@ decltype(auto) run(T root, Ops const& ops, C&& f_cb = [](auto&&){return false;})
   return run(root, ops.preds, ops.succs, f_cb);
 } // }}}
 
-} // namespace celaeno::graph::search::bfs }}}
+} // namespace celaeno::graph::search::bfs

@@ -48,7 +48,7 @@
 #include <celaeno/graph/representations/incidence.hpp>
 #include <celaeno/fun/fun.hpp>
 
-// namespace celaeno::graph::operations::minimize::crossings::impl {{{
+// namespace celaeno::graph::operations::minimize::crossings::impl
 namespace celaeno::graph::operations::minimize::crossings::impl
 {
 
@@ -59,16 +59,12 @@ namespace celaeno::graph::operations::minimize::crossings::impl
 // Using namespaces {{{
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-using namespace celaeno::fun::fn;
 // }}}
 
 // namespaces {{{
 namespace rg = ranges;
-namespace rv = ranges::views;
 namespace ra = ranges::actions;
-namespace fun = celaeno::fun;
 namespace fp = fplus;
-namespace ns_views = celaeno::graph::views;
 namespace barycenter = celaeno::heuristics::barycenter;
 namespace incidence = celaeno::graph::representations::incidence;
 namespace ccrossings = celaeno::graph::operations::count::crossings;
@@ -413,4 +409,4 @@ template<SignedIntegral S
   return view;
 } // }}}
 
-} // namespace celaeno::graph::operations::minimize::crossing::impl }}}
+} // namespace celaeno::graph::operations::minimize::crossing::impl

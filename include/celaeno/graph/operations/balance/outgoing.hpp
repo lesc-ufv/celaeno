@@ -40,30 +40,32 @@
 #endif
 
 #include <celaeno/concepts.hpp>
+#include <celaeno/log/log.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/fun/fun.hpp>
 
-// namespace celaeno::graph::operations::balance::outgoing {{{
+// namespace celaeno::graph::operations::balance::outgoing
 namespace celaeno::graph::operations::balance::outgoing
 {
 
-// Using declarations {{{
-using Ops = celaeno::graph::Ops;
-// }}}
+namespace
+{
 
-// namespaces {{{
+// Using declarations
+using Ops = celaeno::graph::Ops;
+
+// namespaces
 namespace fp = fplus;
 namespace rg = ranges;
+namespace ns_log = celaeno::log;
 namespace ns_search = celaeno::graph::search;
-namespace fun = celaeno::fun;
-// }}}
 
-// Using namespaces {{{
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-using namespace celaeno::fun::fn;
-// }}}
+
+}
 
 // fn: run {{{
 template<SignedIntegral T, typename P, typename S, typename L, typename U>
@@ -73,11 +75,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   && CallableWith<L,T,T>
   && CallableWith<U,T,T>
 {
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::operations::balance::outgoing");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::balance::outgoing");
 
   // Dummy vertex with lowest value
   T idx{};
@@ -177,4 +175,4 @@ void run(T root, Ops ops)
 }
 // }}}
 
-} // namespace celaeno::graph::operations::balance::outgoing }}}
+} // namespace celaeno::graph::operations::balance::outgoing

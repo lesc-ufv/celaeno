@@ -46,43 +46,41 @@
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
-// namespace celaeno::graph::operations::count::crossings {{{
+// namespace celaeno::graph::operations::count::crossings
 namespace celaeno::graph::operations::count::crossings
 {
 
-// Macros {{{
-#define assertm(exp, msg) assert(((void)msg, exp))
-// }}}
+namespace
+{
 
-// namespaces {{{
+// Macros
+#define assertm(exp, msg) assert(((void)msg, exp))
+
+// namespaces
 namespace rg = ranges;
 namespace fp = fplus;
 namespace fw = fplus::fwd;
 
+namespace ns_log = celaeno::log;
 namespace ns_graph = celaeno::graph;
 namespace ns_views = celaeno::graph::views;
 namespace ns_operations = celaeno::graph::operations;
-// }}}
 
-// Using namespaces {{{
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
 
-// Using declarations {{{
+// Using declarations
 using Ops = ns_graph::Ops;
-// }}}
 
-// function: run {{{
+} // namespace
+
+// fn: run {{{
 template<SignedIntegral T = i64, Range R, typename S>
 T run(R&& l1, R&& l2, S&& f_succ)
   requires CallableWith<S,i64>
 {
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::operations::count::crossings");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::count::crossings");
 
   //
   // @ Index by vertices positions in layer l2
@@ -143,7 +141,7 @@ T run(R&& l1, R&& l2, S&& f_succ)
 
   return crossings;
 
-} // function: run }}}
+} // fn: run }}}
 
 // fn: run {{{
 template<SignedIntegral T = i64, typename V>
@@ -171,4 +169,4 @@ T run(T root, Ops const& ops, V&& ln)
   return count;
 } // function: run }}}
 
-} // celaeno::graph::operations::count::crossings }}}
+} // celaeno::graph::operations::count::crossings

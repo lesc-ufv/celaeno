@@ -45,19 +45,23 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 
-// namespace celaeno::graph::search::kahn {{{
+// namespace celaeno::graph::search::kahn
 namespace celaeno::graph::search::kahn
 {
 
-// Namespaces {{{
+namespace
+{
+
+// Namespaces
 namespace fp = fplus;
 namespace bfs = celaeno::graph::search::bfs;
-// }}}
+namespace ns_log = celaeno::log;
 
-// Using namespaces {{{
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
+
+}
 
 // Algorithm {{{
 template<SignedIntegral T, typename P, typename S, typename C = std::function<bool(int64_t)>>
@@ -66,11 +70,7 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return fa
   && CallableWith<S,T>
   && CallableWith<C,T>
 {
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::search::kahn");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::search::kahn");
 
   // Topologically sorted result
   std::vector<T> result;
@@ -112,4 +112,4 @@ std::vector<T> run(T root, P&& f_pred, S&& f_succ, C&& cb = [](auto&&){return fa
   return result;
 } // function: run }}}
 
-} // namespace celaeno::graph::search::kahn }}}
+} // namespace celaeno::graph::search::kahn

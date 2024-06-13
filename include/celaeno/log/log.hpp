@@ -1,7 +1,7 @@
 // vim: set expandtab fdm=marker ts=2 sw=2 tw=80 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
-// @file        : err
+// @file        : log
 // @created     : Thursday Aug 19, 2021 12:35:25 UTC
 //
 
@@ -18,14 +18,17 @@
 
 #define DEBUG (!NDEBUG)
 
-// namespace celaeno::err {{{
-namespace celaeno::err
+// namespace celaeno::log {{{
+namespace celaeno::log
 {
 
-// using namespace {{{
+namespace
+{
+
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
+
+} // namespace
 
 // class: Location {{{
 class Location
@@ -131,4 +134,33 @@ class Logger
 inline char const * const Logger::m_log_filename = "celaeno.log";
 // class: Logger }}}
 
-} // namespace celaeno::err }}}
+// struct: Timer {{{
+struct Timer
+{
+  std::string m_label;
+  std::chrono::milliseconds m_start;
+  std::chrono::milliseconds m_end;
+
+  Timer(std::string label)
+    : m_label(label)
+  {
+    spdlog::debug("[exe] {}", label);
+    m_start = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch()
+    );
+  }
+
+  ~Timer()
+  {
+    m_end = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch()
+    );
+    std::chrono::duration<f64> dur {m_end-m_start};
+    spdlog::debug("[end] {} took {} milliseconds"
+      , m_label
+      , std::chrono::duration_cast<std::chrono::milliseconds>(dur).count()
+    );
+  }
+}; // struct Timer }}}
+
+} // namespace celaeno::log }}}

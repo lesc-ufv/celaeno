@@ -43,10 +43,11 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/log/log.hpp>
 #include <celaeno/graph/representations/incidence/impl.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
-// namespace celaeno::graph::representations::incidence {{{
+// namespace celaeno::graph::representations::incidence
 namespace celaeno::graph::representations::incidence
 {
 
@@ -57,7 +58,8 @@ namespace celaeno::graph::representations::incidence
 
 // Namespaces {{{
 namespace depth = celaeno::graph::views::depth;
-namespace incidence = celaeno::graph::representations::incidence::impl;
+namespace ns_incidence = celaeno::graph::representations::incidence::impl;
+namespace ns_log = celaeno::log;
 // }}}
 
 // Using namespaces {{{
@@ -79,39 +81,30 @@ auto run(T root, P&& f_pred, S&& f_succ, A&& f_adj)
   && CallableWith<S,T>
   && CallableWith<A,T,T>
 {
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::representations::incidence");
 
-#ifndef NDEBUG
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::representations::incidence");
-#endif
+  // depth view: @level → vertices && @vertex → level
+  auto [ln,_] = depth::run(root,f_pred,f_succ);
 
-    // depth view: @level → vertices && @vertex → level
-    auto [ln,_] = depth::run(root,f_pred,f_succ);
+  // Number of levels must be > 1
+  assertm(ln.size() > 1, "Number of layers of the input graph is less 2");
 
-    // Number of levels must be > 1
-    assertm(ln.size() > 1, "Number of layers of the input graph is less 2");
-
-    // Return the incidence matrix
-    return incidence::all(
-      std::forward<decltype(ln)>(ln),
-      std::forward<decltype(f_adj)>(f_adj)
-    );
+  // Return the incidence matrix
+  return ns_incidence::all(
+    std::forward<decltype(ln)>(ln),
+    std::forward<decltype(f_adj)>(f_adj)
+  );
 
 } // function: run }}}
 
 // fn: run {{{
-
 template<Range R, typename A>
 auto run(R&& l1, R&& l2, A&& f_adj)
   requires CallableWith<A,i64,i64>
 {
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::representations::incidence");
 
-#ifndef NDEBUG
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::representations::incidence");
-#endif
-
-  return incidence::single(
+  return ns_incidence::single(
     std::forward<R>(l1),
     std::forward<R>(l2),
     std::forward<A>(f_adj)
@@ -119,4 +112,4 @@ auto run(R&& l1, R&& l2, A&& f_adj)
 
 } // function: run }}}
 
-} // namespace celaeno::graph::representations::incidence }}}
+} // namespace celaeno::graph::representations::incidence

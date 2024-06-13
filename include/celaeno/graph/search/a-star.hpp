@@ -45,16 +45,18 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-
-// TODO Remove
-#include <fmt/core.h>
-#include <fmt/ranges.h>
+#include <celaeno/log/log.hpp>
+#include <celaeno/heuristics/chebyshev.hpp>
+#include <celaeno/heuristics/manhattan.hpp>
 
 namespace celaeno::graph::search::a_star
 {
 
+namespace
+{
+
 // Namespaces {{{
-namespace ns_heuristics = celaeno::heuristics;
+namespace ns_log = celaeno::log;
 // }}}
 
 // Using Namespaces {{{
@@ -112,6 +114,8 @@ std::deque<T> rebuild_path(T start, T end, Map const& m)
   return out;
 } // fn: rebuild_path }}}
 
+} // namespace
+
 // fn: run {{{
 template<typename T
   , typename F1
@@ -127,6 +131,8 @@ std::optional<std::deque<T>>
     , F3&& f_heuristic
     , F4&& f_is_path_valid = [](auto&&){ return true; })
 {
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::search::a-star");
+
   // Open set in ascending order
   std::multimap<f64,T> open;
 

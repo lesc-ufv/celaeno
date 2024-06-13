@@ -34,7 +34,6 @@
 #pragma once
 
 #include <map>
-#include <type_traits>
 
 #include <range/v3/all.hpp>
 #ifndef NDEBUG
@@ -44,32 +43,31 @@
 #include <celaeno/concepts.hpp>
 #include <celaeno/graph/search/kahn.hpp>
 
-// namespace celaeno::graph::views::depth {{{
+// namespace celaeno::graph::views::depth
 namespace celaeno::graph::views::depth
 {
 
-// Macros {{{
-#define assertm(exp, msg) assert(((void)msg, exp))
-// }}}
+namespace
+{
 
-// Namespaces {{{
+// Macros
+#define assertm(exp, msg) assert(((void)msg, exp))
+
+// Namespaces
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace kahn = celaeno::graph::search::kahn;
-// }}}
 
-// Using namespaces {{{
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
 
-// Aliases {{{
+// Aliases
 using Layer = i64;
 template<typename N> using LayerNodes = std::map<Layer,std::vector<N>>;
 template<typename N> using NodeLayer = std::map<N,Layer>;
-// }}}
 
-// struct: Result {{{
+// struct: Result
 template<typename N>
 struct Result
 {
@@ -79,7 +77,9 @@ struct Result
     : ln(std::move(_ln))
     , nl(std::move(_nl))
   {}
-}; // struct }}}
+}; // struct
+
+}
 
 // fn: run {{{
 template<SignedIntegral N, typename P, typename S>
@@ -131,5 +131,3 @@ Result<N> run(N root, P&& f_pred, S&& f_succ)
 } // function: run }}}
 
 } // namespace celaeno::graph::view::depth
-
-// }}}

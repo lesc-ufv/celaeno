@@ -1,3 +1,4 @@
+// vim: set expandtab fdm=marker ts=2 sw=2 tw=100 et :
 //
 // @author      : Ruan E. Formigoni (ruanformigoni@gmail.com)
 // @file        : crossings
@@ -38,6 +39,7 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
+#include <celaeno/log/log.hpp>
 #include <celaeno/graph/operations/balance/paths.hpp>
 #include <celaeno/graph/operations/minimize/crossings/impl.hpp>
 #include <celaeno/graph/views/depth.hpp>
@@ -46,10 +48,18 @@
 namespace celaeno::graph::operations::minimize::crossings
 {
 
-// using namespaces {{{
+namespace
+{
+
+// using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
+
+// namespace
+namespace ns_log = celaeno::log;
+
+} // namespace 
+
 
 // run {{{
 template<SignedIntegral S
@@ -66,11 +76,8 @@ decltype(auto) run(S root
   && CallableWith<N2,i64>
   && CallableWith<N3,i64,i64>
 {
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::minimize::crossings");
 
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::debug("Algorithm: celaeno::graph::operations::minimize::crossings");
-  spdlog::set_level(spdlog::level::debug);
-#endif
   //
   // @ Sugiyama algorithm requires a k-layered bipartite graph
   //

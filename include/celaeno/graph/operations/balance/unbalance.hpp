@@ -48,22 +48,25 @@
 namespace celaeno::graph::operations::balance::unbalance
 {
 
+namespace
+{
+
 using namespace celaeno::aliases;
 using namespace celaeno::concepts;
 
+namespace ns_log = celaeno::log;
 namespace ns_search = celaeno::graph::search;
 
 using Ops = celaeno::graph::Ops;
 using celaeno::fun::fn::fn;
 
+}
+
+// fn: run {{{
 template<SignedIntegral I, typename V>
 V& run(I root, Ops const& ops, V& view)
 {
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::operations::balance::unbalance");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::balance::unbalance");
 
   auto bfs{ns_search::bfs::run(root,ops)};
 
@@ -152,6 +155,6 @@ V& run(I root, Ops const& ops, V& view)
   } // for
 
   return view;
-} // fn: run
+} // fn: run }}}
 
 } // namespace celaeno::graph::operations::balance::unbalance

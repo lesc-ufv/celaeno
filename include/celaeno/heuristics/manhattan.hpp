@@ -39,13 +39,16 @@
 namespace celaeno::heuristics::manhattan
 {
 
-// Aliases {{{
+namespace
+{
+
 using namespace celaeno::aliases;
 using namespace celaeno::concepts;
 
 template<typename T>
 using Coord = std::pair<T,T>;
-// }}}
+
+}
 
 // fn: run {{{
 template<SignedIntegral T>

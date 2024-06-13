@@ -39,30 +39,33 @@
 #endif
 
 #include <celaeno/concepts.hpp>
+#include <celaeno/log/log.hpp>
 #include <celaeno/graph/graph.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 #include <celaeno/graph/views/depth.hpp>
 
-// namespace celaeno::graph::operations::balance::incoming {{{
+// namespace celaeno::graph::operations::balance::incoming
 namespace celaeno::graph::operations::balance::incoming
 {
 
-// Using declarations {{{
-using Ops = celaeno::graph::Ops;
-// }}}
+namespace
+{
 
-// namespaces {{{
+// Using declarations
+using Ops = celaeno::graph::Ops;
+
+// namespaces
 namespace fp = fplus;
 namespace rg = ranges;
-
+namespace ns_log = celaeno::log;
 namespace ns_views = celaeno::graph::views;
 namespace ns_search = celaeno::graph::search;
-// }}}
 
-// Using namespaces {{{
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
+
+}
 
 // fn: run {{{
 template<SignedIntegral T, typename P, typename S, typename L, typename U>
@@ -72,11 +75,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink )
   && CallableWith<L,T,T>
   && CallableWith<U,T,T>
 {
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::operations::balance::incoming");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::balance::incoming");
 
   auto depth_view {ns_views::depth::run(root,
     std::forward<P>(f_pred),
@@ -156,4 +155,4 @@ void run(T root, Ops ops)
 }
 // }}}
 
-} // namespace celaeno::graph::operations::balance::incoming }}}
+} // namespace celaeno::graph::operations::balance::incoming

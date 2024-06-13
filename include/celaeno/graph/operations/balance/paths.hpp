@@ -44,24 +44,27 @@
 #include <celaeno/fun/fun.hpp>
 #include <celaeno/graph/search/bfs.hpp>
 
-// namespace celaeno::graph::operations::balance::paths {{{
+// namespace celaeno::graph::operations::balance::paths
 namespace celaeno::graph::operations::balance::paths
 {
 
-// Namespaces {{{
-namespace bfs = celaeno::graph::search::bfs;
-namespace fun = celaeno::fun;
-// }}}
+namespace
+{
 
-// Using namespaces {{{
+// Namespaces
+namespace ns_bfs = celaeno::graph::search::bfs;
+namespace ns_fun = celaeno::fun;
+namespace ns_log = celaeno::log;
+
+// Using namespaces
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
 using namespace celaeno::fun::fn;
-// }}}
 
-// Using declarations {{{
+// Using declarations
 using Ops = celaeno::graph::Ops;
-// }}}
+
+}
 
 // fn: run {{{
 template<SignedIntegral T
@@ -76,11 +79,7 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, V& view)
   && CallableWith<L,T,T>
   && CallableWith<U,T,T>
 {
-
-#if ! defined(NDEBUG) && defined(DEBUG_SHOW_ALG)
-  spdlog::set_level(spdlog::level::debug);
-  spdlog::debug("Algorithm: celaeno::graph::operations::balance::paths");
-#endif
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::balance::paths");
 
   // Dummy vertex with lowest value
   i64 idx{};
@@ -89,13 +88,13 @@ void run(T root, P&& f_pred, S&& f_succ, L&& f_link, U&& f_unlink, V& view)
   auto f_lowest = [&idx](auto&& e) { if(e < idx){ idx=e; } return false; };
 
   // Get the dummy vertex with the lowest value
-  bfs::run(root,f_pred,f_succ,f_lowest);
+  ns_bfs::run(root,f_pred,f_succ,f_lowest);
 
   // vl = Vertex → Level; lv = Level  → Vertex
   auto& [lv,vl] = view;
 
   // Create the vector with levels indices
-  std::vector<T> levels = fn(lv).as(fun::fst).sort().vec();
+  std::vector<T> levels = fn(lv).as(ns_fun::fst).sort().vec();
 
   // Nodes to insert in level i
   std::map<i64, std::vector<T>> map_level_new_nodes;
@@ -184,4 +183,4 @@ void run(T root, Ops ops, V& view)
 }
 // }}}
 
-} // namespace celaeno::graph::operations::balance::paths }}}
+} // namespace celaeno::graph::operations::balance::paths

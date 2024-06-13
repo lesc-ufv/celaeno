@@ -36,7 +36,7 @@
 #include <numeric>
 #include <celaeno/concepts.hpp>
 
-// namespace cealeno::heuristics::barycenter {{{
+// namespace cealeno::heuristics::barycenter
 namespace celaeno::heuristics::barycenter
 {
 
@@ -63,4 +63,4 @@ template<Range R>
   return (b != 0)? static_cast<double>(a)/b : 0;
 } // function: run }}}
 
-} // namespace celaeno::heuristics::barycenter }}}
+} // namespace celaeno::heuristics::barycenter

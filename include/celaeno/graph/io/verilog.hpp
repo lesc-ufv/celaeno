@@ -32,10 +32,8 @@
 
 #pragma once
 
-#include <optional>
 #include <map>
 #include <sstream>
-#include <type_traits>
 #include <regex>
 #include <fstream>
 
@@ -45,23 +43,22 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/err/err.hpp>
+#include <celaeno/log/log.hpp>
 #include <celaeno/fun/fun.hpp>
 #include <celaeno/fun/macros.hpp>
 
 #include <celaeno/graph/search/bfs.hpp>
 
-// celaeno::graph::io::verilog {{{
+// celaeno::graph::io::verilog
 namespace celaeno::graph::io::verilog
 {
 
 // Namespaces {{{
-namespace err = celaeno::err;
-
 namespace rg = ranges;
 namespace rv = ranges::views;
 namespace ra = ranges::actions;
 
+namespace ns_log = celaeno::log;
 namespace ns_search = celaeno::graph::search;
 // }}}
 
@@ -144,7 +141,7 @@ Reader<T>::Reader(S&& _filename, T _callback)
 
   std::ifstream ifile{_filename};
 
-  err::err({ifile.good()})("Invalid input file {}", _filename);
+  log::err({ifile.good()})("Invalid input file {}", _filename);
 
   std::string input;
 
@@ -173,7 +170,7 @@ Reader<T>::Reader(S&& _filename, T _callback)
   {
     std::string _line(rng.begin(),rng.end());
 
-    err::err({
+    log::err({
       // Newline
       eval_regex(_line,"^$","Newline")
       // Comment
@@ -366,11 +363,13 @@ Writer::Writer( std::map<i64,GateType> m_id_type
   , auto&& f_succ
   , String auto&& out)
 {
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::io::dimacs::Writer");
+
   // Read file
   std::ofstream ofile{out};
 
   // Check for erros
-  err::err({ ofile.good() })("Error to open file {}", out);
+  log::err({ ofile.good() })("Error to open file {}", out);
 
   // Get all nodes through bfs
   auto bfs{ns_search::bfs::run(0,f_pred,f_succ)};
@@ -429,7 +428,7 @@ Writer::Writer( std::map<i64,GateType> m_id_type
         case GateType::DUMMY: op = "&"; break;
         case GateType::NOT: op = "~"; break;
         default:
-          err::err()("Operation not supported for node {}", node);
+          log::err()("Operation not supported for node {}", node);
       } // switch
 
       auto preds{f_pred(node)};
@@ -492,4 +491,4 @@ Writer::Writer( std::map<i64,GateType> m_id_type
 }
 // }}}
 
-} // namespace celaeno::graph::io::verilog }}}
+} // namespace celaeno::graph::io::verilog

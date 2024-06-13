@@ -34,9 +34,6 @@
 
 #include <optional>
 #include <map>
-#include <sstream>
-#include <type_traits>
-#include <regex>
 #include <fstream>
 
 #include <fmt/ranges.h>
@@ -45,26 +42,29 @@
 
 #include <celaeno/aliases.hpp>
 #include <celaeno/concepts.hpp>
-#include <celaeno/err/err.hpp>
+#include <celaeno/log/log.hpp>
 #include <celaeno/fun/fun.hpp>
 
 #include <celaeno/graph/graph.hpp>
 
-// celaeno::graph::io::dot {{{
+// celaeno::graph::io::dot
 namespace celaeno::graph::io::dot
 {
 
-// Namespaces {{{
-namespace err = celaeno::err;
-namespace rv = ranges::views;
-// }}}
+namespace
+{
 
-// Using namespaces {{{
+// Namespaces
+namespace ns_log = celaeno::log;
+
+// Using namespaces
 using namespace celaeno::fun::fn;
 using namespace celaeno::concepts;
 using namespace celaeno::aliases;
-// }}}
 
+}
+
+// class Writer {{{
 class Writer
 {
   public:
@@ -72,18 +72,21 @@ class Writer
       , celaeno::graph::Ops const& ops
       , String auto&& out
       , std::optional<std::map<i64,std::pair<i64,i64>>> map_node_position = std::nullopt);
-}; // class: Writer
+}; // class: Writer }}}
 
+// Writer::Writer {{{
 Writer::Writer(auto&& view
   , celaeno::graph::Ops const& ops
   , String auto&& out
   , std::optional<std::map<i64,std::pair<i64,i64>>> map_node_position)
 {
+  [[maybe_unused]] ns_log::Timer timer("celaeno::graph::io::dimacs::Writer");
+
   // Read file
   std::ofstream ofile{out};
 
   // Check for errors
-  err::err({ ofile.good() })("Error to open file {}", out);
+  log::err({ ofile.good() })("Error to open file {}", out);
 
   // Write header
   ofile << "digraph {\n";
@@ -145,6 +148,6 @@ Writer::Writer(auto&& view
   ofile << "}\n";
 
   ofile.close();
-}
+} // }}}
 
-} // namespace celaeno::graph::io::dot }}}
+} // namespace celaeno::graph::io::dot
