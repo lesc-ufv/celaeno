@@ -146,17 +146,14 @@ decltype(auto) view_collapse(Ops const& ops
   Nodes nodes_collapsed = map_layer_nodes.at(id_lowest_layer);
   Positions positions_collapsed = fp::numbers(i64{}, static_cast<i64>(nodes_collapsed.size()));
 
-  auto f_print_node_positions = [&]
-  {
-    for (auto&& zipped : std::views::zip(nodes_collapsed, positions_collapsed))
-    {
-      std::cout << "[" << std::get<0>(zipped) << "," << std::get<1>(zipped) << "]\n";
-    } // for
-  };
-  f_print_node_positions();
-
-  NodeSet nodes_visited;
-
+  // auto f_print_node_positions = [&]
+  // {
+  //   for (auto&& zipped : std::views::zip(nodes_collapsed, positions_collapsed))
+  //   {
+  //     std::cout << "[" << std::get<0>(zipped) << "," << std::get<1>(zipped) << "]\n";
+  //   } // for
+  // };
+  // f_print_node_positions();
 
   for (auto it_entry{std::next(map_layer_nodes.begin())}; it_entry != map_layer_nodes.end(); ++it_entry)
   {
@@ -470,13 +467,9 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
   // Save parents of nodes in acc
   std::vector<i64> parents;
 
-  // Parents of l2 nodes
-  std::map<i64,i64> m_id_parent;
-
   // Initialize parents of acc nodes
-  for( auto e : acc )
+  for(int i=0; i < acc.size(); ++i)
   {
-    m_id_parent[e] = l1.at(0);
     parents.push_back(l1.at(0));
   } // for
 
@@ -534,9 +527,6 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
 
           // Create dummy
           --idx;
-
-          // Save new crossing
-          set_id_crossings.insert(idx);
 
           /* Get child & parent of intersection
            *  np p
