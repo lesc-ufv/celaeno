@@ -63,8 +63,6 @@ namespace fw = fplus::fwd;
 
 namespace ns_log = celaeno::log;
 namespace ns_graph = celaeno::graph;
-namespace ns_views = celaeno::graph::views;
-namespace ns_operations = celaeno::graph::operations;
 
 // Using namespaces
 using namespace celaeno::concepts;
@@ -76,8 +74,8 @@ using Ops = ns_graph::Ops;
 } // namespace
 
 // fn: run {{{
-template<SignedIntegral T = i64, Range R, typename S>
-T run(R&& l1, R&& l2, S&& f_succ)
+template<Range R, typename S>
+i64 run(R&& l1, R&& l2, S&& f_succ)
   requires CallableWith<S,i64>
 {
   [[maybe_unused]] ns_log::Timer timer("celaeno::graph::operations::count::crossings");
@@ -85,13 +83,13 @@ T run(R&& l1, R&& l2, S&& f_succ)
   //
   // @ Index by vertices positions in layer l2
   //
-  std::map<T,T> ids;
-  rg::for_each(fp::numbers({},l2.size()),[&](T n) mutable { ids.emplace(l2.at(n),n); });
+  std::map<i64,i64> ids;
+  rg::for_each(fp::numbers({},l2.size()),[&](i64 n) mutable { ids.emplace(l2.at(n),n); });
 
   //
   // @ Create vector of id ordered successors, for all vertices of l2
   //
-  std::vector<std::vector<T>> succs;
+  std::vector<std::vector<i64>> succs;
 
   std::ranges::for_each(l1,
   [&](auto u)
@@ -99,7 +97,7 @@ T run(R&& l1, R&& l2, S&& f_succ)
     // Get successors of u, sort and transform in ids
     succs.emplace_back(fw::apply(f_succ(u)
       , fw::sort_by([&](auto a, auto b){ return ids.at(a) < ids.at(b); })
-      , fw::transform([&](auto v){ return static_cast<T>(ids.at(v)); })
+      , fw::transform([&](auto v){ return static_cast<i64>(ids.at(v)); })
     ));
   });
 
@@ -129,7 +127,8 @@ T run(R&& l1, R&& l2, S&& f_succ)
       {
         // Insert element
         // Include the distance from inserted position in accumulator last elem
-        crossings += std::distance(acc.insert(search,*it2),std::prev(acc.end()));
+        auto it_insert = acc.insert(search,*it2);
+        crossings += std::distance(it_insert,acc.end());
       } // if
       else
       {
@@ -144,8 +143,8 @@ T run(R&& l1, R&& l2, S&& f_succ)
 } // fn: run }}}
 
 // fn: run {{{
-template<SignedIntegral T = i64, typename V>
-T run(T root, Ops const& ops, V&& ln)
+template<typename V>
+i64 run(Ops const& ops, V&& ln)
 {
   // Balance paths
   // ns_operations::balance::paths::run(root,ops);
@@ -154,7 +153,7 @@ T run(T root, Ops const& ops, V&& ln)
   // auto ln{ns_views::depth::run(root,ops.preds,ops.succs).ln};
 
   // Count crossings between each layer
-  T count{};
+  i64 count{};
 
   auto layers{fp::overlapping_pairs(fp::numbers({},ln.size()))};
 

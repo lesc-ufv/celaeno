@@ -55,7 +55,6 @@ function(add_applet target)
         -Wextra
         -Wpedantic
         -Wshadow
-        -Weffc++
         -g
         ,
         -DNDEBUG

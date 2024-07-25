@@ -31,11 +31,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#include <algorithm>
-#include <tuple>
-#include <optional>
-#include <variant>
-#include <ranges>
 #include <filesystem>
 
 #include <fmt/core.h>
@@ -99,18 +94,12 @@ using namespace celaeno::aliases;
 // namespaces {{{
 // namespace py = pybind11;
 namespace fs = std::filesystem;
-namespace fp = fplus;
-namespace rg = ranges;
-namespace rv = ranges::views;
-namespace fun = celaeno::fun;
 
+namespace ns_log = celaeno::log;
 namespace ns_graph = celaeno::graph;
 namespace ns_ops = celaeno::graph::operations;
-namespace ns_heuristics = celaeno::heuristics;
 namespace ns_io_verilog = celaeno::graph::io::verilog;
-namespace ns_io_dimacs = celaeno::graph::io::dimacs;
 namespace ns_io_dot = celaeno::graph::io::dot;
-namespace ns_search = celaeno::graph::search;
 namespace ns_views = celaeno::graph::views;
 // }}}
 
@@ -143,32 +132,23 @@ auto timer(Location const& loc, F&& f, Args&&... args)
 {
   if constexpr(std::is_void_v<std::invoke_result_t<F, Args...>>)
   {
-#ifdef DEBUG
-    fmt::print("[exe] {}\n", loc.get());
+    spdlog::info("[exe] {}", loc.get());
     auto start {std::chrono::system_clock::now()};
     std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
-    fmt::print("[end] {} took {} seconds\n", loc.get(), dur.count());
-    return void();
-#else
-    std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
-    return void();
-#endif
+    spdlog::info("[end] {} took {} seconds", loc.get(), dur.count());
+    return;
   }
   else
   {
-#ifdef DEBUG
-    fmt::print("[exe] {}\n", loc.get());
+    spdlog::info("[exe] {}", loc.get());
     auto start {std::chrono::system_clock::now()};
     auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
     auto end {std::chrono::system_clock::now()};
     std::chrono::duration<f64> dur {end-start};
-    fmt::print("[end] {} took {} seconds\n", loc.get(), dur.count());
+    spdlog::info("[end] {} took {} seconds", loc.get(), dur.count());
     return result;
-#else
-    return std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
-#endif
   }
 }; // fn: timer }}}
 
@@ -184,18 +164,19 @@ decltype(auto) pre_processing(Ops const& ops)
   // Balance paths
   timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
 
+  ns_graph::operations::minimize::crossings::run(0, ops.preds, ops.succs, ops.adj, view);
+
   // Write to file
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_dot::Writer(std::forward<Args>(args)...); };
   timer({}, f_write_v, view, ops, "out/1-out.dot");
 
   // Count number of crossings
-  fmt::print("Number of crossings: {}\n", ns_ops::count::crossings::run(0, ops, view.ln));
+  spdlog::info("Number of crossings: {}", ns_ops::count::crossings::run(ops, view.ln));
 
   // Balance crossings
   view = timer({}, LR(ns_ops::balance::crossings::run(ops, view),0));
-  fmt::print("Number of layers: {}\n", view.ln.size());
-  fmt::print("Largest layer size: {}\n", fn(view.ln).as(LR(_1.second.size())).max() );
-  fmt::print("Balance crossings layer/nodes:\n");
+  spdlog::info("Number of layers: {}", view.ln.size());
+  spdlog::info("Largest layer size: {}", fn(view.ln).as(LR(_1.second.size())).max() );
 
   // Write to file
   timer({}, f_write_v, view, ops, "out/2-out.dot");
@@ -205,19 +186,40 @@ decltype(auto) pre_processing(Ops const& ops)
   // Write to file
   timer({}, f_write_v, view, ops, "out/3-out.dot");
 
-  // // Balance paths
-  // timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
-
   return view;
 } // function: pre_processing }}}
+
+template<typename Map>
+decltype(auto) get_area(Map&& map_node_position)
+{
+  struct Area
+  {
+    int64_t width;
+    int64_t height;
+  }; // Area
+  auto width_minmax = std::ranges::minmax_element(map_node_position | std::views::values | std::views::keys);
+  auto height_minmax = std::ranges::minmax_element(map_node_position | std::views::values | std::views::values);
+  i64 width = *(width_minmax.max) - *(width_minmax.min);
+  i64 height = *(height_minmax.max) - *(height_minmax.min);
+  return Area(width, height);
+} // function: get_area
 
 // fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
 {
+  ns_log::init();
+  spdlog::set_level(spdlog::level::info);
+
+  if ( argc < 2 )
+  {
+    spdlog::error("No arguments passed to the program");
+    spdlog::error("Usage:");
+    spdlog::error("./mapper circuit.v");
+  } // if
+
   // Read graph
   ns_graph::Graph<i64> g;
   auto emplace = [&g](auto&& e) -> void { g.emplace(e); };
-
   auto metadata {ns_io_verilog::Reader{argv[1],emplace}};
 
   // Helpers
@@ -228,14 +230,14 @@ int main([[maybe_unused]] int argc, char const* argv[])
   auto f_u = [&g](auto u, auto v){ g.erase(std::make_pair(u,v)); };
   auto f_h = [&g](auto u){ return g.has(u); };
 
-  fmt::print("Gates: {}\n", g.vertices_count());
-  fmt::print("Wires: {}\n", g.edges_count());
+  spdlog::info("Gates: {}", g.vertices_count());
+  spdlog::info("Wires: {}", g.edges_count());
 
   // Create ops
   Ops ops(f_p, f_s, f_a, f_l, f_u, f_h);
 
   // Create output directory
-  std::error_code ec{}; fs::create_directory("./out", ec);
+  fs::create_directory("./out");
 
   // Pre-processings
   auto view = pre_processing(ops);
@@ -250,6 +252,10 @@ int main([[maybe_unused]] int argc, char const* argv[])
   // Write to file
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_dot::Writer(std::forward<Args>(args)...); };
   timer({}, f_write_v, view, ops, "out/4-out.dot", map_node_position);
+
+  // Print area
+  auto area = get_area(map_node_position);
+  spdlog::info("Area: {}x{}", area.width, area.height);
 
   return EXIT_SUCCESS;
 } // main }}}

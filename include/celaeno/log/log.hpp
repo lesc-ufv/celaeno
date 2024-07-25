@@ -30,6 +30,12 @@ using namespace celaeno::aliases;
 
 } // namespace
 
+// fn: init {{{
+inline void init()
+{
+  spdlog::set_pattern("[%L] %v");
+} // fn: init }}}
+
 // class: Location {{{
 class Location
 {

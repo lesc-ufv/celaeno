@@ -73,6 +73,10 @@ namespace ns_log = celaeno::log;
 // Aliases
 template<SignedIntegral T>
 using Cross = std::map<T,T>;
+using Position = i64;
+using Positions = std::vector<Position>;
+using Node = i64;
+using Nodes = std::vector<Node>;
 
 }
 
@@ -118,6 +122,503 @@ decltype(auto) create_crossing_layers(Ops const& ops, R1&& r1, R2&& rc)
   return map_layer_nodes;
 } // function: create_crossing_layers }}}
 
+// fn: insert_before_parent {{{
+template<typename Node>
+void insert_before_parent(Node u
+  , Node p
+  , Range auto&& layer
+  , Range auto& positions_collapsed
+  , Range auto& nodes_collapsed)
+{
+  // Get x-coordinate position of p
+  auto position_p = positions_collapsed.at(std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p)));
+
+  // Find an index in positions_collapsed that equals p
+  auto index_insert = std::distance(positions_collapsed.begin(),
+      std::find_if(positions_collapsed.begin()
+    , positions_collapsed.end()
+    , fun::unary::equal(position_p)));
+
+  // Skip past the previous (by layer ordering) nodes in the same layer
+  // E.g. In layer {w,x,y,u,z}, {w,x,y} should be skipped for u to be after y
+  while(std::ranges::find_first_of(
+      std::ranges::subrange(nodes_collapsed.begin()+index_insert, nodes_collapsed.end())
+    , std::ranges::subrange(layer.begin(), std::find(layer.begin(), layer.end(), u)))
+    != std::ranges::end(nodes_collapsed))
+  {
+    ++index_insert;
+  } // while
+
+  nodes_collapsed.insert(nodes_collapsed.begin()+index_insert, u);
+  positions_collapsed.insert(positions_collapsed.begin()+index_insert, position_p-1);
+} // }}}
+
+// fn: insert_after_parent {{{
+void insert_after_parent(auto&& u
+  , auto&& p
+  , Range auto& layer
+  , Range auto& positions_collapsed
+  , Range auto& nodes_collapsed)
+{
+  std::ranges::reverse(nodes_collapsed);
+  std::ranges::reverse(positions_collapsed);
+
+  // Retrieve position of p in positions_collapsed
+  auto position_p = positions_collapsed.at(std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p)));
+
+  // Find the index in which to insert u
+  auto index_insert = std::distance(positions_collapsed.begin(),
+      std::find_if(positions_collapsed.begin()
+        , positions_collapsed.end()
+        , fun::unary::equal(position_p)
+      )
+  );
+
+  // Skip past the previous (by layer ordering) nodes in the same layer
+  // E.g. In layer {w,x,y,u,z}, {w,x,y} should be skipped for u to be after y
+  std::ranges::reverse(layer);
+  while(std::ranges::find_first_of(
+      std::ranges::subrange(nodes_collapsed.begin()+index_insert, nodes_collapsed.end())
+    , std::ranges::subrange(layer.begin(), std::find(layer.begin(), layer.end(), u)))
+    != std::ranges::end(nodes_collapsed))
+  {
+    ++index_insert;
+  } // while
+  std::ranges::reverse(layer);
+
+  nodes_collapsed.insert(nodes_collapsed.begin()+index_insert, u);
+  positions_collapsed.insert(positions_collapsed.begin()+index_insert, position_p+1);
+
+  std::ranges::reverse(positions_collapsed);
+  std::ranges::reverse(nodes_collapsed);
+} // }}}
+
+// fn: abs_diff_mean_ceil {{{
+double abs_diff_mean_ceil(double a, double b)
+{
+  return std::ceil(
+    fp::abs_diff(
+        static_cast<double>(a)
+      , static_cast<double>(b)
+    ) / 2.0);
+} // }}}
+
+// fn: keep_sequential {{{
+bool keep_sequential(bool is_left
+  , Range auto& map_node_layer
+  , Range auto& positions_collapsed
+  , Range auto& nodes_collapsed)
+{
+  // 2.6 Adjust positions to only contain an increasing sequence
+  auto zipped_position_node = std::views::zip(
+      std::views::slide(positions_collapsed, 2)
+    , std::views::slide(nodes_collapsed, 2)
+  );
+
+  // 2.6.1 Check if insertion caused the sequence to be non-increasing
+  enum class NonSequentialType
+  {
+    LESS_THAN,
+    EQUAL,
+  };
+
+  NonSequentialType non_sequential_type;
+  auto it_not_sequential = std::ranges::find_if(zipped_position_node, [&](auto&& e)
+  {
+    auto rng_positions = std::get<0>(e);
+    auto rng_nodes = std::get<1>(e);
+    // Found a non-sequential pair
+    if (rng_positions[1] < rng_positions[0])
+    {
+      non_sequential_type = NonSequentialType::LESS_THAN;
+      return true;
+    } // if
+    // It is ok to be the same as long as it is not between nodes on the same layer
+    if (rng_positions[1] == rng_positions[0] and map_node_layer.at(rng_nodes[0]) == map_node_layer.at(rng_nodes[1]))
+    {
+      non_sequential_type = NonSequentialType::EQUAL;
+      return true;
+    } // if
+    return false;
+  });
+
+  if ( it_not_sequential == std::ranges::end(zipped_position_node) )
+  {
+    return false;
+  } // if
+
+  auto rng_positions = std::get<0>(*it_not_sequential);
+  auto rng_nodes = std::get<1>(*it_not_sequential);
+
+  // Found a non-sequential pair
+  int64_t amount{};
+  if ( non_sequential_type == NonSequentialType::LESS_THAN )
+  {
+    // Define the adjustment amount as the ceil of the mean of the absolute difference of positions
+    amount = abs_diff_mean_ceil(rng_positions[0], rng_positions[1]);
+  } // if
+  // It is ok to be the same as long as it is not between nodes on the same layer
+  else if ( non_sequential_type == NonSequentialType::EQUAL )
+  {
+    amount = 1;
+  } // else if
+
+  // 2.6.2 Check if should increase the sequence forwards or backwards
+  // Decrease backwards if configuration is to the left
+  // Increase forwards if configuration is to the right
+  if ( is_left )
+  {
+    for(auto it=std::ranges::begin(zipped_position_node); it != std::next(it_not_sequential); ++it)
+    {
+      std::get<0>(*it)[0] -= amount;
+    } // for
+    return true;
+  } // if
+  else
+  {
+    for(auto it=it_not_sequential; it != std::ranges::end(zipped_position_node); ++it)
+    {
+      std::get<0>(*it)[1] += amount;
+    } // for
+    return true;
+  } // else if
+
+  return false;
+} // }}}
+
+// fn: restructure_indices {{{
+void restructure_indices(Ops const& ops
+  , Range auto&& layers
+  , Range auto&& nodes_collapsed
+  , Range auto&& positions_collapsed)
+{
+  for (auto&& layer : layers)
+  {
+    for(auto window : layer | std::views::slide(2))
+    {
+      auto u = *window.begin();
+      auto v = *std::next(window.begin());
+      auto uv_pred = fn(ops.preds(u)).in(ops.preds(v)).vec();
+      // Check if uv have a common parent
+      if ( uv_pred.size() > 0 )
+      {
+        // Parent of both u and v
+        auto p = uv_pred.at(0);
+        // Find index of u, which is the node to the left of parent
+        auto index_u = std::distance(nodes_collapsed.begin()
+          , std::find(nodes_collapsed.begin(), nodes_collapsed.end(), u)
+        );
+        auto index_v = std::distance(nodes_collapsed.begin()
+          , std::find(nodes_collapsed.begin(), nodes_collapsed.end(), v)
+        );
+        // Decrease by 1 all positions previous to u (inclusive)
+        std::for_each(positions_collapsed.begin()
+          , positions_collapsed.begin()+index_u
+          , [](auto& e){ e -= 1; }
+        );
+        // Adjust index of parent
+        auto index_p = std::distance(nodes_collapsed.begin()
+          , std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p)
+        );
+        positions_collapsed.at(index_p) = (positions_collapsed.at(index_u) + positions_collapsed.at(index_v)) / 2;
+      } // if
+      fmt::println("{} : {}", u, v);
+    } // for
+  } // for
+} // fn: restructure_indices }}}
+
+// fn: predecessor_single {{{
+void predecessor_single(Node u
+  , auto&& ops
+  , Map auto&& map_node_layer
+  , Range auto&& nodes_collapsed
+  , Range auto&& positions_collapsed
+  , Range auto&& layer)
+{
+  auto preds = ops.preds(u);
+
+  Node p = preds.at(0);
+
+  // Get successor of p, v, that is not u
+  //  u v
+  //  | |
+  //   p
+  Node v = fn(ops.succs(p))
+    .dif(std::vector<Node>{u})
+    .test([&](auto&& e){ return e.size() == 1; }, "Size of successors of p is not 1")
+    .vec()
+    .at(0);
+
+  // If the order is pv, put u before p, i.e.: upv
+  bool is_left = true;
+  if (*std::ranges::find_first_of(nodes_collapsed, Nodes{p,v}) == p)
+  {
+    insert_before_parent(u, p, layer, positions_collapsed, nodes_collapsed);
+
+    auto distance_u = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), u));
+    auto position_u = positions_collapsed.at(distance_u);
+    auto distance_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
+    auto position_p = positions_collapsed.at(distance_p);
+
+    if ( position_u >= position_p )
+    {
+      i64 offset = 1;
+      if ( position_p != position_u ) { offset = abs_diff_mean_ceil(position_p, position_u); } // if
+      std::for_each(positions_collapsed.begin()
+        , positions_collapsed.begin() + distance_u + 1
+        , [&](auto& e){ e -= offset; });
+    } // if
+
+    if ( auto it = std::find(nodes_collapsed.begin(), nodes_collapsed.end(), v); it != nodes_collapsed.end() )
+    {
+      auto distance_v = std::distance(nodes_collapsed.begin(), it);
+      auto position_v = positions_collapsed.at(distance_v);
+
+      if ( position_v <= position_p )
+      {
+        i64 offset = 1;
+        if ( position_p != position_v ) { offset = abs_diff_mean_ceil(position_p, position_v); } // if
+        std::for_each(positions_collapsed.begin() + distance_v
+          , positions_collapsed.end()
+          , [&](auto& e){ e += offset; });
+      } // if
+
+    } // if
+
+  } // if
+  // Else if the order is vp, put u after p, i.e.: vpu
+  else
+  {
+    is_left = false;
+    insert_after_parent(u, p, layer, positions_collapsed, nodes_collapsed);
+
+    auto distance_u = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), u));
+    auto position_u = positions_collapsed.at(distance_u);
+    auto distance_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
+    auto position_p = positions_collapsed.at(distance_p);
+
+    if ( auto it = std::find(nodes_collapsed.begin(), nodes_collapsed.end(), v); it != nodes_collapsed.end() )
+    {
+      auto distance_v = std::distance(nodes_collapsed.begin(), it);
+      auto position_v = positions_collapsed.at(distance_v);
+
+      if ( position_v >= position_p )
+      {
+        i64 offset = 1;
+        if ( position_p != position_v ) { offset = abs_diff_mean_ceil(position_p, position_v); } // if
+        std::for_each(positions_collapsed.begin()
+          , positions_collapsed.begin() + distance_v + 1
+          , [&](auto& e){ e -= offset; });
+      } // if
+    } // if
+
+    if ( position_u <= position_p )
+    {
+      i64 offset = 1;
+      if ( position_p != position_u ) { offset = abs_diff_mean_ceil(position_p, position_u); } // if
+      std::for_each(positions_collapsed.begin() + distance_u
+        , positions_collapsed.end()
+        , [&](auto& e){ e += offset; });
+    } // if
+
+
+  } // else
+
+  while(keep_sequential(is_left, map_node_layer, positions_collapsed, nodes_collapsed)) {};
+} // }}}
+
+// fn: predecessor_immediate_single {{{
+void predecessor_immediate_single(Node u
+  , auto&& ops
+  , Map auto&& map_node_layer
+  , Range auto&& preds_in_layer
+  , Range auto&& nodes_collapsed
+  , Range auto&& positions_collapsed
+  , Range auto&& layer)
+{
+  // Current possibilities
+  //         u           u
+  //        | |         | |
+  //       |  |  or    |  |
+  //       p  |        w  |
+  //          w           p
+
+  // {p,w}
+  auto preds = ops.preds(u);
+
+  // {p}
+  Node p = preds_in_layer.at(0);
+
+  // {p,w} - {p} == {w}
+  Node w = fn(preds).dif(preds_in_layer).vec().at(0);
+
+  // If the order is pw, put u after p, i.e.: puw
+  bool is_left = true;
+  if (*std::ranges::find_first_of(nodes_collapsed, Nodes{p,w}) == p)
+  {
+    is_left = false;
+    insert_after_parent(u, p, layer, positions_collapsed, nodes_collapsed);
+    // If index of w is equal or greater than u, decrease all nodes from w
+    // backwards
+    auto distance_w = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), w));
+    auto position_w = positions_collapsed.at(distance_w);
+    auto distance_u = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), u));
+    auto position_u = positions_collapsed.at(distance_u);
+    auto distance_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
+    auto position_p = positions_collapsed.at(distance_p);
+    if ( position_p >= position_u )
+    {
+      std::for_each(positions_collapsed.begin()
+        , positions_collapsed.begin() + distance_p + 1
+        , [](auto& e){ e -= 1; });
+    } // if
+    // If index of p is equal or less than u, increase all nodes from p
+    // backwards
+    if ( position_w <= position_u )
+    {
+      std::for_each(positions_collapsed.begin() + distance_w
+        , positions_collapsed.end()
+        , [](auto& e){ e += 1; });
+    } // if
+  } // if
+  // Else if the order is wp, put u before p, i.e.: wup
+  else
+  {
+    insert_before_parent(u, p, layer, positions_collapsed, nodes_collapsed);
+    // If index of w is equal or greater than u, decrease all nodes from w
+    // backwards
+    auto distance_w = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), w));
+    auto position_w = positions_collapsed.at(distance_w);
+    auto distance_u = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), u));
+    auto position_u = positions_collapsed.at(distance_u);
+    auto distance_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
+    auto position_p = positions_collapsed.at(distance_p);
+    if ( position_w >= position_u )
+    {
+      std::for_each(positions_collapsed.begin()
+        , positions_collapsed.begin() + distance_w + 1
+        , [](auto& e){ e -= 1; });
+    } // if
+    // If index of p is equal or less than u, increase all nodes from p
+    // backwards
+    if ( position_p <= position_u )
+    {
+      std::for_each(positions_collapsed.begin() + distance_p
+        , positions_collapsed.end()
+        , [](auto& e){ e += 1; });
+    } // if
+  } // else
+
+  while(keep_sequential(is_left, map_node_layer, positions_collapsed, nodes_collapsed)) {};
+} // }}}
+
+// fn: predecessor_multiple {{{
+void predecessor_multiple(Node u
+  , auto&& ops
+  , Map auto&& map_node_layer
+  , Range auto&& nodes_collapsed
+  , Range auto&& positions_collapsed)
+{
+  auto preds = ops.preds(u);
+
+  // 3.1 The position of u is k=(p1+p2)/2
+  Node p1, p2;
+  if ( *std::ranges::find_first_of(nodes_collapsed, preds) == preds.at(0) )
+  {
+    p1 = preds.at(0);
+    p2 = preds.at(1);
+  } // if
+  else
+  {
+    p1 = preds.at(1);
+    p2 = preds.at(0);
+  } // else
+  auto distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
+  auto distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
+  auto f_calculate_k = [&] -> double
+  {
+    auto position_p1 = positions_collapsed.at(distance_p1);
+    auto position_p2 = positions_collapsed.at(distance_p2);
+    return (static_cast<double>(position_p1) + position_p2) / 2.0;
+  };
+  double k = f_calculate_k();
+  
+  // 3.2 Find the position l that is greater or equal to k in positions_collapsed
+  auto it = std::find_if(positions_collapsed.begin() + std::min(distance_p1, distance_p2)
+    , positions_collapsed.end()
+    , fun::unary::greater_equal(std::floor(k)));
+  log::err({ it != positions_collapsed.end() })("Failed to find greate_equal position");
+  auto index_insert = std::distance(positions_collapsed.begin(), it) + 1;
+
+  // 3.5 Increment following positions by 1 if abs_diff(distance_p2, distance_p2) < 2
+  // This is to set node 'u' in-between p1 and p2
+  //      u
+  //     | |
+  //    p1  p2
+  bool is_left = true;
+  auto position_p1 = positions_collapsed.at(distance_p1);
+  auto position_p2 = positions_collapsed.at(distance_p2);
+  if ( std::round(k) != k
+    and map_node_layer.at(p1) == map_node_layer.at(p2)
+    and std::abs(position_p1 - position_p2) < 2)
+  {
+    auto dist_fst_half = std::distance(positions_collapsed.begin(), positions_collapsed.begin() + std::max(distance_p1, distance_p2) + 1);
+    auto dist_snd_half = std::distance(positions_collapsed.begin() + std::max(distance_p1, distance_p2), positions_collapsed.end());
+
+    if ( dist_snd_half < dist_fst_half  )
+    {
+      is_left = false;
+      i64 offset = (position_p1 == position_p2)? 2 : 1;
+      std::for_each(positions_collapsed.begin() + std::max(distance_p1, distance_p2)
+        , positions_collapsed.end()
+        , [&](auto& e){ e += offset; });
+    } // if
+    else
+    {
+      i64 offset = (position_p1 == position_p2)? 2 : 1;
+      std::for_each(positions_collapsed.begin()
+        , positions_collapsed.begin() + std::max(distance_p1, distance_p2)
+        , [&](auto& e){ e -= offset; });
+    } // else
+    // k should now be an integer
+    k = f_calculate_k();
+    assert(std::round(k) == k);
+  } // if
+
+  // 3.3 Put k in position l of positions_collapsed
+  positions_collapsed.insert(positions_collapsed.begin()+index_insert, std::floor(k));
+
+  // 3.4 Put u in position l of nodes_collapsed
+  nodes_collapsed.insert(nodes_collapsed.begin()+index_insert, u);
+
+  distance_p1 = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p1));
+  position_p1 = positions_collapsed.at(distance_p1);
+  distance_p2 = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p2));
+  position_p2 = positions_collapsed.at(distance_p2);
+  auto distance_u = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), u));
+  auto position_u = positions_collapsed.at(distance_u);
+  if ( position_p1 >= position_u )
+  {
+    i64 offset = 1;
+    if ( position_p1 != position_u ) { offset = abs_diff_mean_ceil(position_p1, position_u); } // if
+    std::for_each(positions_collapsed.begin()
+      , positions_collapsed.begin() + distance_p1 + 1
+      , [&](auto& e){ e -= offset; });
+  } // if
+  // If index of p is equal or less than u, increase all nodes from p
+  // backwards
+  if ( position_p2 <= position_u )
+  {
+    i64 offset = 1;
+    if ( position_p2 != position_u ) { offset = abs_diff_mean_ceil(position_p2, position_u); } // if
+    std::for_each(positions_collapsed.begin() + distance_p2
+      , positions_collapsed.end()
+      , [&](auto& e){ e += offset; });
+  } // if
+
+  while(keep_sequential(is_left, map_node_layer, positions_collapsed, nodes_collapsed)) {};
+} // }}}
+
 // view_collapse {{{
 template<typename V1, typename V2>
 decltype(auto) view_collapse(Ops const& ops
@@ -126,13 +627,13 @@ decltype(auto) view_collapse(Ops const& ops
 // Requires ordered map
 {
   using Key = typename std::remove_cvref_t<typename std::remove_cvref_t<V1>::key_type>;
-  using Node = typename std::remove_cvref_t<typename std::remove_cvref_t<V1>::mapped_type>::value_type;
-  using Position = i64;
-  using Positions = std::vector<Position>;
-  using Nodes = std::vector<Node>;
-  using NodeSet = std::unordered_set<Node>;
 
   log::err( { ! map_layer_nodes.empty() } )("Empty view");
+
+  auto f_is_leaf = [&](Node node)
+  {
+    return ops.succs(node).size() == 0 or ops.preds(node).size() == 0;
+  };
 
   // Fetch lowest layer id
   Key id_lowest_layer = fn(map_layer_nodes).key().min();
@@ -146,14 +647,14 @@ decltype(auto) view_collapse(Ops const& ops
   Nodes nodes_collapsed = map_layer_nodes.at(id_lowest_layer);
   Positions positions_collapsed = fp::numbers(i64{}, static_cast<i64>(nodes_collapsed.size()));
 
-  // auto f_print_node_positions = [&]
-  // {
-  //   for (auto&& zipped : std::views::zip(nodes_collapsed, positions_collapsed))
-  //   {
-  //     std::cout << "[" << std::get<0>(zipped) << "," << std::get<1>(zipped) << "]\n";
-  //   } // for
-  // };
-  // f_print_node_positions();
+  auto f_print_node_positions = [&]
+  {
+    for (auto&& zipped : std::views::zip(nodes_collapsed, positions_collapsed))
+    {
+      std::cout << "[" << std::get<0>(zipped) << "," << std::get<1>(zipped) << "]\n";
+    } // for
+  };
+  f_print_node_positions();
 
   for (auto it_entry{std::next(map_layer_nodes.begin())}; it_entry != map_layer_nodes.end(); ++it_entry)
   {
@@ -161,6 +662,14 @@ decltype(auto) view_collapse(Ops const& ops
 
     for (auto&& u : layer)
     {
+      // Skip inputs / outputs
+      if ( f_is_leaf(u) )
+      {
+        continue;
+      } // if
+
+      // restructure_indices(std::ranges::subrange(map_layer_nodes.begin(), it_entry) | std::views::values);
+
       // 1. Check for predecessors of u in nodes collapsed
       auto preds = ops.preds(u);
       auto preds_in_layer = fn(preds).in(std::prev(it_entry)->second).vec();
@@ -168,227 +677,23 @@ decltype(auto) view_collapse(Ops const& ops
       log::err({preds.size() != 0})("Empty preds for {}"_fmt(u));
 
       // 2. If there is only 1 predecessor p
-      if ( preds.size() == 1
-      or (preds_in_layer.size() == 1 and ops.succs(preds_in_layer.at(0)).size() > 1))
+      if ( preds.size() == 1 )
       {
-        Node p = (preds_in_layer.size() == 1)? preds_in_layer.at(0) : preds.at(0);
+        predecessor_single(u, ops, map_node_layer, nodes_collapsed, positions_collapsed, layer);
+        continue;
+      } // if
 
-        // 2.1 Get successor of p, v, that is not u
-        Nodes succs_p = fn(ops.succs(p)).dif(std::vector<Node>{u}).vec();
-        log::err({succs_p.size() == 1})("Size of successors of p is not 1: {}"_fmt(succs_p));
-        Node v = succs_p.at(0);
-
-        enum class Direction
-        {
-          LEFT,
-          RIGHT,
-        };
-
-        std::optional<Direction> opt_direction = std::nullopt;
-        if ( preds.size() == 2 and preds_in_layer.size() == 1 )
-        {
-          // If first pred found in nodes_collapsed is parent, should position
-          // to the right, else if is predecessor w should position to the left
-          //          u
-          //        |  | -> Put u to the right of p if is first match
-          //        p  |
-          //           w
-          //          u
-          //        |  | -> Put u to the left of p if w is first match
-          //        |  p
-          //        w
-          if ( *std::ranges::find_first_of(nodes_collapsed, preds) == p )
-          {
-            opt_direction = Direction::RIGHT;
-          } // if
-          else
-          {
-            opt_direction = Direction::LEFT;
-          } // else
-        } // if
-
-        // 2.2 If the order is pv, put u before p, i.e.: upv
-        if (auto it_fst = std::ranges::find_first_of(nodes_collapsed, Nodes{p,v});
-           (not opt_direction and *it_fst == p)
-        or (opt_direction and *opt_direction == Direction::LEFT))
-        {
-          opt_direction = Direction::LEFT;
-          auto distance_p = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p));
-          auto position_p = positions_collapsed.at(distance_p);
-          // Find a position in positions_collapsed that is equal or greater than p+1
-          auto it_positions_collapsed = std::find_if(positions_collapsed.begin()
-            , positions_collapsed.end()
-            , fun::unary::greater_equal(position_p));
-          auto distance_insert = std::distance(positions_collapsed.begin(), it_positions_collapsed);
-
-          // Skip past the previous (by layer ordering) nodes in the same layer
-          // E.g. In layer {w,x,y,u,z}, {w,x,y} should be skipped for u to be after y
-          while(std::ranges::find_first_of(
-              std::ranges::subrange(nodes_collapsed.begin()+distance_insert, nodes_collapsed.end())
-            , std::ranges::subrange(layer.begin(), std::find(layer.begin(), layer.end(), u)))
-            != std::ranges::end(nodes_collapsed))
-          {
-            ++distance_insert;
-          } // while
-
-          // Put node in-between predecessors if there is two
-          if ( preds.size() == 2 )
-          {
-            while(std::count_if(nodes_collapsed.begin()+distance_insert
-              , nodes_collapsed.end()
-              , [&](auto&& e){ return e == preds.at(0) or e == preds.at(1); })
-              >= 2)
-            {
-              ++distance_insert;
-            } // while
-          } // if
-
-          nodes_collapsed.insert(nodes_collapsed.begin()+distance_insert, u);
-          positions_collapsed.insert(positions_collapsed.begin()+distance_insert, position_p-1);
-        } // if
-        // 2.3 Else if the order is vp, put u after p, i.e.: vpu
-        else if ( (not opt_direction and *it_fst == v) or ( opt_direction and *opt_direction == Direction::RIGHT ))
-        {
-          opt_direction = Direction::RIGHT;
-          // Find distance to p in nodes_collapsed
-          auto distance_p = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p));
-          // Retrieve position of p in positions_collapsed
-          auto position_p = positions_collapsed.at(distance_p);
-          // Find a position in positions_collapsed that is equal or greater than p+1
-          auto it_positions_collapsed = std::find_if(positions_collapsed.rbegin()
-            , positions_collapsed.rend()
-            , fun::unary::less_equal(position_p));
-          auto distance_positions_collapsed = std::distance(positions_collapsed.begin(), (it_positions_collapsed+1).base());
-          nodes_collapsed.insert(nodes_collapsed.begin()+distance_positions_collapsed+1, u);
-          positions_collapsed.insert(positions_collapsed.begin()+distance_positions_collapsed+1, position_p+1);
-        } // else if
-        else
-        {
-          log::err()("Could not bind parent nor child");
-        } // else
-
-        // 2.6 Adjust positions to only contain an increasing sequence
-        auto zipped_position_node = std::views::zip(
-            std::views::slide(positions_collapsed, 2)
-          , std::views::slide(nodes_collapsed, 2)
-        );
-
-        // 2.6.1 Check if insertion caused the sequence to be non-increasing
-        int64_t amount{};
-        auto it_non_increasing = std::ranges::find_if(zipped_position_node
-        , [&,i=-1](auto&& e) mutable
-        {
-          i++;
-          auto rng_positions = std::get<0>(e);
-          auto rng_nodes = std::get<1>(e);
-          // It is ok to be the same as long as it is not between nodes on the
-          // same layer
-          if (rng_positions[1] < rng_positions[0])
-          {
-            // Define the adjustment amount as the neighboring difference
-            amount = std::ceil(
-              fp::abs_diff(
-                  static_cast<double>(rng_positions[0])
-                , static_cast<double>(rng_positions[1])
-              ) / 2.0
-            );
-            // Check if there is a previous node on nodes_collapsed that is on the same layer
-            auto reverse_nodes_collapsed = std::ranges::subrange(nodes_collapsed.begin(), nodes_collapsed.begin()+i+1)
-              | std::views::reverse;
-            if ( auto it_rev = std::ranges::find_if(reverse_nodes_collapsed
-              , [&](auto&& f){ return map_node_layer.at(f) == map_node_layer.at(rng_nodes[1]); });
-              it_rev != std::ranges::end(reverse_nodes_collapsed))
-            {
-              auto distance = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, *it_rev));
-              if ( positions_collapsed.at(distance) >= rng_positions[1] )
-              {
-                amount = std::ceil(
-                  fp::abs_diff(
-                      static_cast<double>(positions_collapsed.at(distance))
-                    , static_cast<double>(rng_positions[1])
-                  ) / 2.0
-                ) + 1;
-              } // if
-            } // if
-            return true;
-          } // if
-          else if (rng_positions[1] == rng_positions[0] and map_node_layer.at(rng_nodes[0]) == map_node_layer.at(rng_nodes[1]))
-          {
-            amount = 1;
-            return true;
-          } // if
-          return false;
-        });
-
-        if ( it_non_increasing == std::ranges::end(zipped_position_node) )
-        {
-          continue;
-        } // if
-
-        // 2.6.2 Check if should increase the sequence forwards or backwards
-        // Decrease backwards if configuration is to the left
-        // Increase forwards if configuration is to the right
-        assert(opt_direction);
-        if ( *opt_direction == Direction::LEFT )
-        {
-          for(auto it=std::ranges::begin(zipped_position_node); it != std::next(it_non_increasing); ++it)
-          {
-            auto rng_positions = std::get<0>(*it);
-            rng_positions[0] -= amount;
-          } // for
-        } // if
-        else if ( *opt_direction == Direction::RIGHT )
-        {
-          for(auto it=it_non_increasing; it != std::ranges::end(zipped_position_node); ++it)
-          {
-            auto rng_positions = std::get<0>(*it);
-            rng_positions[1] += amount;
-          } // for
-        } // else if
-
+      // if (preds_in_layer.size() == 1 and ops.succs(preds_in_layer.at(0)).size() > 1)
+      if (preds_in_layer.size() == 1)
+      {
+        predecessor_immediate_single(u, ops, map_node_layer, preds_in_layer, nodes_collapsed, positions_collapsed, layer);
         continue;
       } // if
 
       // 3. If there is 2 predecessors p1 and p2 in nodes_collapsed
       if ( preds.size() == 2 )
       {
-        // 3.1 The position of u is k=(p1+p2)/2
-        Node p1 = preds.at(0);
-        Node p2 = preds.at(1);
-        auto distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
-        auto distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
-        auto position_p1 = positions_collapsed.at(distance_p1);
-        auto position_p2 = positions_collapsed.at(distance_p2);
-        double k = (static_cast<double>(position_p1) + position_p2) / 2.0;
-        
-        // 3.2 Find the position l that is greater or equal to k in positions_collapsed
-        auto it = std::find_if(positions_collapsed.begin() + std::min(distance_p1, distance_p2)
-          , positions_collapsed.end()
-          , fun::unary::greater_equal(std::floor(k)));
-        log::err({ it != positions_collapsed.end() })("Failed to find greate_equal position");
-        auto position_l = std::distance(positions_collapsed.begin(), it) + 1;
-
-        // 3.5 Increment following positions by 1 if abs_diff(distance_p2, distance_p2) < 2
-        // This is to set node 'u' in-between p1 and p2
-        //      u
-        //     | |
-        //    p1  p2
-        if ( std::round(k) != k
-          and (map_node_layer.at(p1) == map_node_layer.at(p2))
-          and map_node_layer.at(u) == map_node_layer.at(p1)+1)
-        {
-          std::for_each(positions_collapsed.begin() + std::max(distance_p1, distance_p2)
-            , positions_collapsed.end()
-            , [](auto& e){ e += 1; });
-          k = std::ceil(k);
-        } // if
-
-        // 3.3 Put k in position l of positions_collapsed
-        positions_collapsed.insert(positions_collapsed.begin()+position_l, std::floor(k));
-
-        // 3.4 Put u in position l of nodes_collapsed
-        nodes_collapsed.insert(nodes_collapsed.begin()+position_l, u);
-
+        predecessor_multiple(u, ops, map_node_layer, nodes_collapsed, positions_collapsed);
         continue;
       } // if
 
@@ -468,7 +773,7 @@ std::map<T,Cross<T>> run(i64 idx_l2, R&& l1, R&& l2, Ops const& ops)
   std::vector<i64> parents;
 
   // Initialize parents of acc nodes
-  for(int i=0; i < acc.size(); ++i)
+  for(size_t i=0; i < acc.size(); ++i)
   {
     parents.push_back(l1.at(0));
   } // for

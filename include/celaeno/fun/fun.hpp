@@ -683,7 +683,8 @@ struct Fun
   template<typename F, typename S>
   decltype(auto) test(F&& f, S&& s)
   {
-    rg::for_each(view, [&](auto e) { log::err(f(e))(s); });
+    log::err({ f(this->vec()) })(s);
+    return Fun<V>(view);
   } // function: assert
   // }}}
 
