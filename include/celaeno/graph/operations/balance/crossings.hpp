@@ -360,7 +360,7 @@ void predecessor_single(Node u
     auto distance_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
     auto position_p = positions_collapsed.at(distance_p);
 
-    if ( position_u >= position_p )
+    if ( position_u > position_p )
     {
       i64 offset = 1;
       if ( position_p != position_u ) { offset = abs_diff_mean_ceil(position_p, position_u); } // if
@@ -374,7 +374,7 @@ void predecessor_single(Node u
       auto distance_v = std::distance(nodes_collapsed.begin(), it);
       auto position_v = positions_collapsed.at(distance_v);
 
-      if ( position_v <= position_p )
+      if ( position_v < position_p )
       {
         i64 offset = 1;
         if ( position_p != position_v ) { offset = abs_diff_mean_ceil(position_p, position_v); } // if
@@ -466,7 +466,7 @@ void predecessor_immediate_single(Node u
     auto position_u = positions_collapsed.at(distance_u);
     auto distance_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
     auto position_p = positions_collapsed.at(distance_p);
-    if ( position_p >= position_u )
+    if ( position_p > position_u )
     {
       std::for_each(positions_collapsed.begin()
         , positions_collapsed.begin() + distance_p + 1
@@ -474,7 +474,7 @@ void predecessor_immediate_single(Node u
     } // if
     // If index of p is equal or less than u, increase all nodes from p
     // backwards
-    if ( position_w <= position_u )
+    if ( position_w < position_u )
     {
       std::for_each(positions_collapsed.begin() + distance_w
         , positions_collapsed.end()
@@ -493,7 +493,7 @@ void predecessor_immediate_single(Node u
     auto position_u = positions_collapsed.at(distance_u);
     auto distance_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
     auto position_p = positions_collapsed.at(distance_p);
-    if ( position_w >= position_u )
+    if ( position_w > position_u )
     {
       std::for_each(positions_collapsed.begin()
         , positions_collapsed.begin() + distance_w + 1
@@ -501,7 +501,7 @@ void predecessor_immediate_single(Node u
     } // if
     // If index of p is equal or less than u, increase all nodes from p
     // backwards
-    if ( position_p <= position_u )
+    if ( position_p < position_u )
     {
       std::for_each(positions_collapsed.begin() + distance_p
         , positions_collapsed.end()
@@ -597,7 +597,7 @@ void predecessor_multiple(Node u
   position_p2 = positions_collapsed.at(distance_p2);
   auto distance_u = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), u));
   auto position_u = positions_collapsed.at(distance_u);
-  if ( position_p1 >= position_u )
+  if ( position_p1 > position_u )
   {
     i64 offset = 1;
     if ( position_p1 != position_u ) { offset = abs_diff_mean_ceil(position_p1, position_u); } // if
@@ -607,7 +607,7 @@ void predecessor_multiple(Node u
   } // if
   // If index of p is equal or less than u, increase all nodes from p
   // backwards
-  if ( position_p2 <= position_u )
+  if ( position_p2 < position_u )
   {
     i64 offset = 1;
     if ( position_p2 != position_u ) { offset = abs_diff_mean_ceil(position_p2, position_u); } // if
