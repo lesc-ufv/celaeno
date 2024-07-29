@@ -153,7 +153,8 @@ auto timer(Location const& loc, F&& f, Args&&... args)
 }; // fn: timer }}}
 
 // fn: pre_processing {{{
-decltype(auto) pre_processing(Ops const& ops)
+decltype(auto) pre_processing(Ops const& ops
+  , std::map<Node, ns_graph::operations::balance::crossings::Direction>& map_node_direction)
 {
   // Balance outgoing edges to a maximum of 2
   timer({}, [&]{ns_ops::balance::outgoing::run(0,ops);});
@@ -164,7 +165,7 @@ decltype(auto) pre_processing(Ops const& ops)
   // Balance paths
   timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
 
-  ns_graph::operations::minimize::crossings::run(0, ops.preds, ops.succs, ops.adj, view);
+  // ns_graph::operations::minimize::crossings::run(0, ops.preds, ops.succs, ops.adj, view);
 
   // Write to file
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_dot::Writer(std::forward<Args>(args)...); };
@@ -174,7 +175,7 @@ decltype(auto) pre_processing(Ops const& ops)
   spdlog::info("Number of crossings: {}", ns_ops::count::crossings::run(ops, view.ln));
 
   // Balance crossings
-  view = timer({}, LR(ns_ops::balance::crossings::run(ops, view),0));
+  view = timer({}, LR(ns_ops::balance::crossings::run(ops, view, map_node_direction),0));
   spdlog::info("Number of layers: {}", view.ln.size());
   spdlog::info("Largest layer size: {}", fn(view.ln).as(LR(_1.second.size())).max() );
 
@@ -189,6 +190,7 @@ decltype(auto) pre_processing(Ops const& ops)
   return view;
 } // function: pre_processing }}}
 
+// fn get_area {{{
 template<typename Map>
 decltype(auto) get_area(Map&& map_node_position)
 {
@@ -202,7 +204,7 @@ decltype(auto) get_area(Map&& map_node_position)
   i64 width = *(width_minmax.max) - *(width_minmax.min);
   i64 height = *(height_minmax.max) - *(height_minmax.min);
   return Area(width, height);
-} // function: get_area
+} // function: get_area }}}
 
 // fun: main  {{{
 int main([[maybe_unused]] int argc, char const* argv[])
@@ -240,10 +242,18 @@ int main([[maybe_unused]] int argc, char const* argv[])
   fs::create_directory("./out");
 
   // Pre-processings
-  auto view = pre_processing(ops);
+  std::map<Node, ns_graph::operations::balance::crossings::Direction> map_node_direction;
+  auto view = pre_processing(ops, map_node_direction);
+  for(auto [k,v] : map_node_direction)
+  {
+    spdlog::info("Node: {} IsLeft: {}", k, v == ns_graph::operations::balance::crossings::LEFT);
+  } // for
 
   // Collapse
-  auto [nodes_collapsed, positions_collapsed] = timer({}, [&]{ return ns_ops::balance::crossings::view_collapse(ops, view.ln, view.nl); });
+  auto [nodes_collapsed, positions_collapsed] = timer({}
+    , [&]{ return ns_ops::balance::crossings::view_collapse(ops, view, map_node_direction); }
+  );
+
   auto map_node_position = fn(nodes_collapsed)
     .zip(positions_collapsed)
     .as([&](auto&& e){ return std::make_pair(e.first, std::make_pair(e.second, view.nl.at(e.first))); })

@@ -50,15 +50,18 @@ function(add_applet target)
   target_compile_options(${target}
     PRIVATE
       -std=c++23
-      $<IF:$<CONFIG:Debug>,
+      # $<IF:$<CONFIG:Debug>,
         -Wall
         -Wextra
         -Wpedantic
         -Wshadow
         -g
-        ,
-        -DNDEBUG
-        -O3
+        -O0
+        -fno-inline-functions
+        -fno-inline-small-functions
+        # ,
+        # -DNDEBUG
+        # -O3
       >
   )
 

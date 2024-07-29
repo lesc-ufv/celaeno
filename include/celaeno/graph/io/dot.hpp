@@ -97,7 +97,9 @@ Writer::Writer(auto&& view
     // Write positions
     for(auto&& [node,position] : *map_node_position)
     {
-      ofile << fmt::format("{} [pos=\"{},{}!\"]\n", node, position.first, position.second);
+      ofile << fmt::format("{} [pos=\"{},{}!\"]\n", node, position.first*100, position.second*100);
+      ofile << fmt::format("{} [label=\"{}\\n{}x{}\"]\n", node, node, position.first, position.second);
+      ofile << fmt::format("{} [color=red]\n", node);
     } // for
     // Write nodes
     for (auto&& [layer,nodes] : view.ln)
@@ -106,7 +108,10 @@ Writer::Writer(auto&& view
       {
         for(auto succ : ops.succs(node))
         {
-          ofile << fmt::format("{} -> {}\n", node, succ);
+          if ( map_node_position->contains(node) and map_node_position->contains(succ) )
+          {
+            ofile << fmt::format("{} -> {}\n", node, succ);
+          } // if
         }
       } // for
     } // for
