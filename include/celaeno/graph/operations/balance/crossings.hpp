@@ -286,16 +286,10 @@ decltype(auto) slide_backwards(Node stopper
   , Range auto&& positions_collapsed
 )
 {
-  // Keep going back until distance of u is equal or greater than w
-  // Or hits p1
   while ( nodes_collapsed.at(distance) != stopper and position < positions_collapsed.at(distance) )
   {
     --distance;
   } // while
-  // if ( nodes_collapsed.at(distance) == stopper )
-  // {
-  //   ++distance;
-  // } // if
   return distance;
 } // }}}
 
@@ -309,13 +303,10 @@ decltype(auto) slide_backwards(Node stopper
 //   , Range auto&& positions_collapsed
 // )
 // {
-//   // Keep going forward until distance of u is less than w
-//   // Or hits p1
-//   while ( position < positions_collapsed.at(distance) )
+//   while ( nodes_collapsed.at(distance) != stopper and position >= positions_collapsed.at(distance) )
 //   {
-//     ++distance;
+//     --distance;
 //   } // while
-//
 //   return distance;
 // } // }}}
 
@@ -506,10 +497,22 @@ void insert_between(Ops const& ops
   // Check if both parents are in the same position
   if ( position_p1 == position_p2 )
   {
-    push_nodes((map_node_layer.at(p1) < map_node_layer.at(p2))? p1 : p2
-      , Direction::RIGHT
-      , positions_collapsed
-      , nodes_collapsed);
+    // Push left
+    if ( map_node_layer.at(p1) < map_node_layer.at(p2) )
+    {
+      push_nodes(p1
+        , Direction::LEFT
+        , positions_collapsed
+        , nodes_collapsed);
+    } // if
+    // Push right
+    else
+    {
+      push_nodes(p2
+        , Direction::RIGHT
+        , positions_collapsed
+        , nodes_collapsed);
+    } // else
     distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
     distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
     position_p1 = positions_collapsed.at(distance_p1);
@@ -910,22 +913,33 @@ void predecessor_multiple(Ops const& ops
     p1 = preds.at(1);
     p2 = preds.at(0);
   } // else
-  auto distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
-  auto distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
+
   auto f_calculate_k = [&] -> double
   {
+    auto distance_p1 = find_first(nodes_collapsed, p1);
+    auto distance_p2 = find_first(nodes_collapsed, p2);
     auto position_p1 = positions_collapsed.at(distance_p1);
     auto position_p2 = positions_collapsed.at(distance_p2);
+    assert(distance_p1 < distance_p2);
     return (static_cast<double>(position_p1) + position_p2) / 2.0;
   };
-  double k = f_calculate_k();
   
-  // 3.2 Find the position l that is greater or equal to k in positions_collapsed
-  auto it = std::find_if(positions_collapsed.begin() + std::min(distance_p1, distance_p2)
-    , positions_collapsed.end()
-    , fun::unary::greater_equal(std::floor(k)));
-  log::err({ it != positions_collapsed.end() })("Failed to find greate_equal position");
-  auto index_insert = std::distance(positions_collapsed.begin(), it) + 1;
+  // Find insertion index
+  auto f_index_insert = [&]
+  {
+    auto distance_p1 = find_first(nodes_collapsed, p1);
+    auto distance_p2 = find_first(nodes_collapsed, p2);
+    auto k = f_calculate_k();
+    // Start search after p1
+    // Stop before p2
+    i64 distance = distance_p1+1;
+    while ( positions_collapsed.at(distance) < std::floor(k) )
+    {
+      if ( distance == distance_p2 ) { break; }
+      ++distance;
+    } // while
+    return std::make_pair(k, distance);
+  };
 
   // 3.5 Increment following positions by 1 if abs_diff(distance_p2, distance_p2) < 2
   // This is to set node 'u' in-between p1 and p2
@@ -933,40 +947,43 @@ void predecessor_multiple(Ops const& ops
   //     | |
   //    p1  p2
   // bool is_left = true;
-  auto position_p1 = positions_collapsed.at(distance_p1);
-  auto position_p2 = positions_collapsed.at(distance_p2);
-  if ( std::round(k) != k
-    and map_node_layer.at(p1) == map_node_layer.at(p2)
-    and std::abs(position_p1 - position_p2) < 2)
   {
-    // auto opt_minimum_expandable_layer = get_minimum_expandable_layer(ops, map_layer_nodes, nodes_collapsed, positions_collapsed);
-    // auto f_is_expandable = [&](auto&& e){ return opt_minimum_expandable_layer and map_node_layer.at(e) >= *opt_minimum_expandable_layer; };
-
-    auto dist_fst_half = std::distance(positions_collapsed.begin(), positions_collapsed.begin() + std::max(distance_p1, distance_p2) + 1);
-    auto dist_snd_half = std::distance(positions_collapsed.begin() + std::max(distance_p1, distance_p2), positions_collapsed.end());
-
-    // i64 offset = (position_p1 == position_p2)? 2 : 1;
-    if ( dist_fst_half < dist_snd_half )
+    auto distance_p1 = find_first(nodes_collapsed, p1);
+    auto distance_p2 = find_first(nodes_collapsed, p2);
+    auto position_p1 = positions_collapsed.at(distance_p1);
+    auto position_p2 = positions_collapsed.at(distance_p2);
+    // if ( std::round(k) != k
+    if ( (std::abs(position_p1) - std::abs(position_p2)) == 0
+      and map_node_layer.at(p1) == map_node_layer.at(p2)
+      and std::abs(position_p1 - position_p2) < 2)
     {
-      std::for_each(positions_collapsed.begin() + distance_p2
-        , positions_collapsed.end()
-        , [&](auto& e){ e += 1; });
+      auto size_fst_half = distance_p2;
+      auto size_snd_half = positions_collapsed.size() - distance_p2;
+
+      // i64 offset = (position_p1 == position_p2)? 2 : 1;
+      if ( size_fst_half < size_snd_half )
+      {
+        std::for_each(positions_collapsed.begin() + distance_p2
+          , positions_collapsed.end()
+          , [&](auto& e){ e += 1; });
+      } // if
+      else
+      {
+        std::for_each(positions_collapsed.begin()
+          , positions_collapsed.begin() + distance_p1 + 1 // inclusive for p1
+          , [&](auto& e){ e -= 1; });
+      } // else
+      // assert(std::round(k) == k);
     } // if
-    else
-    {
-      std::for_each(positions_collapsed.begin()
-        , positions_collapsed.begin() + distance_p1 + 1 // inclusive for p1
-        , [&](auto& e){ e -= 1; });
-    } // else
-    k = f_calculate_k();
-    // assert(std::round(k) == k);
-  } // if
+  }
+
+  auto [k,distance] = f_index_insert();
 
   // 3.3 Put k in position l of positions_collapsed
-  positions_collapsed.insert(positions_collapsed.begin()+index_insert, std::floor(k));
+  positions_collapsed.insert(positions_collapsed.begin()+distance, std::floor(k));
 
   // 3.4 Put u in position l of nodes_collapsed
-  nodes_collapsed.insert(nodes_collapsed.begin()+index_insert, u);
+  nodes_collapsed.insert(nodes_collapsed.begin()+distance, u);
 } // }}}
 
 // fn: print_node_positions {{{
@@ -1036,7 +1053,7 @@ decltype(auto) view_collapse(Ops const& ops
 
     for (auto&& u : layer)
     {
-      write_dot(ops, view, nodes_collapsed, positions_collapsed);
+      // write_dot(ops, view, nodes_collapsed, positions_collapsed);
 
       // Skip inputs / outputs
       if ( f_is_leaf(u) )
@@ -1100,6 +1117,8 @@ decltype(auto) view_collapse(Ops const& ops
       log::err()("Invalid preds size of {}"_fmt(preds.size()));
     } // for
   } // for
+
+  write_dot(ops, view, nodes_collapsed, positions_collapsed);
 
   return std::make_pair(nodes_collapsed, positions_collapsed);
 } // function: view_collapse }}}
