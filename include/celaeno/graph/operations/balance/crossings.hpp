@@ -717,14 +717,20 @@ bool keep_sequential(Ops const& ops
   // 2.6.2 Check if should increase the sequence forwards or backwards
   // Decrease backwards if configuration is to the left
   // Increase forwards if configuration is to the right
-  for(auto it=std::ranges::begin(zipped_position_node); it != std::next(it_not_sequential); ++it)
+  if ( is_left )
   {
-    std::get<0>(*it)[0] -= amount;
-  } // for
-  for(auto it=it_not_sequential; it != std::ranges::end(zipped_position_node); ++it)
+    for(auto it=std::ranges::begin(zipped_position_node); it != std::next(it_not_sequential); ++it)
+    {
+      std::get<0>(*it)[0] -= amount;
+    } // for
+  } // if
+  else
   {
-    std::get<0>(*it)[1] += amount;
-  } // for
+    for(auto it=it_not_sequential; it != std::ranges::end(zipped_position_node); ++it)
+    {
+      std::get<0>(*it)[1] += amount;
+    } // for
+  } // else
 
   return true;
 } // }}}
@@ -758,43 +764,43 @@ void predecessor_single(Node u
   // vpu or upv
   bool is_left = *std::ranges::find_first_of(nodes_collapsed, Nodes{p,v}) == p;
 
-  // // The current node has only one predecessor
-  // // So it must have two successors
-  // // Use the successors with a bfs downwards (predecessors) the first node w
-  // // contained in nodes_collapsed
-  // // If w has a position smaller than p, put u before p, else put u after p
-  // // s1 s2
-  // //  | |
-  // //   u
-  // //   |
-  // //   p
-  // auto succs = ops.succs(u);
-  // assert(succs.size() == 2);
-  // // Successors of u
-  // Nodes collapsed_predecessors;
-  // auto f_collapsed_successor = [&](auto&& e)
-  // {
-  //   if ( std::ranges::find(nodes_collapsed, e) == std::ranges::end(nodes_collapsed) ) { return false; }
-  //   collapsed_predecessors.push_back(e);
-  //   return true;
-  // };
-  // auto f_preds = [&](auto&& e)
-  // {
-  //   return fn(ops.preds(e)).dif(Nodes{u}).vec();
-  // };
-  // // Populate collapsed_predecessors with the predecessors of successors
-  // ns_search::bfs::run(succs.at(0), f_preds, f_preds, f_collapsed_successor);
-  // ns_search::bfs::run(succs.at(1), f_preds, f_preds, f_collapsed_successor);
-  // // Sort by layer index, the one in the highest layer will be at the end
-  // std::ranges::sort(collapsed_predecessors, {}, [&](auto&& e){ return map_node_layer.at(e); });
-  //
-  // if ( not collapsed_predecessors.empty() )
-  // {
-  //   Node w = collapsed_predecessors.back();
-  //   i64 distance_w = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), w));
-  //   i64 position_w = positions_collapsed.at(distance_w);
-  //   is_left = position_w < position_p;
-  // } // if
+  // The current node has only one predecessor
+  // So it must have two successors
+  // Use the successors with a bfs downwards (predecessors) the first node w
+  // contained in nodes_collapsed
+  // If w has a position smaller than p, put u before p, else put u after p
+  // s1 s2
+  //  | |
+  //   u
+  //   |
+  //   p
+  auto succs = ops.succs(u);
+  assert(succs.size() == 2);
+  // Successors of u
+  Nodes collapsed_predecessors;
+  auto f_collapsed_successor = [&](auto&& e)
+  {
+    if ( std::ranges::find(nodes_collapsed, e) == std::ranges::end(nodes_collapsed) ) { return false; }
+    collapsed_predecessors.push_back(e);
+    return true;
+  };
+  auto f_preds = [&](auto&& e)
+  {
+    return fn(ops.preds(e)).dif(Nodes{u}).vec();
+  };
+  // Populate collapsed_predecessors with the predecessors of successors
+  ns_search::bfs::run(succs.at(0), f_preds, f_preds, f_collapsed_successor);
+  ns_search::bfs::run(succs.at(1), f_preds, f_preds, f_collapsed_successor);
+  // Sort by layer index, the one in the highest layer will be at the end
+  std::ranges::sort(collapsed_predecessors, {}, [&](auto&& e){ return map_node_layer.at(e); });
+
+  if ( not collapsed_predecessors.empty() )
+  {
+    Node w = collapsed_predecessors.back();
+    i64 distance_w = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), w));
+    i64 position_w = positions_collapsed.at(distance_w);
+    is_left = position_w <= position_p;
+  } // if
 
   if (is_left)
   {
@@ -813,21 +819,18 @@ void predecessor_single(Node u
   // Else if the order is vp, put u after p, i.e.: vpu
   else
   {
-    insert_after(u, p, layer, positions_collapsed, nodes_collapsed);
+    if ( map_node_layer.at(u) != map_node_layer.at(v) )
+    {
+      insert_after(u, p, layer, positions_collapsed, nodes_collapsed, position_p+1);
+    }
+    else
+    {
+      insert_after(u, p, layer, positions_collapsed, nodes_collapsed);
+    } // else
   } // else
 
-  // if ( std::ranges::find(nodes_collapsed, v) == std::ranges::end(nodes_collapsed) )
-  // {
-  //   auto f_position_in_layer = [&](auto&& e)
-  //   {
-  //     auto const& layer = map_layer_nodes.at(map_node_layer.at(e));
-  //     return std::distance(layer.begin(), std::find(layer.begin(), layer.end(), e));
-  //   };
-  //   is_left = f_position_in_layer(u) < f_position_in_layer(v);
-  // } // if
-
-
-  while(keep_sequential(ops, is_left, map_node_layer, map_layer_nodes, positions_collapsed, nodes_collapsed)) {};
+  keep_sequential(ops, true, map_node_layer, map_layer_nodes, positions_collapsed, nodes_collapsed);
+  keep_sequential(ops, false, map_node_layer, map_layer_nodes, positions_collapsed, nodes_collapsed);
 } // }}}
 
 // fn: predecessor_immediate_single {{{
@@ -866,24 +869,10 @@ void predecessor_immediate_single(Node u
   // Determine the current configuration of nodes
   Config config = (*std::ranges::find_first_of(nodes_collapsed, Nodes{p,w}) == p)? Config::FST : Config::SND;
 
-  // If the order is pw, put u after p, i.e.: puw
-  // if ( config == Config::FST )
-  // {
-  //   insert_rightafter(u, w, layer, positions_collapsed, nodes_collapsed);
-  //   // insert_between(u, p, w, map_node_layer, positions_collapsed, nodes_collapsed);
-  // }
-  // else
-  // {
-  //   insert_rightbefore(u, w, layer, positions_collapsed, nodes_collapsed);
-  // } // else
-  // else
-  // {
-  //   insert_after(u, w, layer, positions_collapsed, nodes_collapsed);
-  // } // else
-
   insert_between(ops, u, p, w, map_node_layer, map_layer_nodes, positions_collapsed, nodes_collapsed);
 
-  while(keep_sequential(ops, config == Config::FST, map_node_layer, map_layer_nodes, positions_collapsed, nodes_collapsed)) {};
+  keep_sequential(ops, true, map_node_layer, map_layer_nodes, positions_collapsed, nodes_collapsed);
+  keep_sequential(ops, false, map_node_layer, map_layer_nodes, positions_collapsed, nodes_collapsed);
 } // }}}
 
 // fn: predecessor_multiple {{{

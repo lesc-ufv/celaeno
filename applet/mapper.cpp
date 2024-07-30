@@ -165,7 +165,7 @@ decltype(auto) pre_processing(Ops const& ops
   // Balance paths
   timer({}, [&]{ns_ops::balance::paths::run(i64{},ops,view);});
 
-  ns_graph::operations::minimize::crossings::run(0, ops.preds, ops.succs, ops.adj, view);
+  // ns_graph::operations::minimize::crossings::run(0, ops.preds, ops.succs, ops.adj, view);
 
   // Write to file
   auto f_write_v = [&]<typename... Args>(Args&&... args) { ns_io_dot::Writer(std::forward<Args>(args)...); };
