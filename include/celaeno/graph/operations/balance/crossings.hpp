@@ -165,6 +165,28 @@ enum Direction
 //   } // for
 // } // fn: restructure_indices }}}
 
+// fn: find_first {{{
+inline decltype(auto) find_first(Range auto&& r, auto&& e)
+{
+  return std::distance(r.begin(), std::find(r.begin(), r.end(), e));
+} // }}}
+
+// fn: find_last {{{
+inline decltype(auto) find_last(Range auto&& r, auto&& e)
+{
+  auto it = std::find(r.begin(), r.end(), e);
+
+  while(true)
+  {
+    if ( it == r.end() ) { break; }
+    auto search = std::find(std::next(it), r.end(), e);
+    if ( search == r.end() ) { break; }
+    it = search;
+  } // while
+
+  return std::distance(r.begin(), it);
+} // }}}
+
 // fn: create_crossing_layers {{{
 template<Range R1, Range R2>
 decltype(auto) create_crossing_layers(Ops const& ops, R1&& r1, R2&& rc)
@@ -233,11 +255,11 @@ void push_nodes(Node node
   , Range auto& positions_collapsed
   , Range auto& nodes_collapsed)
 {
-  auto distance_node = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), node));
-  auto position_node = positions_collapsed.at(distance_node);
-
   if ( direction == Direction::LEFT )
   { 
+    auto distance_node = find_first(nodes_collapsed, node);
+    auto position_node = positions_collapsed.at(distance_node);
+
     i64 offset = 1;
     std::for_each(positions_collapsed.begin()
       , positions_collapsed.begin() + distance_node + 1
@@ -245,6 +267,8 @@ void push_nodes(Node node
   } // if
   else
   {
+    auto distance_node = find_last(nodes_collapsed, node);
+    auto position_node = positions_collapsed.at(distance_node);
     i64 offset = 1;
     std::for_each(positions_collapsed.begin() + distance_node
       , positions_collapsed.end()
@@ -387,19 +411,27 @@ void insert_before(Node u
 {
   // Get x-coordinate position of p
   auto distance_p = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p));
-  auto position_p = (opt_position)? *opt_position : positions_collapsed.at(distance_p);
+  i64 position_p{};
 
-  // Put as the leftmost element with the same position in the array
-  // node: [-11,-10,-13]
-  // pos : [ 1 , 2 , 2 ]
-  //               < u
-  //             u
-  while (distance_p > 0 and positions_collapsed.at(distance_p) >= position_p)
+  if ( opt_position )
   {
-    --distance_p;
-  } // while
+    position_p = *opt_position;
+  } // if
+  else
+  {
+    position_p = positions_collapsed.at(distance_p);
+    // Put as the leftmost element with the same position in the array
+    // node: [-11,-10,-13]
+    // pos : [ 1 , 2 , 2 ]
+    //               < u
+    //             u
+    while (distance_p > 0 and positions_collapsed.at(distance_p) >= position_p)
+    {
+      --distance_p;
+    } // while
 
-  --position_p;
+    --position_p;
+  } // else
 
   // Skip past the previous (by layer ordering) nodes in the same layer
   // E.g. In layer {w,x,y,u,z}, {w,x,y} should be skipped for u to be after y
@@ -488,18 +520,54 @@ void insert_between(Ops const& ops
   i64 position_u{};
   i64 distance_u{};
 
-  // Check if parents are on distinct layers
-  if ( map_node_layer.at(p2) > map_node_layer.at(p1) )
+
+  // Check if node v is reacheable through u, excluding w
+  auto f_reacheable = [&](Node v, Node u, Node w)
   {
-    // Put right before p1
-    if ( std::abs(position_p1 - position_p2) < 2 )
+    auto f_succs = [&](auto&& e){  fn(ops.succs(e)).dif(Nodes{w}).vec(); };
+    bool found = false;
+    ns_search::bfs::run(u, ops.succs, ops.succs, [&](auto&& e){ found = e == v; return found; });
+    return found;
+  }; // f_reacheable
+
+  // Check if parents are on distinct layers
+  if ( map_node_layer.at(p1) < map_node_layer.at(p2) )
+  {
+    // Position: Top of p1
+    // Distance: Left of p2
+    //
+    //  u
+    //  | \
+    //  |  p2
+    //  | /
+    //  p1
+    //
+    if ( f_reacheable(p2, p1, u) )
     {
       position_u = position_p1;
       distance_u = distance_p1;
-      // distance_u = distance_p2;
       // distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
-    }
-    // Put between p1 and p2
+    } // if
+    // Position: Middle of p1 and p2
+    // Distance: Left of p2
+    //
+    //  u
+    //  | \
+    //  | p2
+    //  |
+    //  p1
+    //
+    else if ( std::abs(position_p1 - position_p2) < 2 )
+    {
+      position_u = position_p1;
+      distance_u = distance_p2;
+      distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
+    } // else if
+    //    u
+    //  /   \
+    //  |    p2
+    //  |
+    //  p1
     else
     {
       position_u = std::ceil((static_cast<double>(position_p1) + position_p2) / 2.0);
@@ -507,16 +575,47 @@ void insert_between(Ops const& ops
       distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
     } // else
   } // if
-  // Put to the left of p2
-  else if ( map_node_layer.at(p2) < map_node_layer.at(p1) )
+  else if ( map_node_layer.at(p1) > map_node_layer.at(p2) )
   {
-    // Put on top of p2
-    if ( std::abs(position_p1 - position_p2) < 2 )
+    // Position: Top of p2
+    // Distance: Right of p2
+    //
+    //      u
+    //    / |
+    //  p1  |
+    //    \ |
+    //     p2
+    //
+    if ( f_reacheable(p1, p2, u) )
+    {
+      position_u = position_p2;
+      distance_u = distance_p2+1;
+      // distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
+    } // if
+    // Position: Top of p2
+    // Distance: Right of p2
+    //
+    //      u
+    //    / |
+    //  p1  |
+    //      |
+    //     p2
+    //
+    else if ( std::abs(position_p1 - position_p2) < 2 )
     {
       position_u = position_p2;
       distance_u = distance_p2;
       distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
     }
+    // Position: Middle of p1 and p2
+    // Distance: Right of p2
+    //
+    //      u
+    //    /  \
+    //  p1   |
+    //       |
+    //      p2
+    //
     // Put between p1 and p2
     else
     {
@@ -527,21 +626,22 @@ void insert_between(Ops const& ops
   } // else if 
   else
   {
-    // if ( std::abs(position_p1 - position_p2) < 2 )
-    // {
-    //   push_nodes((map_node_layer.at(p1) < map_node_layer.at(p2))? p1 : p2
-    //     , Direction::RIGHT
-    //     , positions_collapsed
-    //     , nodes_collapsed);
-    //   distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
-    //   distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
-    //   position_p1 = positions_collapsed.at(distance_p1);
-    //   position_p2 = positions_collapsed.at(distance_p2);
-    // }
-    // Put between p1 and p2
-    position_u = std::ceil((static_cast<double>(position_p1) + position_p2) / 2.0);
-    distance_u = distance_p2;
-    distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
+    ns_log::err()("No handled by this case, handled by 2 predecessors");
+    // // if ( std::abs(position_p1 - position_p2) < 2 )
+    // // {
+    // //   push_nodes((map_node_layer.at(p1) < map_node_layer.at(p2))? p1 : p2
+    // //     , Direction::RIGHT
+    // //     , positions_collapsed
+    // //     , nodes_collapsed);
+    // //   distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
+    // //   distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
+    // //   position_p1 = positions_collapsed.at(distance_p1);
+    // //   position_p2 = positions_collapsed.at(distance_p2);
+    // // }
+    // // Put between p1 and p2
+    // position_u = std::ceil((static_cast<double>(position_p1) + position_p2) / 2.0);
+    // distance_u = distance_p2;
+    // distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
   } // else
 
 
@@ -700,7 +800,17 @@ void predecessor_single(Node u
 
   if (is_left)
   {
-    insert_before(u, p, layer, positions_collapsed, nodes_collapsed);
+    // If nodes u and v are in different layers
+    // And u only has a single predecessor p
+    // u can be on top of parent
+    if ( map_node_layer.at(u) != map_node_layer.at(v) )
+    {
+      insert_before(u, p, layer, positions_collapsed, nodes_collapsed, position_p);
+    }
+    else
+    {
+      insert_before(u, p, layer, positions_collapsed, nodes_collapsed);
+    } // else
   } // if
   // Else if the order is vp, put u after p, i.e.: vpu
   else
@@ -728,7 +838,7 @@ void predecessor_immediate_single(Node u
   , Map auto&& map_node_layer
   , Map auto&& map_layer_nodes
   , Map auto&& map_node_direction
-  , Range auto&& preds_in_layer
+  , Range auto&& preds_immediate
   , Range auto&& nodes_collapsed
   , Range auto&& positions_collapsed
   , Range auto&& layer)
@@ -748,11 +858,11 @@ void predecessor_immediate_single(Node u
   auto preds = ops.preds(u);
 
   // {p}
-  Node p = preds_in_layer.at(0);
+  Node p = preds_immediate.at(0);
   auto position_p = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), p));
 
   // {p,w} - {p} == {w}
-  Node w = fn(preds).dif(preds_in_layer).vec().at(0);
+  Node w = fn(preds).dif(preds_immediate).vec().at(0);
   auto position_w = std::distance(nodes_collapsed.begin(), std::find(nodes_collapsed.begin(), nodes_collapsed.end(), w));
 
   // Determine the current configuration of nodes
@@ -940,7 +1050,21 @@ decltype(auto) view_collapse(Ops const& ops
 
       // 1. Check for predecessors of u in nodes collapsed
       auto preds = ops.preds(u);
-      auto preds_in_layer = fn(preds).in(std::prev(it_entry)->second).vec();
+      Nodes preds_immediate;
+      if ( preds.size() == 2 )
+      {
+        i64 layer_p0 = map_node_layer.at(preds[0]);
+        i64 layer_p1 = map_node_layer.at(preds[1]);
+        if ( layer_p0 != layer_p1 )
+        {
+          preds_immediate.push_back(( layer_p0 > layer_p1 )? preds[0] : preds[1]);
+        } // if
+        else
+        {
+          preds_immediate.push_back(preds[0]);
+          preds_immediate.push_back(preds[1]);
+        } // else
+      } // if
 
       log::err({preds.size() != 0})("Empty preds for {}"_fmt(u));
 
@@ -951,15 +1075,15 @@ decltype(auto) view_collapse(Ops const& ops
         continue;
       } // if
 
-      // if (preds_in_layer.size() == 1 and ops.succs(preds_in_layer.at(0)).size() > 1)
-      if (preds_in_layer.size() == 1)
+      // if (preds_immediate.size() == 1 and ops.succs(preds_immediate.at(0)).size() > 1)
+      if (preds_immediate.size() == 1)
       {
         predecessor_immediate_single(u
             , ops
             , map_node_layer
             , map_layer_nodes
             , map_node_direction
-            , preds_in_layer
+            , preds_immediate
             , nodes_collapsed
             , positions_collapsed
             , layer);
