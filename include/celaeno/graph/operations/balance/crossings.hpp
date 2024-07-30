@@ -498,6 +498,11 @@ void insert_between(Ops const& ops
   if ( position_p1 == position_p2 )
   {
     // Push left
+    //  u
+    //  | \
+    //  | p2
+    //  |
+    //  p1
     if ( map_node_layer.at(p1) < map_node_layer.at(p2) )
     {
       push_nodes(p1
@@ -506,6 +511,11 @@ void insert_between(Ops const& ops
         , nodes_collapsed);
     } // if
     // Push right
+    //      u
+    //    / |
+    //  p1  |
+    //      |
+    //     p2
     else
     {
       push_nodes(p2
@@ -630,21 +640,6 @@ void insert_between(Ops const& ops
   else
   {
     ns_log::err()("No handled by this case, handled by 2 predecessors");
-    // // if ( std::abs(position_p1 - position_p2) < 2 )
-    // // {
-    // //   push_nodes((map_node_layer.at(p1) < map_node_layer.at(p2))? p1 : p2
-    // //     , Direction::RIGHT
-    // //     , positions_collapsed
-    // //     , nodes_collapsed);
-    // //   distance_p1 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p1));
-    // //   distance_p2 = std::distance(nodes_collapsed.begin(), std::ranges::find(nodes_collapsed, p2));
-    // //   position_p1 = positions_collapsed.at(distance_p1);
-    // //   position_p2 = positions_collapsed.at(distance_p2);
-    // // }
-    // // Put between p1 and p2
-    // position_u = std::ceil((static_cast<double>(position_p1) + position_p2) / 2.0);
-    // distance_u = distance_p2;
-    // distance_u = slide_backwards(p1, distance_u, position_u, nodes_collapsed, positions_collapsed);
   } // else
 
 
@@ -973,7 +968,6 @@ void predecessor_multiple(Ops const& ops
           , positions_collapsed.begin() + distance_p1 + 1 // inclusive for p1
           , [&](auto& e){ e -= 1; });
       } // else
-      // assert(std::round(k) == k);
     } // if
   }
 
